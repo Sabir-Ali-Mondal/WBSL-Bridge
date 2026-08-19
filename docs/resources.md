@@ -46,28 +46,6 @@ The playlist is titled **“Online Basic Indian Sign Language Course in Self Lea
 
 The playlist is titled **“Indian Sign Language 101.”** ([YouTube][4])
 
----
+Indian Sign Language for Children
+[https://youtube.com/playlist?list=PL7U3r2l3wmq3MEr558JZR825YYBOTAUvV&si=qQLOQQ4-JHfuaPzQ](https://youtube.com/playlist?list=PL7U3r2l3wmq3MEr558JZR825YYBOTAUvV&si=qQLOQQ4-JHfuaPzQ) 
 
-## Quick Classification
-
-| Resource                     | Target                   | Main purpose        |
-| ---------------------------- | ------------------------ | ------------------- |
-| Wikisigns WBSL               | **WBSL**                 | Regional vocabulary |
-| Bangla Sign Language Grammar | **Bangla Sign Language** | Grammar/sentences   |
-| Basic ISL Course             | **ISL**                  | Basic ISL learning  |
-| ISL 101                      | **ISL**                  | Basic ISL learning  |
-
-### For your project
-
-Use them separately:
-
-**WBSL →** Wikisigns
-**ISL →** Basic ISL Course + ISL 101
-**Bangla sign language/grammar →** Grammar Tutorial
-
-Do **not** assume that the Bangla Sign Language video, ISL resources, and WBSL dictionary represent exactly the same sign language. This distinction is important for your literature review and for deciding whether your project should target **ISL, WBSL, or a Bengali-focused regional system**.
-
-[1]: https://www.wikisigns.org/list/bn/wbsl "পশ্চিমবঙ্গ প্রতীক ভাষা | Wikisigns"
-[2]: https://youtu.be/XYb9Y2vbJ4w "Bangla Sign Language Tutorial 45 Grammar //ইশারা ভাষার টিউটোরিয়াল ৪৫ ব্যাকরণ - YouTube"
-[3]: https://youtube.com/playlist?list=PLFjydPMg4DapfRTBMokl09Ht-fhMOAYf6 "Online Basic Indian Sign Language Course in Self Learning Mode - YouTube"
-[4]: https://youtube.com/playlist?list=PLxYMaKXKMMcMgg4f47WkG7AM0bb3AyjTi "Indian Sign Language 101 - YouTube"
