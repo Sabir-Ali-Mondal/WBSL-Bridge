@@ -1,7 +1,5 @@
 # SignSetu — Complete Research Gap Summary
 
----
-
 ## How to Read This Document
 
 Each gap is tagged with a **status** reflecting the entire conversation:
