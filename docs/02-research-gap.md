@@ -1,4 +1,4 @@
-# SignSetu — Research Gap Summary
+# Research Gap Summary
 
 **Document:** `docs/02-research-gap.md`
 **Date:** August 2026
