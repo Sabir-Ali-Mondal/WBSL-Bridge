@@ -2,7 +2,7 @@
 
 **Document:** `docs/02-research-gap.md`
 **Date:** August 2026
-**Project:** SignSetu (সেতু) — Real-Time Bidirectional WBSL/BdSL Communication System
+**Project:** WBSL Bridge — Real-Time Bidirectional WBSL/BdSL Communication System
 **Focus:** West Bengal Sign Language (WBSL) & Bengali Sign Language (BdSL)
 **Target Users:** Deaf and hard-of-hearing communities in West Bengal, India & Bangladesh
 
