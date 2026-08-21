@@ -1,5 +1,7 @@
 # Prompting
 
+- *one of the good model we found Qwen3.5-9B-UD-IQ3_XXS.gguf*
+
 ```text
 Temporal LSTM
       ↓
