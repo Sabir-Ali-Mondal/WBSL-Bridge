@@ -1,7 +1,7 @@
 # WBSL Bridge: Minimum Viable Tests (MVT)
 
 ## Phase 1: Vision & Intent (The Eyes)
-*   **1.1 MediaPipe Stream:** Open webcam, draw 540 landmarks (hand/face/pose), verify 30 FPS.
+*   **1.1 MediaPipe Stream:** Open webcam, draw 540 landmarks (hand/face/pose), verify 30 FPS. [ Done testing ]
 *   **1.2 DeepFace Snapshot:** Capture static frame, run `DeepFace.analyze()`, verify emotion dict output.
 *   **1.3 Geometry NMM:** Calculate eyebrow-eye distance and lip distance from landmarks; verify values change with facial expressions.
 
