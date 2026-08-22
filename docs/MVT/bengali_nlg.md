@@ -1,53 +1,69 @@
-# WBSL Bridge — Bengali NLG Model Benchmark
+# WBSL Bridge — Bengali NLG Model Testing
 
-## 1. Best Model
+## 1. Best Models
 
-**Model:** `gemma-4-12b-it-Q4_0.gguf`
+### Primary Reference Model
 
-**Status:** **BEST PRACTICAL MODEL**
-
-### Results
+`gemma-4-12b-it-Q4_0.gguf`
 
 * ~97% observed manual accuracy
-* Good West Bengal Bengali
+* Best overall Bengali quality
 * Good WBSL gloss interpretation
 * Good question and negation handling
 * Good NMM and emotion handling
-* Good speed
-* Practical for CPU inference
 * ~13 GB RAM with Brave + KoboldCpp
+
+### Final Deployment Model
+
+`gemma-4-E4B-it-Q4_K_M.gguf`
+
+* Very good Bengali generation
+* Natural West Bengal Bengali
+* Good question and negation handling
+* Good NMM and emotion handling
+* Faster inference
+* ~10 GB RAM with Brave + KoboldCpp
+* Better memory efficiency
+* Suitable for CPU inference
 
 ---
 
 ## 2. Models Tested
 
-| Model                              | Result   | Problem      |
-| ---------------------------------- | -------- | ------------ |
-| `gemma-4-12b-it-Q4_0.gguf`         | **Best** | —            |
-| `gpt-oss-20b-Q4_K_M.gguf`          | Failed   | Poor Bengali |
-| `Qwen3.6-35B-A3B-UD-IQ2_M.gguf`    | Failed   | Poor Bengali |
-| `Qwen3.5-9B-UD-IQ3_XXS.gguf`       | Failed   | Poor Bengali |
-| `gemma-4-26B-A4B-it-UD-IQ2_M.gguf` | Failed   | Memory maxed |
+| Model                              | Result           | Main Issue                          |
+| ---------------------------------- | ---------------- | ----------------------------------- |
+| `gemma-4-12b-it-Q4_0.gguf`         | **Best Quality** | Higher RAM                          |
+| `gemma-4-E4B-it-Q4_K_M.gguf`       | **Selected**     | Slightly lower semantic consistency |
+| `gpt-oss-20b-Q4_K_M.gguf`          | Failed           | Poor Bengali                        |
+| `Qwen3.6-35B-A3B-UD-IQ2_M.gguf`    | Failed           | Poor Bengali                        |
+| `Qwen3.5-9B-UD-IQ3_XXS.gguf`       | Failed           | Poor Bengali                        |
+| `gemma-4-26B-A4B-it-UD-IQ2_M.gguf` | Failed           | Memory limit exceeded               |
 
 ---
 
-## 3. NLG Pipeline
+## 3. WBSL NLG Pipeline
 
 ```text
 Temporal LSTM
       ↓
-Sign Gloss + NMM
+Sign Gloss Sequence
+      +
+Geometry NMM
       ↓
-Question / Negation + Emotion
+Question / Negation
+      +
+DeepFace Emotion
       ↓
-Gemma 4 12B
+Gemma 4 E4B
       ↓
 Natural Bengali Sentence
 ```
 
+The LLM is used only for the **Bengali NLG stage**.
+
 ---
 
-## 4. Final Prompt
+## 4. Final NLG Prompt
 
 ```text
 You are the Bengali NLG module of a WBSL communication system.
@@ -89,9 +105,9 @@ Give Output:
 
 ---
 
-## 5. Reduced Test Suite
+# 5. Reduced Test Suite
 
-Use the **same prompt and settings** for every model.
+Use the **same prompt and generation settings** for every model.
 
 ### Test 1 — Question + Negation
 
@@ -147,7 +163,7 @@ Expected:
 গতকাল বৃষ্টির কারণে আমি স্কুলে যাইনি।
 ```
 
-### Test 4 — Honorific
+### Test 4 — Honorific Question
 
 ```text
 Gloss:
@@ -231,29 +247,24 @@ Emotion: worried
 NMM: Eyebrow raise + Head shake + Head tilt + Mouth tense
 ```
 
-Tests:
+Semantic target:
 
-* Long gloss
-* Multiple clauses
-* Question
-* Negation
-* Cause/effect
-* Emotion
-* NMM
-* Bengali restructuring
+```text
+তোমার গতকাল পরীক্ষা ছিল, কিন্তু তুমি প্রস্তুতি নিতে পারোনি, তাই ফল ভালো হবে না—কেন?
+```
 
 ---
 
-## 6. Final Decision
+## Final Selection
 
 ```text
+Reference:
 gemma-4-12b-it-Q4_0.gguf
-          ↓
-     ~97% observed
-          ↓
- Good Bengali NLG
-          ↓
- BEST PRACTICAL CHOICE
+
+Deployment:
+gemma-4-E4B-it-Q4_K_M.gguf
 ```
 
-**Final selected model:** `gemma-4-12b-it-Q4_0.gguf`
+**Final deployment model:** `gemma-4-E4B-it-Q4_K_M.gguf`
+
+**Reason:** Strong Bengali NLG with lower RAM usage and faster CPU inference, making it more practical for the WBSL Bridge system.
