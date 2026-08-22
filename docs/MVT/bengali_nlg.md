@@ -6,38 +6,39 @@
 
 `gemma-4-12b-it-Q4_0.gguf`
 
-* ~97% observed manual accuracy
-* Best overall Bengali quality
-* Good WBSL gloss interpretation
-* Good question and negation handling
-* Good NMM and emotion handling
-* ~13 GB RAM with Brave + KoboldCpp
+- ~97% observed manual accuracy
+- Best overall Bengali quality
+- Good WBSL gloss interpretation
+- Good question and negation handling
+- Good NMM and emotion handling
+- ~13 GB RAM with Brave + KoboldCpp
 
 ### Final Deployment Model
 
 `gemma-4-E4B-it-Q4_K_M.gguf`
 
-* Very good Bengali generation
-* Natural West Bengal Bengali
-* Good question and negation handling
-* Good NMM and emotion handling
-* Faster inference
-* ~10 GB RAM with Brave + KoboldCpp
-* Better memory efficiency
-* Suitable for CPU inference
+- Very good Bengali generation
+- Natural West Bengal Bengali
+- Good question and negation handling
+- Good NMM and emotion handling
+- Good long-gloss handling after prompt optimization
+- Faster inference
+- ~10 GB RAM with Brave + KoboldCpp
+- Better memory efficiency
+- Suitable for CPU inference
 
 ---
 
 ## 2. Models Tested
 
-| Model                              | Result           | Main Issue                          |
-| ---------------------------------- | ---------------- | ----------------------------------- |
-| `gemma-4-12b-it-Q4_0.gguf`         | **Best Quality** | Higher RAM                          |
-| `gemma-4-E4B-it-Q4_K_M.gguf`       | **Selected**     | Slightly lower semantic consistency |
-| `gpt-oss-20b-Q4_K_M.gguf`          | Failed           | Poor Bengali                        |
-| `Qwen3.6-35B-A3B-UD-IQ2_M.gguf`    | Failed           | Poor Bengali                        |
-| `Qwen3.5-9B-UD-IQ3_XXS.gguf`       | Failed           | Poor Bengali                        |
-| `gemma-4-26B-A4B-it-UD-IQ2_M.gguf` | Failed           | Memory limit exceeded               |
+| Model | Result | Main Issue |
+|---|---|---|
+| `gemma-4-12b-it-Q4_0.gguf` | **Best Quality** | Higher RAM |
+| `gemma-4-E4B-it-Q4_K_M.gguf` | **Selected** | Slightly lower semantic consistency |
+| `gpt-oss-20b-Q4_K_M.gguf` | Failed | Poor Bengali |
+| `Qwen3.6-35B-A3B-UD-IQ2_M.gguf` | Failed | Poor Bengali |
+| `Qwen3.5-9B-UD-IQ3_XXS.gguf` | Failed | Poor Bengali |
+| `gemma-4-26B-A4B-it-UD-IQ2_M.gguf` | Failed | Memory limit exceeded |
 
 ---
 
@@ -56,8 +57,8 @@ DeepFace Emotion
       ↓
 Gemma 4 E4B
       ↓
-Natural Bengali Sentence
-```
+Natural Bengali Text
+````
 
 The LLM is used only for the **Bengali NLG stage**.
 
@@ -278,16 +279,90 @@ Semantic target:
 
 ---
 
-## Final Selection
+# 6. Large Bengali Power Test
+
+This test evaluates the model's ability to handle a **long WBSL gloss sequence** rather than only individual grammatical cases.
 
 ```text
-Reference:
+Gloss:
+LAST-WEEK + I + COLLEGE + GO + FRIEND + MEET + THEN + WE + TOGETHER + LIBRARY + GO + MANY + BOOK + SEE + BUT + I + BOOK + BUY + NOT + BECAUSE + MONEY + HAVE + NOT + AFTER + LIBRARY + EXIT + HEAVY + RAIN + START + SO + WE + BUS + WAIT + BUT + BUS + COME + NOT + FINALLY + WE + WALK + HOME + GO + ON-THE-WAY + TEACHER + MEET + TEACHER + ASK + WHY + TODAY + COLLEGE + COME + NOT + I + EXPLAIN + RAIN + BECAUSE + LATE + ARRIVE + THEN + TEACHER + SAY + TOMORROW + EXAM + HAVE + PREPARE + WELL + MUST + I + WORRIED + BECAUSE + PREVIOUS + EXAM + RESULT + GOOD + NOT + BUT + FRIEND + SAY + THIS-TIME + RESULT + GOOD + WILL + I + HOPE + SO
+
+Question:
+false
+
+Negation:
+true
+
+Emotion:
+worried
+
+NMM:
+Head shake = negation
+Mouth tense = concern
+Head tilt = uncertainty
+```
+
+### Observed E4B Output
+
+```text
+গত সপ্তাহে আমি আমার বন্ধুর সাথে কলেজে গিয়েছিলাম। তারপর আমরা একসাথে লাইব্রেরিতে গিয়ে অনেক বই দেখেছি। কিন্তু আমি বই কিনিনি কারণ আমার কাছে টাকা ছিল না। লাইব্রেরি থেকে বের হওয়ার পরে ভারী বৃষ্টি শুরু হয়েছিল, তাই আমরা বাসের জন্য অপেক্ষা করছিলাম, কিন্তু বাস আসেনি। অবশেষে আমরা হেঁটে বাড়ি গেলাম। যাওয়ার পথে শিক্ষকের সাথে দেখা হলো। শিক্ষক জিজ্ঞেস করলেন, "আজ কলেজে কেন আসোনি?" আমি বললাম, "বৃষ্টির জন্য দেরি হয়ে গিয়েছিল।" তখন শিক্ষক বললেন, "কাল পরীক্ষা আছে, তোমাকে ভালোভাবে প্রস্তুত হতে হবে।" আমি চিন্তিত হয়ে পড়লাম কারণ আগের পরীক্ষার ফল ভালো হয়নি। কিন্তু বন্ধু বলল, এইবার ফল ভালো হবে। আমি আশা করি তাই হবে।
+```
+
+### Result
+
+```text
+Bengali Fluency:          Very Good
+Naturalness:              Very Good
+Information Preservation: Very Good
+Long Gloss Handling:      Very Good
+Grammar:                  Very Good
+Overall:                  Strong
+```
+
+The original prompt caused the model to summarize the long gloss.
+The optimized prompt significantly improved **information preservation and long-sequence Bengali generation**.
+
+---
+
+# 7. Inference Configuration
+
+### KoboldCpp
+
+```text
+Context Size:
+4096
+```
+
+### API
+
+```json
+{
+  "max_context_length": 4096
+}
+```
+
+Do not request `32768` when KoboldCpp is running with a `4096` context.
+
+Observed long-test performance:
+
+```text
+Prompt processing: ~38 tok/s
+Generation:        ~6.2 tok/s
+RAM:                ~10 GB
+```
+
+---
+
+# Final Selection
+
+```text
+Reference Model:
 gemma-4-12b-it-Q4_0.gguf
 
-Deployment:
+Deployment Model:
 gemma-4-E4B-it-Q4_K_M.gguf
 ```
 
 **Final deployment model:** `gemma-4-E4B-it-Q4_K_M.gguf`
 
-**Reason:** Strong Bengali NLG with lower RAM usage and faster CPU inference, making it more practical for the WBSL Bridge system.
+**Reason:** Strong Bengali NLG, good long-gloss handling with the optimized prompt, faster CPU inference, and significantly lower RAM usage, making it the most practical model for the WBSL Bridge system.
