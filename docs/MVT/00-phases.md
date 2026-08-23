@@ -39,3 +39,6 @@
 |:---|:---|:---|
 | .venv | Active - Primary | mediapipe 0.10.14, torch, onnxruntime, transformers, opencv |
 | .venv-deepface | Retired | tensorflow 2.13, deepface (superseded by ViT-ONNX) |
+
+## Noted for the future: 
+word/clause-level fusion of gloss, NMM, and affect streams is technically real but not cheap — it needs three separate models running in parallel (hand/gloss recognizer, facial-landmark/NMM classifier, affect classifier), each with its own training data and timestamps, plus a fusion layer to align their outputs and resolve conflicts when windows don't overlap cleanly. Building and maintaining that pipeline (data collection, model training, alignment tuning, confidence calibration) is a high-budget, multi-team effort — realistic for a well-funded research lab or product team, not a lightweight or solo project. For now, skipping this and treating NMM/emotion as simplified, manually-specified inputs to the NLG layer is the reasonable choice; the fusion architecture is worth revisiting only if/when there's budget for real multi-model video pipelines.
