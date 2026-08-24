@@ -63,15 +63,26 @@ The LLM is used only for the **Bengali NLG stage**.
 
 ## 3. Input Format
 
-Each gloss word uses:
+Each gloss word is encoded as:
 
 ```text
-GLOSS[?][negation][emotion]
+WORD[emotion]
+WORD[negation][emotion]
 ```
 
-* `[?]` = word belongs to a question clause
-* `[negation]` = word is negated
-* `[emotion]` = emotion of the signer
+A question is marked **once at the end of the complete question clause**:
+
+```text
+WORD[emotion] ... END[?][emotion]
+```
+
+### Markers
+
+```text
+[?]         = the whole clause ending here is a question
+[negation]  = this word carries negation
+[emotion]   = signer emotion
+```
 
 Possible emotions:
 
@@ -79,30 +90,45 @@ Possible emotions:
 happy, sad, angry, neutral, surprise, fear, disgust
 ```
 
-Markers that are not applicable are omitted.
+### Important
 
-Example:
+Do not put `[?]` on every question word.
 
-```text
-I[neutral] + BOOK[?][neutral] + BUY[?][negation][neutral]
-```
-
-Consecutive `[?]` words normally form **one question**, not separate questions.
-
-Example:
+Wrong:
 
 ```text
-WHY[?][neutral] + TODAY[?][neutral] +
-COLLEGE[?][neutral] + COME[?][negation][neutral]
+WHY[?] TODAY[?] COLLEGE[?] COME[?]
 ```
 
-means:
+Correct:
+
+```text
+WHY[neutral] TODAY[neutral] COLLEGE[neutral] COME[?][neutral]
+```
+
+This means one question:
 
 ```text
 আজ কলেজে আসিনি কেন?
 ```
 
-`[?]` and `[negation]` are independent markers.
+Likewise, do not duplicate negation:
+
+Wrong:
+
+```text
+BUY[negation] NOT[negation]
+```
+
+Use:
+
+```text
+BUY[negation]
+```
+
+The runtime formatter should normalize standalone `NOT` / `NO` markers so the model receives one clear negation signal.
+
+Words are joined with `+` and read left to right in signing order.
 
 ---
 
@@ -113,106 +139,89 @@ You are the Bengali NLG module of a WBSL communication system.
 
 Convert the WBSL gloss into natural West Bengal Bengali.
 
-FORMAT GUIDE:
+INPUT FORMAT:
 
-Each word may contain:
+WORD[emotion]
+WORD[negation][emotion]
+WORD[?][emotion]
 
-[?] = belongs to a question clause
-[negation] = negated
-[emotion] = emotion while signing this word
+[?] appears ONLY on the LAST word of a complete question clause.
+It means the whole clause ending there is a question.
 
-Possible emotions:
-happy, sad, angry, neutral, surprise, fear, disgust
+[negation] marks the word whose meaning is negated.
+Do not invent negation.
 
-Words are joined by + and must be read in signing order.
+Emotion may be:
+happy, sad, angry, neutral, surprise, fear, disgust.
 
 MAIN GOAL:
 
-Preserve the COMPLETE meaning of the gloss while producing natural Bengali.
+Preserve the COMPLETE meaning of the gloss in natural Bengali.
 
 RULES:
 
-- Preserve EVERY meaningful event, action, person, object, place, time,
-  reason, result, relationship, ability, permission, obligation,
-  condition, uncertainty and emotion.
-- Do NOT summarize or omit information.
-- Do NOT invent information.
-- Do NOT translate word-by-word.
-- You may reorder words to make natural Bengali.
-- Preserve tense, time, sequence, cause and effect.
-- Preserve who performs each action and who receives it.
-- Do NOT merge separate events if doing so changes their meaning.
-- If the gloss contains multiple events, use multiple Bengali sentences.
-- Preserve negation exactly.
-- Preserve CAN, CANNOT, MAY, MUST, SHOULD and NOT-NOW correctly.
-- Preserve IF/THEN/OTHERWISE conditions.
+- Preserve every meaningful event, person, action, object, time, place,
+  reason, result, relationship, tense, negation, ability, permission,
+  obligation, condition, uncertainty and emotion.
+- Do not summarize.
+- Do not omit events.
+- Do not invent information.
+- Do not translate word by word.
+- You may reorder words for natural Bengali.
+- Preserve who does each action.
+- Preserve event order and cause/effect.
+- Keep separate events separate when needed.
+- Use multiple Bengali sentences when necessary.
+- Preserve CAN, CANNOT, MAY, MUST, SHOULD and NOT-NOW.
+- Preserve IF/THEN/OTHERWISE.
 - Preserve questions as questions.
 - Preserve reported speech and speaker changes.
-- Preserve uncertainty such as WHETHER, NOT-SURE and HOPE.
-- NMM information is meaningful and must be reflected naturally.
-- Emotion should be expressed naturally without adding emotion not given.
+- Preserve WHETHER, NOT-SURE and HOPE.
+- Reflect NMM and emotion naturally without adding facts.
 - Use natural West Bengal Bengali.
-- Prefer completeness over brevity.
+- Prefer complete meaning over short output.
+- Output ONLY Bengali text.
 
-QUESTION RULE:
+IMPORTANT:
 
-Consecutive words containing [?] normally belong to ONE question clause.
-Do NOT create a separate question for every [?].
-
-NEGATION RULE:
-
-[negation] must never be lost.
-Do not introduce negation for a word that has no [negation] marker unless
-the gloss explicitly contains another negation unit.
-
-EVENT RULE:
-
-Keep separate semantic events separate when necessary.
+[?] is one question boundary, not one question per word.
 
 Example:
+YOU + YESTERDAY + EXAM + HAVE + BUT + PREPARE[negation] +
+CAN[negation] + RESULT[negation] + GOOD[negation] + WHY[?]
 
-I[neutral] + COLLEGE[neutral] + GO[neutral] +
-FRIEND[neutral] + MEET[neutral]
+must be one connected question, not two questions.
 
-means:
-
-আমি কলেজে গিয়েছিলাম। সেখানে বন্ধুর সঙ্গে দেখা হয়েছিল।
-
-Do NOT change it to:
-
-আমি বন্ধুর সঙ্গে কলেজে গিয়েছিলাম।
-
-Another example:
-
-THEY[neutral] + ASK[neutral] + CHEST_PAIN[?][neutral] +
-SHE[neutral] + SAY[neutral] + NO[?][negation][neutral]
+Example:
+THEY + ASK + CHEST_PAIN + SHE + SAY + NO
 
 must preserve both events:
-
 তাঁরা জিজ্ঞাসা করলেন, বুকে ব্যথা আছে কি না।
 তিনি বললেন, না।
 
-CONDITION RULE:
+Example:
+I + COLLEGE + GO + FRIEND + MEET
 
-IF + A + THEN + B + OTHERWISE + C
-must remain a conditional structure in Bengali.
+means:
+আমি কলেজে গিয়েছিলাম। সেখানে বন্ধুর সঙ্গে দেখা হয়েছিল।
 
-NO-HALLUCINATION RULE:
+Do not change it to:
+আমি বন্ধুর সঙ্গে কলেজে গিয়েছিলাম।
 
-Do not add names, places, objects, time, causes, relationships,
-symptoms or actions that are not present in the gloss.
+NEGATION:
+Only use negation when the gloss provides it.
+Do not make an unmarked word negative.
 
-Before answering, internally verify that:
-- every meaningful event is present
-- no subject/action relationship changed
-- no negation was lost
-- no condition was lost
-- no question was changed into a statement
-- no information was invented
+NO HALLUCINATION:
+Do not add names, places, objects, causes, time, relationships,
+symptoms or actions not present in the gloss.
 
-Do not output this check.
+Before answering, internally check:
+every event, subject, negation, question, condition and speaker is preserved.
 
-Output ONLY the Bengali text.
+Do not output the check.
+
+Output ONLY the final natural West Bengal Bengali text.
 ```
 
 ---
@@ -222,8 +231,8 @@ Output ONLY the Bengali text.
 ### Test 1 — Question + Negation
 
 ```text
-YOU[?][neutral] + TOMORROW[?][neutral] +
-SCHOOL[?][neutral] + GO[?][negation][neutral]
+YOU[neutral] + TOMORROW[neutral] +
+SCHOOL[neutral] + GO[negation][?][neutral]
 ```
 
 Expected:
@@ -231,6 +240,8 @@ Expected:
 ```text
 তুমি কি আগামীকাল স্কুলে যাবে না?
 ```
+
+---
 
 ### Test 2 — Natural Grammar
 
@@ -246,11 +257,13 @@ Expected:
 গতকাল বৃষ্টির কারণে আমি স্কুলে যাইনি।
 ```
 
+---
+
 ### Test 3 — Honorific Question
 
 ```text
-YOU[?][neutral] + TEACHER[?][neutral] +
-TODAY[?][neutral] + SCHOOL[?][neutral] +
+YOU[neutral] + TEACHER[neutral] +
+TODAY[neutral] + SCHOOL[neutral] +
 COME[?][neutral]
 ```
 
@@ -259,6 +272,8 @@ Expected:
 ```text
 আপনি কি আজ স্কুলে এসেছেন?
 ```
+
+---
 
 ### Test 4 — No Hallucination
 
@@ -272,12 +287,13 @@ Expected:
 আমি বই পড়ি।
 ```
 
+---
+
 ### Test 5 — Negative Ability
 
 ```text
-YOU[?][neutral] + THIS[?][neutral] +
-PROBLEM[?][neutral] + SOLVE[?][negation][neutral] +
-CAN[?][negation][neutral]
+YOU[neutral] + THIS[neutral] + PROBLEM[neutral] +
+SOLVE[negation][neutral] + CAN[negation][?][neutral]
 ```
 
 Expected:
@@ -285,6 +301,8 @@ Expected:
 ```text
 তুমি কি এই সমস্যাটি সমাধান করতে পারবে না?
 ```
+
+---
 
 ### Test 6 — Emotion
 
@@ -298,15 +316,21 @@ Expected:
 আমি বইটি হারিয়েছি।
 ```
 
+---
+
 ### Test 7 — Full Stress Test
 
 ```text
-YOU[?][angry] + YESTERDAY[?][angry] +
-EXAM[?][angry] + HAVE[?][angry] +
-BUT[?][angry] + PREPARE[?][negation][angry] +
-CAN[?][negation][angry] + SO[?][angry] +
-RESULT[?][negation][angry] +
-GOOD[?][negation][angry] +
+YOU[angry] +
+YESTERDAY[angry] +
+EXAM[angry] +
+HAVE[angry] +
+BUT[angry] +
+PREPARE[negation][angry] +
+CAN[negation][angry] +
+SO[angry] +
+RESULT[negation][angry] +
+GOOD[negation][angry] +
 WHY[?][angry]
 ```
 
@@ -317,14 +341,29 @@ Expected:
 তাই ফল ভালো হবে না—কেন?
 ```
 
+This specifically tests:
+
+* one long question
+* multiple negations
+* ability
+* cause/effect
+* emotion
+* semantic scope
+
+---
+
 ### Test 8 — Multi-Event Semantic Test
 
 ```text
-THEY[neutral] + ASK[neutral] +
-CHEST_PAIN[?][neutral] +
-SHE[neutral] + SAY[neutral] +
-NO[?][negation][neutral] +
-BREATHING[neutral] + VERY[neutral] + FAST[neutral]
+THEY[neutral] +
+ASK[neutral] +
+CHEST_PAIN[neutral] +
+SHE[neutral] +
+SAY[neutral] +
+NO[negation][?][neutral] +
+BREATHING[neutral] +
+VERY[neutral] +
+FAST[neutral]
 ```
 
 Expected:
@@ -335,7 +374,13 @@ Expected:
 তবে তাঁর শ্বাস-প্রশ্বাস খুব দ্রুত হচ্ছিল।
 ```
 
-This specifically tests **question scope, negation, subject binding, and separate event preservation**.
+This tests:
+
+* question scope
+* negation
+* subject binding
+* separate events
+* reported speech
 
 ---
 
@@ -347,13 +392,13 @@ Generation:        ~6.2 tok/s
 RAM:               ~10 GB
 ```
 
-Long stress test:
+### Long Stress Test
 
 ```text
-Processed: ~650 tokens
-Generated: ~212 tokens
-Generation speed: ~6.16 tok/s
-Total request: ~109 sec
+Processed:         ~650 tokens
+Generated:         ~212 tokens
+Generation speed:  ~6.16 tok/s
+Total request:     ~109 sec
 ```
 
 ---
@@ -370,4 +415,6 @@ gemma-4-E4B-it-Q4_K_M.gguf
 
 **Final deployment model:** `gemma-4-E4B-it-Q4_K_M.gguf`
 
-Reason: strong Bengali NLG, good long-gloss handling, good question and negation handling, faster CPU inference, and lower RAM usage.
+Strong Bengali NLG, good long-gloss handling, good question and negation
+handling, faster CPU inference, and lower RAM usage make it the most practical
+current model for the WBSL Bridge Bengali NLG stage.
