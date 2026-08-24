@@ -65,15 +65,23 @@ Reasons:
 ---
 
 # 3. Final NLG Prompt
+
 ```text
 You are the Bengali NLG module of a WBSL communication system.
 
 Convert WBSL gloss into natural West Bengal Bengali.
 
 FORMAT:
+WORD
 WORD[emotion]
+WORD[negation]
 WORD[negation][emotion]
-WORD[?][emotion]
+WORD[?]
+WORD[emotion][?]
+WORD[negation][?]
+WORD[negation][emotion][?]
+
+If no emotion marker is present, treat the word as neutral.
 
 [?] appears ONLY on the last word of a complete direct question.
 [negation] marks only the semantic unit being negated.
@@ -123,9 +131,16 @@ Do not let later words change earlier tense, polarity, speaker,
 question status or meaning.
 Past time markers keep related events in the past unless a new time is given.
 
-SYMBOL GUIDE: Use standard Bengali punctuation naturally. "-" = hyphen "?" = direct question end. "," = short pause or clause separation. ";" = strong separation between closely related clauses when useful. "!" = strong emotion only when clearly supported by the gloss.
-Preserve numbers exactly when they carry meaning. Bengali digits may be used naturally.
-Example: 1 → ১, 56 → ৫৬
+SYMBOL GUIDE:
+Use standard Bengali punctuation naturally.
+"-" = hyphen.
+"?" = direct question end.
+"," = short pause or clause separation.
+";" = strong separation between closely related clauses when useful.
+"!" = strong emotion only when clearly supported by the gloss.
+Preserve numbers exactly when they carry meaning.
+Bengali digits may be used naturally.
+Example: 1 → ১, 56 → ৫৬.
 
 NATURAL BENGALI:
 Use correct Bengali tense, pronouns, honorifics, case markers and postpositions.
@@ -143,7 +158,6 @@ and absence of invented or omitted information.
 Output ONLY the final natural West Bengal Bengali text.
 ```
 
-
 ---
 
 # 4. Small Test
@@ -151,10 +165,10 @@ Output ONLY the final natural West Bengal Bengali text.
 ### Input
 
 ```text
-YOU[neutral] +
-TOMORROW[neutral] +
-SCHOOL[neutral] +
-GO[negation][?][neutral]
+YOU +
+TOMORROW +
+SCHOOL +
+GO[negation][?]
 ```
 
 ### Expected Output
@@ -163,12 +177,14 @@ GO[negation][?][neutral]
 তুমি কি আগামীকাল স্কুলে যাবে না?
 ```
 
-Tests:
+### Tests
 
 ```text
 Question scope
 +
 Negation
++
+Subject preservation
 +
 Natural Bengali grammar
 ```
@@ -179,7 +195,7 @@ Natural Bengali grammar
 
 This is the main benchmark for future model and prompt testing.
 
-### Test Configuration
+## Test Configuration
 
 ```text
 max_context_length: 32768
@@ -193,314 +209,443 @@ rep_pen_slope: 0.7
 reasoning_effort: minimal
 ```
 
-### Input
+## Input
 
 ```text
-THREE-DAY-AGO[neutral] +
-MORNING[neutral] +
-I[neutral] +
-BANK[neutral] +
-GO[neutral] +
-BECAUSE[neutral] +
-NEW[neutral] +
-ACCOUNT[neutral] +
-OPEN[neutral] +
-MUST[neutral] +
-I[neutral] +
-DOCUMENT[neutral] +
-BRING[neutral] +
-THEN[neutral] +
-COUNTER[neutral] +
-WAIT[neutral] +
-WHILE[neutral] +
-MY[neutral] +
-PHONE[neutral] +
-BANK_APP[neutral] +
-OPEN[neutral] +
-SUDDENLY[neutral] +
-I[neutral] +
-TRANSACTION[neutral] +
-SEE[neutral] +
-I[neutral] +
-NOT[negation][neutral] +
-MAKE[negation][neutral] +
-THIS[neutral] +
-PAYMENT[neutral] +
-I[neutral] +
-BECOME[neutral] +
-WORRIED[concern] +
-SO[neutral] +
-I[neutral] +
-CUSTOMER_CARE[neutral] +
-CALL[neutral] +
-OFFICER[neutral] +
-ASK[neutral] +
-WHAT[neutral] +
-HAPPEN[?][neutral] +
-I[neutral] +
-EXPLAIN[neutral] +
-THAT[neutral] +
-UNKNOWN[neutral] +
-TRANSACTION[neutral] +
-ACCOUNT[neutral] +
-SHOW[neutral] +
-THEN[neutral] +
-OFFICER[neutral] +
-ASK[neutral] +
-WHETHER[neutral] +
-I[neutral] +
-RECENTLY[neutral] +
-SHARE[neutral] +
-OTP[neutral] +
-ANYONE[neutral] +
-WITH[neutral] +
-I[neutral] +
-SAY[neutral] +
-NO[negation][neutral] +
-I[neutral] +
-SHARE[negation][neutral] +
-OTP[negation][neutral] +
-WITH[neutral] +
-ANYONE[neutral] +
-OFFICER[neutral] +
-SAY[neutral] +
-DO-NOT[negation][neutral] +
-WORRY[negation][neutral] +
-BUT[neutral] +
-THEY[neutral] +
-MUST[neutral] +
-BLOCK[neutral] +
-CARD[neutral] +
-FIRST[neutral] +
-FOR[neutral] +
-SAFETY[neutral] +
-I[neutral] +
-ASK[neutral] +
-WHETHER[neutral] +
-I[neutral] +
-CAN[neutral] +
-USE[neutral] +
-ONLINE_BANKING[neutral] +
-TODAY[neutral] +
-OFFICER[neutral] +
-SAY[neutral] +
-NOT-NOW[negation][neutral] +
-BECAUSE[neutral] +
-ACCOUNT[neutral] +
-UNDER[neutral] +
-SECURITY[neutral] +
-CHECK[neutral] +
-I[neutral] +
-ASK[neutral] +
-HOW_LONG[neutral] +
-THIS[neutral] +
-TAKE[?][neutral] +
-OFFICER[neutral] +
-SAY[neutral] +
-MAYBE[neutral] +
-TWENTY_FOUR_HOUR[neutral] +
-BUT[neutral] +
-FINAL[neutral] +
-TIME[neutral] +
-DEPEND[neutral] +
-ON[neutral] +
-VERIFICATION[neutral] +
-I[neutral] +
-ASK[neutral] +
-WHETHER[neutral] +
-UNKNOWN[neutral] +
-PAYMENT[neutral] +
-MONEY[neutral] +
-CAN[neutral] +
-RETURN[neutral] +
-OFFICER[neutral] +
-SAY[neutral] +
-IF[neutral] +
-TRANSACTION[neutral] +
-CONFIRM[neutral] +
-FRAUD[neutral] +
-BANK[neutral] +
-WILL[neutral] +
-REFUND[neutral] +
-MONEY[neutral] +
-OTHERWISE[neutral] +
-THEY[neutral] +
-MAY[neutral] +
-ASK[neutral] +
-MERCHANT[neutral] +
-FOR[neutral] +
-MORE[neutral] +
-INFORMATION[neutral] +
-I[neutral] +
-FEEL[neutral] +
-RELIEF[happy] +
-BUT[neutral] +
-STILL[neutral] +
-UNCERTAIN[concern] +
-BECAUSE[neutral] +
-REFUND[neutral] +
-NOT[negation][neutral] +
-GUARANTEED[negation][neutral] +
-YET[neutral] +
-THEN[neutral] +
-OFFICER[neutral] +
-GIVE[neutral] +
-ME[neutral] +
-A[neutral] +
-FORM[neutral] +
-AND[neutral] +
-SAY[neutral] +
-I[neutral] +
-MUST[neutral] +
-FILL[neutral] +
-IT[neutral] +
-BEFORE[neutral] +
-BANK[neutral] +
-CAN[neutral] +
-START[neutral] +
-INVESTIGATION[neutral] +
-I[neutral] +
-FILL[neutral] +
-FORM[neutral] +
-BUT[neutral] +
-ONE[neutral] +
-DOCUMENT[neutral] +
-NOT[negation][neutral] +
-HAVE[negation][neutral] +
-WITH[neutral] +
-ME[neutral] +
-SO[neutral] +
-I[neutral] +
-CANNOT[negation][neutral] +
-SUBMIT[negation][neutral] +
-COMPLETE[neutral] +
-APPLICATION[neutral] +
-TODAY[neutral] +
-OFFICER[neutral] +
-SAY[neutral] +
-IF[neutral] +
-I[neutral] +
-BRING[neutral] +
-DOCUMENT[neutral] +
-TOMORROW[neutral] +
-BANK[neutral] +
-CAN[neutral] +
-COMPLETE[neutral] +
-VERIFICATION[neutral] +
-THEN[neutral] +
-I[neutral] +
-ASK[neutral] +
-WHETHER[neutral] +
-MY[neutral] +
-CARD[neutral] +
-CAN[neutral] +
-BE[neutral] +
-UNBLOCK[neutral] +
-TODAY[?][neutral] +
-OFFICER[neutral] +
-SAY[neutral] +
-NO[negation][neutral] +
-IT[neutral] +
-CAN[neutral] +
-ONLY[neutral] +
-BE[neutral] +
-UNBLOCK[neutral] +
-AFTER[neutral] +
-SECURITY[neutral] +
-CHECK[neutral] +
-COMPLETE[neutral] +
-I[neutral] +
-THANK[neutral] +
-THEM[neutral] +
-AND[neutral] +
-LEAVE[neutral] +
-BANK[neutral] +
-THEN[neutral] +
-ON[neutral] +
-WAY[neutral] +
-I[neutral] +
-CALL[neutral] +
-MY[neutral] +
-BROTHER[neutral] +
-AND[neutral] +
-TELL[neutral] +
-HIM[neutral] +
-EVERYTHING[neutral] +
-HE[neutral] +
-SAY[neutral] +
-IF[neutral] +
-BANK[neutral] +
-NEED[neutral] +
-EXTRA[neutral] +
-DOCUMENT[neutral] +
-HE[neutral] +
-CAN[neutral] +
-BRING[neutral] +
-IT[neutral] +
-FOR[neutral] +
-ME[neutral] +
-BUT[neutral] +
-I[neutral] +
-SAY[neutral] +
-FIRST[neutral] +
-I[neutral] +
-MUST[neutral] +
-CHECK[neutral] +
-WHETHER[neutral] +
-THE[neutral] +
-TRANSACTION[neutral] +
-REALLY[neutral] +
-FRAUD[neutral] +
-OR[neutral] +
-NOT[negation][neutral] +
-BEFORE[neutral] +
-MAKING[neutral] +
-ANY[neutral] +
-DECISION[neutral] +
-THAT[neutral] +
-EVENING[neutral] +
-BANK[neutral] +
-SEND[neutral] +
-ME[neutral] +
-MESSAGE[neutral] +
-SAY[neutral] +
-THE[neutral] +
-TRANSACTION[neutral] +
-IS[neutral] +
-UNDER[neutral] +
-REVIEW[neutral] +
-I[neutral] +
-DO-NOT[negation][neutral] +
-NEED[negation][neutral] +
-TO[neutral] +
-VISIT[neutral] +
-BANK[neutral] +
-AGAIN[neutral] +
-UNTIL[neutral] +
-THEY[neutral] +
-CALL[neutral] +
-ME[neutral] +
+TWO-DAY-AGO +
+MORNING +
+EIGHT_THIRTY-AM +
+I +
+COLLEGE +
+GO +
+BECAUSE +
+SCHOLARSHIP +
+APPLICATION +
+SUBMIT +
+MUST +
+BEFORE +
+FIVE +
+PM +
+THEN +
+ADMINISTRATION +
+OFFICE +
+GO +
+WAIT +
+OUTSIDE +
+MY +
+FRIEND +
+RITA +
+ALREADY +
+WAIT +
+THERE +
+SHE[happy] +
+SAY +
+IF +
+YOU +
+BRING +
+ALL +
+DOCUMENT +
+TODAY +
+STAFF +
+MAY +
+ACCEPT +
+APPLICATION +
+WITHOUT +
+DELAY +
+I +
+SAY +
+I +
+HAVE +
+ALL +
+DOCUMENT +
+EXCEPT +
+INCOME +
+CERTIFICATE +
 I[concern] +
-STILL[neutral] +
-FEEL[neutral] +
-UNCERTAIN[concern] +
-BECAUSE[neutral] +
-I[neutral] +
-DO-NOT[negation][neutral] +
-KNOW[negation][neutral] +
-WHETHER[neutral] +
-MY[neutral] +
-MONEY[neutral] +
-WILL[neutral] +
-RETURN[neutral] +
-BUT[happy] +
+BECOME +
+WORRIED[concern] +
+BECAUSE +
+TOMORROW +
+SUBMISSION +
+DEADLINE +
+END +
+I +
+ASK +
+STAFF +
+WHETHER +
+I +
+CAN +
+SUBMIT +
+APPLICATION +
+WITHOUT +
+INCOME +
+CERTIFICATE +
+TODAY[?] +
+STAFF +
+SAY +
+NO[negation] +
+APPLICATION +
+CANNOT[negation] +
+SUBMIT[negation] +
+WITHOUT +
+CERTIFICATE +
+FIRST +
+I +
+ASK +
+WHETHER +
+ONLINE +
+PORTAL +
+MAY +
+ACCEPT +
+MISSING +
+DOCUMENT +
+LATER +
+STAFF +
+SAY +
+YES +
+BUT +
+PHYSICAL +
+APPLICATION +
+MUST +
+BE +
+SUBMIT +
+FIRST +
+I +
+ASK +
+WHAT +
+HAPPEN[?] +
+STAFF +
+EXPLAIN +
+THAT +
+MY +
+ATTENDANCE +
+RECORD +
+SHOW +
+SIXTY +
+PERCENT +
+BUT +
+I[surprise] +
+KNOW +
+MY +
+ATTENDANCE +
+WAS +
+EIGHTY_FIVE +
+PERCENT +
+SO +
+I[angry] +
+SAY[angry] +
+THIS +
+RECORD +
+SEEM +
+WRONG +
+AND +
+I[angry] +
+DO-NOT[negation] +
+AGREE[negation] +
+WITH +
+IT +
+STAFF +
+SAY +
+I +
+SHOULD +
+SPEAK +
+TO +
+DEPARTMENT +
+CLERK +
+FIRST +
+I +
+GO +
+TO +
+CLERK +
+AND +
+ASK +
+WHETHER +
+THE +
+ATTENDANCE +
+RECORD +
+CAN +
+BE +
+CORRECTED +
+TODAY[?] +
+CLERK +
+SAY +
+IF +
+YOU +
+SHOW +
+CLASS +
+ATTENDANCE +
+PROOF +
+WE +
+CAN +
+CHECK +
+THE +
+RECORD +
+OTHERWISE +
+YOU +
+MAY +
+NEED +
+TO +
+WAIT +
+UNTIL +
+TOMORROW +
+I +
+ASK +
+WHETHER +
+I +
+CAN +
+TAKE +
+PHOTO +
+OF +
+THE +
+SCREEN +
+AS +
+PROOF +
+TODAY[?] +
+CLERK +
+SAY +
+YES +
+BUT +
+DO-NOT[negation] +
+SHARE[negation] +
+THE +
+PHOTO +
+PUBLICLY +
+I +
+SAY +
+I +
+MUST +
+KEEP +
+IT +
+PRIVATE +
+THEN +
+MY +
+PHONE +
+RING +
+AT +
+TEN_THIRTY-FIVE +
+AM +
+I +
+SEE +
+A +
+MESSAGE +
+FROM +
+MY +
+DEPARTMENT +
+THEY +
+SAY +
+THE +
+DEADLINE +
+EXTEND +
+TO +
+NEXT-WEEK +
 I[happy] +
-HOPE[happy] +
-THEY[happy] +
-WILL[happy]
+FEEL +
+RELIEF[happy] +
+BUT +
+RITA[sad] +
+BECAUSE +
+HER +
+APPLICATION +
+ALREADY +
+REJECT +
+I +
+ASK +
+WHY +
+HER +
+APPLICATION +
+REJECT +
+HAPPEN[?] +
+SHE +
+SAY +
+THEY +
+FIND +
+ONE +
+MISSING +
+SIGNATURE +
+AND +
+SHE[disgust] +
+SAY +
+THEY +
+SPEAK +
+RUDELY +
+SHE +
+DO-NOT[negation] +
+WANT[negation] +
+TO +
+ARGUE +
+I +
+TELL +
+HER +
+SHE +
+SHOULD +
+KEEP +
+A +
+COPY +
+OF +
+EVERY +
+DOCUMENT +
+BECAUSE +
+IF +
+SOMETHING +
+GO +
+WRONG +
+LATER +
+IT +
+MAY +
+HELP +
+I +
+ASK +
+HER +
+WHETHER +
+SHE +
+CAN +
+REOPEN +
+THE +
+APPLICATION +
+TODAY[?] +
+SHE +
+SAY +
+NO[negation] +
+THEY +
+WILL +
+ONLY +
+REVIEW +
+IT +
+AFTER +
+NEW +
+DOCUMENT +
+ARRIVE +
+THEN +
+I +
+CALL +
+MY +
+MOTHER +
+AND +
+TELL +
+HER +
+EVERYTHING +
+SHE[happy] +
+SAY +
+IF +
+I +
+NEED +
+HELP +
+SHE +
+CAN +
+BRING +
+THE +
+MISSING +
+CERTIFICATE +
+TOMORROW +
+I +
+SAY +
+THANK +
+YOU +
+BUT +
+FIRST +
+I +
+MUST +
+CHECK +
+WHETHER +
+THE +
+COLLEGE +
+HAS +
+ALREADY +
+UPDATED +
+MY +
+RECORD +
+OR +
+NOT[negation] +
+BEFORE +
+I +
+MAKE +
+ANY +
+FINAL +
+DECISION +
+THAT +
+EVENING +
+COLLEGE +
+SEND +
+ME +
+AN +
+EMAIL +
+SAY +
+THE +
+RECORD +
+UPDATE +
+IS +
+COMPLETE +
+MY[happy] +
+SCHOLARSHIP +
+APPLICATION +
+CAN +
+NOW +
+CONTINUE +
+I[happy] +
+FEEL +
+HOPEFUL[happy] +
+ONE-HUNDRED +
+PERCENT +
+CONFIDENT[happy]
 ```
 
-### Latest Observed Performance
+## Criteria Covered
+
+```text
+1. Semantic meaning
+2. Event order
+3. Subject/object preservation
+4. Past, present and future tense
+5. Time and temporal order
+6. 8:30 AM
+7. 10:35 AM
+8. 5 PM
+9. Two-day-ago
+10. Tomorrow
+11. Next-week
+12. Later
+13. Numbers
+14. 60 percent
+15. 85 percent
+16. 100 percent
+17. Direct question boundaries
+18. Multiple direct questions
+19. Embedded WHETHER questions
+20. WHETHER ... OR NOT
+21. Local negation
+22. Standalone NO
+23. Specific negated action
+24. CAN
+25. CANNOT
+26. MAY
+27. MUST
+28. SHOULD
+29. Permission
+30. Obligation
+31. IF / THEN
+32. OTHERWISE
+33. BEFORE
+34. AFTER
+35. UNTIL
+36. THEN
+37. Cause/effect
+38. Reported speech
+39. Multiple speakers
+40. Speaker binding
+41. Event segmentation
+42. Pronoun consistency
+43. Honorific/register
+44. Emotion:
+    neutral / concern / surprise / angry / happy / sad / disgust
+45. Natural Bengali grammar
+46. Bengali punctuation
+47. Numbers and percentage preservation
+48. Hyphenated temporal concepts
+49. No hallucination
+50. Long-range semantic consistency
+```
+
+## Latest Observed Performance
 
 ```text
 Prompt processing: ~37.84 tok/s
@@ -509,7 +654,7 @@ Total time:        ~131.98 sec
 Generated tokens:  ~450
 ```
 
-### Latest Observed Output Quality
+## Latest Observed Output Quality
 
 ```text
 Bengali fluency:        Good
@@ -523,7 +668,7 @@ No hallucination:       Fairly good
 Overall:                Good, but semantic scope still needs improvement
 ```
 
-### Main Remaining Weakness
+## Main Remaining Weakness
 
 ```text
 Semantic scope tracking
@@ -535,4 +680,65 @@ IF / THEN scope
 Event segmentation
 Tense consistency
 ```
+
 The current priority for further improvement is **semantic scope accuracy**, not basic Bengali fluency or generation speed.
+
+---
+
+# 6. Speed Summary
+
+Latest selected model:
+
+```text
+gemma-4-E4B-it-Q4_K_M.gguf
+```
+
+Latest long-test result:
+
+```text
+Prompt processing: ~37.84 tok/s
+Generation:        ~5.76 tok/s
+Total:             ~131.98 sec
+```
+
+Small-test benchmark should be used separately because long prompts dominate processing time.
+
+---
+
+# 7. Final Selection
+
+## Reference Model
+
+```text
+gemma-4-12b-it-Q4_0.gguf
+```
+
+Best-quality reference model.
+
+## Deployment Model
+
+```text
+gemma-4-E4B-it-Q4_K_M.gguf
+```
+
+**Selected for WBSL Bridge Bengali NLG.**
+
+### Selection Reason
+
+```text
+Strong Bengali generation
++
+Good semantic understanding
++
+Practical question handling
++
+Reasonable negation handling
++
+Good long-gloss performance
++
+Lower RAM usage
++
+Faster CPU inference
+```
+
+The deployment model is currently the most practical local choice, while future improvement should focus mainly on **semantic scope preservation**.
