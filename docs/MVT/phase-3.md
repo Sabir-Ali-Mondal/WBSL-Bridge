@@ -1,407 +1,693 @@
 # WBSL Bridge — Bengali NLG Model Testing
 
-## 1. Best Models
+## 1. Objective
 
-### Primary Reference Model
+Test local LLMs for the **Bengali NLG stage** of WBSL Bridge.
 
-`gemma-4-12b-it-Q4_0.gguf`
+The model receives WBSL gloss with:
 
-- ~97% observed manual accuracy
-- Best overall Bengali quality
-- Good WBSL gloss interpretation
-- Good question and negation handling
-- Good NMM and emotion handling
-- ~13 GB RAM with Brave + KoboldCpp
+* semantic markers
+* negation
+* question boundaries
+* emotion
+* temporal information
+* multiple events
+* reported speech
+* conditional structures
 
-### Final Deployment Model
-
-`gemma-4-E4B-it-Q4_K_M.gguf`
-
-- Very good Bengali generation
-- Natural West Bengal Bengali
-- Good question and negation handling
-- Good NMM and emotion handling
-- Good long-gloss handling after prompt optimization
-- Faster inference
-- ~10 GB RAM with Brave + KoboldCpp
-- Better memory efficiency
-- Suitable for CPU inference
+The output must be **natural West Bengal Bengali while preserving the complete semantic meaning**.
 
 ---
 
-## 2. Models Tested
+# 2. Model Tests
 
-| Model | Result | Main Issue |
-|---|---|---|
-| `gemma-4-12b-it-Q4_0.gguf` | **Best Quality** | Higher RAM |
-| `gemma-4-E4B-it-Q4_K_M.gguf` | **Selected** | Slightly lower semantic consistency |
-| `gpt-oss-20b-Q4_K_M.gguf` | Failed | Poor Bengali |
-| `Qwen3.6-35B-A3B-UD-IQ2_M.gguf` | Failed | Poor Bengali |
-| `Qwen3.5-9B-UD-IQ3_XXS.gguf` | Failed | Poor Bengali |
-| `gemma-4-26B-A4B-it-UD-IQ2_M.gguf` | Failed | Memory limit exceeded |
+| Model                              | Result                       | Main Observation                                    |
+| ---------------------------------- | ---------------------------- | --------------------------------------------------- |
+| `gemma-4-12b-it-Q4_0.gguf`         | **Best Quality / Reference** | Best Bengali and semantic consistency; higher RAM   |
+| `gemma-4-E4B-it-Q4_K_M.gguf`       | **Selected for Deployment**  | Very good Bengali, good speed and memory efficiency |
+| `gpt-oss-20b-Q4_K_M.gguf`          | Failed                       | Poor Bengali quality                                |
+| `Qwen3.6-35B-A3B-UD-IQ2_M.gguf`    | Failed                       | Poor Bengali for this task                          |
+| `Qwen3.5-9B-UD-IQ3_XXS.gguf`       | Failed                       | Poor Bengali quality                                |
+| `gemma-4-26B-A4B-it-UD-IQ2_M.gguf` | Failed                       | Memory limit exceeded                               |
 
----
-
-## 3. WBSL NLG Pipeline
+## Reference Model
 
 ```text
-Temporal LSTM
-      ↓
-Sign Gloss Sequence
-      +
-Geometry NMM
-      ↓
-Question / Negation
-      +
-DeepFace Emotion
-      ↓
-Gemma 4 E4B
-      ↓
-Natural Bengali Text
-````
+gemma-4-12b-it-Q4_0.gguf
+```
 
-The LLM is used only for the **Bengali NLG stage**.
+Observed:
+
+```text
+~97% manual accuracy
+~13 GB RAM with Brave + KoboldCpp
+```
+
+Best overall quality and semantic interpretation.
+
+## Selected Deployment Model
+
+```text
+gemma-4-E4B-it-Q4_K_M.gguf
+```
+
+Reasons:
+
+* Strong Bengali generation
+* Natural West Bengal Bengali
+* Good question handling
+* Good negation handling
+* Good long-gloss performance
+* Lower memory usage
+* Faster CPU inference
+* Practical for local deployment
 
 ---
 
-## 4. Final NLG Prompt
+# 3. Final NLG Prompt
 
 ```text
 You are the Bengali NLG module of a WBSL communication system.
 
 Convert the WBSL gloss into natural West Bengal Bengali.
 
+INPUT FORMAT:
+
+WORD[emotion]
+WORD[negation][emotion]
+WORD[?][emotion]
+
+[?] appears ONLY on the LAST word of a complete question clause.
+It means the whole clause ending there is a question.
+
+[negation] marks the semantic unit whose meaning is negated.
+Do not invent negation.
+Do not spread negation to unrelated words.
+
+Emotion may be:
+happy, sad, angry, neutral, surprise, fear, disgust.
+
 MAIN GOAL:
-Preserve the COMPLETE meaning of the gloss while producing natural Bengali.
+
+Preserve the COMPLETE meaning of the gloss in natural West Bengal Bengali.
 
 RULES:
 
-- Preserve EVERY meaningful event, action, person, object, place, time,
-  reason, result, relationship, negation, ability, permission,
+- Preserve every meaningful event, person, action, object, time, place,
+  reason, result, relationship, tense, negation, ability, permission,
   obligation, condition, uncertainty and emotion.
-- Do NOT summarize or omit information.
-- Do NOT invent information.
-- Do NOT translate word-by-word.
-- You may reorder words to make natural Bengali.
-- Preserve tense, time, sequence, cause and effect.
-- Preserve who performs each action and who receives it.
-- Do NOT merge separate events if doing so changes their meaning.
-- If the gloss contains multiple events, use multiple Bengali sentences.
-- Preserve negation exactly.
-- Preserve CAN, CANNOT, MAY, MUST, SHOULD and NOT-NOW correctly.
-- Preserve IF/THEN/OTHERWISE conditions.
+- Do not summarize.
+- Do not omit events.
+- Do not invent information.
+- Do not translate word by word.
+- You may reorder words for natural Bengali grammar.
+- Preserve who does each action.
+- Preserve event order and cause/effect.
+- Preserve semantic relationships between events.
+- Keep separate events separate when needed.
+- Use multiple Bengali sentences when necessary.
+- Do not merge distinct events only to make the output shorter.
+- Preserve CAN, CANNOT, MAY, MUST, SHOULD and NOT-NOW.
+- Preserve IF / THEN / OTHERWISE.
 - Preserve questions as questions.
+- Preserve indirect and embedded questions.
 - Preserve reported speech and speaker changes.
-- Preserve uncertainty such as WHETHER, NOT-SURE and HOPE.
-- NMM information is meaningful and must be reflected naturally.
-- Emotion should be expressed naturally without adding emotion not given.
+- Preserve WHETHER, NOT-SURE and HOPE.
+- Reflect NMM and emotion naturally without adding facts.
 - Use natural West Bengal Bengali.
-- Prefer completeness over brevity.
+- Semantic fidelity is more important than fluency or brevity.
+- Output ONLY Bengali text.
 
-IMPORTANT EVENT RULE:
+QUESTION SCOPE:
 
-Treat separate actions as separate events when necessary.
+[?] is ONE question boundary, not one question per word.
 
-Example:
-I + COLLEGE + GO + FRIEND + MEET
+Only the clause ending at [?] is explicitly marked as a direct question.
 
-means:
-আমি কলেজে গিয়েছিলাম। সেখানে বন্ধুর সঙ্গে দেখা হয়েছিল।
+Do NOT create additional direct questions from words such as:
+WHAT, WHY, HOW, WHETHER, IF, ASK.
 
-Do NOT incorrectly change it to:
-আমি বন্ধুর সঙ্গে কলেজে গিয়েছিলাম।
+When WHETHER or a similar marker introduces an embedded question,
+render it naturally using Bengali indirect-question grammar such as:
+"কি না", "হয় কি না", "পারবে কি না", "আছে কি না".
 
-Example:
-THEY + ASK + CHEST-PAIN + SHE + SAY + NO
+Do not convert an earlier statement or conditional clause into a question
+because of a later embedded question.
 
-must preserve BOTH events:
-তাঁরা জিজ্ঞাসা করলেন, বুকে ব্যথা আছে কি না।
-তিনি বললেন, না।
+NEGATION:
 
-Do NOT remove the second event.
+Only use negation when the gloss provides it.
 
-IMPORTANT NEGATION RULE:
+Do not make an unmarked word negative.
 
-NOT, NO, CANNOT, DO-NOT and NOT-NOW must never be lost.
+Treat [negation] as a local semantic marker.
+Do not automatically negate following words.
 
-IMPORTANT CONDITION RULE:
+Standalone NO / NOT may be a separate response.
 
-IF + A + THEN + B + OTHERWISE + C
-must remain a conditional structure in Bengali.
+Do not create double negation.
 
-IMPORTANT NO-HALLUCINATION RULE:
+EVENT SEGMENTATION:
 
-Do not add names, places, objects, time, causes, relationships,
-symptoms or actions that are not present in the gloss.
+Preserve separate events even when the gloss is continuous.
+
+Keep changes in subject, speaker, action, speech event, time or condition
+semantically separate when merging would change the meaning.
+
+CONDITION RULE:
+
+Preserve the complete IF / THEN / OTHERWISE relationship.
+
+Do not turn a conditional statement into a question unless its own clause
+actually ends at [?].
+
+REPORTED SPEECH:
+
+Preserve speaker changes and reported speech.
+
+Do not invent a speaker for ASK, SAY, TELL or EXPLAIN.
+
+The explicit subject of the speech verb controls that speech event.
+
+SEMANTIC SCOPE CONTROL:
+
+Treat the gloss as ordered semantic events, not as a loose bag of words.
+
+- Preserve each event, its subject, object, tense, polarity and speaker.
+- A past time marker applies to the related past events unless the gloss
+  explicitly introduces a new time.
+- Never convert a specific negated action into a general negative state.
+- Keep the negation attached to the exact marked action or semantic unit.
+- ASK, SAY, TELL and EXPLAIN keep their explicit speaker.
+- Do not invent or duplicate speech events.
+- A change of speaker or speech verb normally begins a new speech event.
+- WHETHER introduces an embedded question only.
+- WHETHER must bind only to its following question content.
+- WHETHER must not change an earlier statement or condition into a question.
+- WHETHER ... OR NOT must remain one uncertainty unit.
+- IF / THEN remains a condition and must not become a question unless that
+  conditional clause itself ends at [?].
+- BEFORE, AFTER, UNTIL and THEN must keep their original temporal scope.
+- Do not let later words retroactively change the meaning, tense, polarity,
+  speaker or question status of an earlier event.
+- Natural Bengali wording is allowed only when the complete semantic structure
+  remains unchanged.
+
+NO HALLUCINATION:
+
+Do not add names, places, objects, causes, time, relationships,
+symptoms or actions not present in the gloss.
+
+NATURAL BENGALI:
+
+Use natural West Bengal Bengali sentence structure.
+
+Use appropriate tense, honorifics, pronouns, case markers and postpositions.
+
+Do not preserve awkward English word order when natural Bengali can express
+the same meaning clearly.
+
+Do not sacrifice meaning for fluency.
 
 FINAL INTERNAL CHECK:
 
-Before answering, internally verify:
-- every meaningful event is present
-- no subject/action relationship changed
-- no negation was lost
-- no condition was lost
-- no question was changed into a statement
-- no information was invented
+Before answering, verify:
 
-Do not output this check.
+1. Every event is preserved.
+2. Every subject and object is preserved.
+3. Every negation has correct scope.
+4. Every [?] question boundary is preserved.
+5. Embedded questions remain embedded questions.
+6. IF / THEN / OTHERWISE structure is preserved.
+7. Speaker changes are preserved.
+8. Tense and temporal relations are preserved.
+9. Separate events have not been incorrectly merged.
+10. No new information has been added.
+11. No event has been omitted.
+12. The Bengali is natural and grammatically correct.
 
-Inputs:
+Do not output the check.
 
-Gloss:
-{GLOSS}
-
-Question:
-{QUESTION}
-
-Negation:
-{NEGATION}
-
-Emotion:
-{EMOTION}
-
-NMM:
-{NMM}
-
-Output ONLY the Bengali text.
+Output ONLY the final natural West Bengal Bengali text.
 ```
 
 ---
 
-# 5. Reduced Test Suite
+# 4. Small Test
 
-Use the **same prompt and generation settings** for every model.
-
-### Test 1 — Question + Negation
+### Input
 
 ```text
-Gloss:
-YOU + TOMORROW + SCHOOL + GO + NOT
-
-Question: true
-Negation: true
-Emotion: neutral
-NMM: Eyebrow raise = question; Head shake = negation
+YOU[neutral] +
+TOMORROW[neutral] +
+SCHOOL[neutral] +
+GO[negation][?][neutral]
 ```
 
-Expected:
+### Expected Output
 
 ```text
 তুমি কি আগামীকাল স্কুলে যাবে না?
 ```
 
-### Test 2 — Past Question + Negation
+Tests:
 
 ```text
-Gloss:
-YOU + YESTERDAY + FRIEND + MEET + BUT + NOT + TALK + WHY
-
-Question: true
-Negation: true
-Emotion: confused
-NMM: Eyebrow raise + Head tilt + Head shake
-```
-
-Expected:
-
-```text
-তুমি গতকাল বন্ধুর সাথে দেখা করলে কিন্তু কথা বললে না কেন?
-```
-
-### Test 3 — Natural Grammar
-
-```text
-Gloss:
-YESTERDAY + I + RAIN + BECAUSE + SCHOOL + GO + NOT
-
-Question: false
-Negation: true
-Emotion: neutral
-NMM: Head shake = negation
-```
-
-Expected:
-
-```text
-গতকাল বৃষ্টির কারণে আমি স্কুলে যাইনি।
-```
-
-### Test 4 — Honorific Question
-
-```text
-Gloss:
-YOU + TEACHER + TODAY + SCHOOL + COME
-
-Question: true
-Negation: false
-Emotion: neutral
-NMM: Eyebrow raise = question
-```
-
-Expected:
-
-```text
-আপনি কি আজ স্কুলে এসেছেন?
-```
-
-### Test 5 — No Hallucination
-
-```text
-Gloss:
-I + BOOK + READ
-
-Question: false
-Negation: false
-Emotion: happy
-NMM: None
-```
-
-Expected:
-
-```text
-আমি বই পড়ি।
-```
-
-### Test 6 — Negative Ability
-
-```text
-Gloss:
-YOU + THIS + PROBLEM + SOLVE + NOT + CAN
-
-Question: true
-Negation: true
-Emotion: concerned
-NMM: Eyebrow raise + Head shake
-```
-
-Expected:
-
-```text
-তুমি কি এই সমস্যাটি সমাধান করতে পারবে না?
-```
-
-### Test 7 — Emotion
-
-```text
-Gloss:
-I + LOSE + BOOK
-
-Question: false
-Negation: false
-Emotion: sad
-NMM: Mouth down = sadness
-```
-
-Expected:
-
-```text
-আমি বইটি হারিয়েছি।
-```
-
-### Test 8 — Full Stress Test
-
-```text
-Gloss:
-YOU + YESTERDAY + EXAM + HAVE + BUT + PREPARE + NOT + CAN + SO + RESULT + GOOD + NOT + WHY
-
-Question: true
-Negation: true
-Emotion: worried
-NMM: Eyebrow raise + Head shake + Head tilt + Mouth tense
-```
-
-Semantic target:
-
-```text
-তোমার গতকাল পরীক্ষা ছিল, কিন্তু তুমি প্রস্তুতি নিতে পারোনি, তাই ফল ভালো হবে না—কেন?
+Question scope
++
+Negation
++
+Natural Bengali grammar
 ```
 
 ---
 
-# 6. Large Bengali Power Test
+# 5. Long Semantic Stress Test
 
-This test evaluates the model's ability to handle a **long WBSL gloss sequence** rather than only individual grammatical cases.
+This is the main benchmark for future model and prompt testing.
 
-```text
-Gloss:
-LAST-WEEK + I + COLLEGE + GO + FRIEND + MEET + THEN + WE + TOGETHER + LIBRARY + GO + MANY + BOOK + SEE + BUT + I + BOOK + BUY + NOT + BECAUSE + MONEY + HAVE + NOT + AFTER + LIBRARY + EXIT + HEAVY + RAIN + START + SO + WE + BUS + WAIT + BUT + BUS + COME + NOT + FINALLY + WE + WALK + HOME + GO + ON-THE-WAY + TEACHER + MEET + TEACHER + ASK + WHY + TODAY + COLLEGE + COME + NOT + I + EXPLAIN + RAIN + BECAUSE + LATE + ARRIVE + THEN + TEACHER + SAY + TOMORROW + EXAM + HAVE + PREPARE + WELL + MUST + I + WORRIED + BECAUSE + PREVIOUS + EXAM + RESULT + GOOD + NOT + BUT + FRIEND + SAY + THIS-TIME + RESULT + GOOD + WILL + I + HOPE + SO
-
-Question:
-false
-
-Negation:
-true
-
-Emotion:
-worried
-
-NMM:
-Head shake = negation
-Mouth tense = concern
-Head tilt = uncertainty
-```
-
-### Observed E4B Output
+### Test Configuration
 
 ```text
-গত সপ্তাহে আমি আমার বন্ধুর সাথে কলেজে গিয়েছিলাম। তারপর আমরা একসাথে লাইব্রেরিতে গিয়ে অনেক বই দেখেছি। কিন্তু আমি বই কিনিনি কারণ আমার কাছে টাকা ছিল না। লাইব্রেরি থেকে বের হওয়ার পরে ভারী বৃষ্টি শুরু হয়েছিল, তাই আমরা বাসের জন্য অপেক্ষা করছিলাম, কিন্তু বাস আসেনি। অবশেষে আমরা হেঁটে বাড়ি গেলাম। যাওয়ার পথে শিক্ষকের সাথে দেখা হলো। শিক্ষক জিজ্ঞেস করলেন, "আজ কলেজে কেন আসোনি?" আমি বললাম, "বৃষ্টির জন্য দেরি হয়ে গিয়েছিল।" তখন শিক্ষক বললেন, "কাল পরীক্ষা আছে, তোমাকে ভালোভাবে প্রস্তুত হতে হবে।" আমি চিন্তিত হয়ে পড়লাম কারণ আগের পরীক্ষার ফল ভালো হয়নি। কিন্তু বন্ধু বলল, এইবার ফল ভালো হবে। আমি আশা করি তাই হবে।
+max_context_length: 32768
+max_length: 1536
+temperature: 0.75
+top_p: 0.92
+top_k: 100
+rep_pen: 1.05
+rep_pen_range: 360
+rep_pen_slope: 0.7
+reasoning_effort: minimal
 ```
 
-### Result
+### Input
 
 ```text
-Bengali Fluency:          Very Good
-Naturalness:              Very Good
-Information Preservation: Very Good
-Long Gloss Handling:      Very Good
-Grammar:                  Very Good
-Overall:                  Strong
+THREE-DAY-AGO[neutral] +
+MORNING[neutral] +
+I[neutral] +
+BANK[neutral] +
+GO[neutral] +
+BECAUSE[neutral] +
+NEW[neutral] +
+ACCOUNT[neutral] +
+OPEN[neutral] +
+MUST[neutral] +
+I[neutral] +
+DOCUMENT[neutral] +
+BRING[neutral] +
+THEN[neutral] +
+COUNTER[neutral] +
+WAIT[neutral] +
+WHILE[neutral] +
+MY[neutral] +
+PHONE[neutral] +
+BANK_APP[neutral] +
+OPEN[neutral] +
+SUDDENLY[neutral] +
+I[neutral] +
+TRANSACTION[neutral] +
+SEE[neutral] +
+I[neutral] +
+NOT[negation][neutral] +
+MAKE[negation][neutral] +
+THIS[neutral] +
+PAYMENT[neutral] +
+I[neutral] +
+BECOME[neutral] +
+WORRIED[concern] +
+SO[neutral] +
+I[neutral] +
+CUSTOMER_CARE[neutral] +
+CALL[neutral] +
+OFFICER[neutral] +
+ASK[neutral] +
+WHAT[neutral] +
+HAPPEN[?][neutral] +
+I[neutral] +
+EXPLAIN[neutral] +
+THAT[neutral] +
+UNKNOWN[neutral] +
+TRANSACTION[neutral] +
+ACCOUNT[neutral] +
+SHOW[neutral] +
+THEN[neutral] +
+OFFICER[neutral] +
+ASK[neutral] +
+WHETHER[neutral] +
+I[neutral] +
+RECENTLY[neutral] +
+SHARE[neutral] +
+OTP[neutral] +
+ANYONE[neutral] +
+WITH[neutral] +
+I[neutral] +
+SAY[neutral] +
+NO[negation][neutral] +
+I[neutral] +
+SHARE[negation][neutral] +
+OTP[negation][neutral] +
+WITH[neutral] +
+ANYONE[neutral] +
+OFFICER[neutral] +
+SAY[neutral] +
+DO-NOT[negation][neutral] +
+WORRY[negation][neutral] +
+BUT[neutral] +
+THEY[neutral] +
+MUST[neutral] +
+BLOCK[neutral] +
+CARD[neutral] +
+FIRST[neutral] +
+FOR[neutral] +
+SAFETY[neutral] +
+I[neutral] +
+ASK[neutral] +
+WHETHER[neutral] +
+I[neutral] +
+CAN[neutral] +
+USE[neutral] +
+ONLINE_BANKING[neutral] +
+TODAY[neutral] +
+OFFICER[neutral] +
+SAY[neutral] +
+NOT-NOW[negation][neutral] +
+BECAUSE[neutral] +
+ACCOUNT[neutral] +
+UNDER[neutral] +
+SECURITY[neutral] +
+CHECK[neutral] +
+I[neutral] +
+ASK[neutral] +
+HOW_LONG[neutral] +
+THIS[neutral] +
+TAKE[?][neutral] +
+OFFICER[neutral] +
+SAY[neutral] +
+MAYBE[neutral] +
+TWENTY_FOUR_HOUR[neutral] +
+BUT[neutral] +
+FINAL[neutral] +
+TIME[neutral] +
+DEPEND[neutral] +
+ON[neutral] +
+VERIFICATION[neutral] +
+I[neutral] +
+ASK[neutral] +
+WHETHER[neutral] +
+UNKNOWN[neutral] +
+PAYMENT[neutral] +
+MONEY[neutral] +
+CAN[neutral] +
+RETURN[neutral] +
+OFFICER[neutral] +
+SAY[neutral] +
+IF[neutral] +
+TRANSACTION[neutral] +
+CONFIRM[neutral] +
+FRAUD[neutral] +
+BANK[neutral] +
+WILL[neutral] +
+REFUND[neutral] +
+MONEY[neutral] +
+OTHERWISE[neutral] +
+THEY[neutral] +
+MAY[neutral] +
+ASK[neutral] +
+MERCHANT[neutral] +
+FOR[neutral] +
+MORE[neutral] +
+INFORMATION[neutral] +
+I[neutral] +
+FEEL[neutral] +
+RELIEF[happy] +
+BUT[neutral] +
+STILL[neutral] +
+UNCERTAIN[concern] +
+BECAUSE[neutral] +
+REFUND[neutral] +
+NOT[negation][neutral] +
+GUARANTEED[negation][neutral] +
+YET[neutral] +
+THEN[neutral] +
+OFFICER[neutral] +
+GIVE[neutral] +
+ME[neutral] +
+A[neutral] +
+FORM[neutral] +
+AND[neutral] +
+SAY[neutral] +
+I[neutral] +
+MUST[neutral] +
+FILL[neutral] +
+IT[neutral] +
+BEFORE[neutral] +
+BANK[neutral] +
+CAN[neutral] +
+START[neutral] +
+INVESTIGATION[neutral] +
+I[neutral] +
+FILL[neutral] +
+FORM[neutral] +
+BUT[neutral] +
+ONE[neutral] +
+DOCUMENT[neutral] +
+NOT[negation][neutral] +
+HAVE[negation][neutral] +
+WITH[neutral] +
+ME[neutral] +
+SO[neutral] +
+I[neutral] +
+CANNOT[negation][neutral] +
+SUBMIT[negation][neutral] +
+COMPLETE[neutral] +
+APPLICATION[neutral] +
+TODAY[neutral] +
+OFFICER[neutral] +
+SAY[neutral] +
+IF[neutral] +
+I[neutral] +
+BRING[neutral] +
+DOCUMENT[neutral] +
+TOMORROW[neutral] +
+BANK[neutral] +
+CAN[neutral] +
+COMPLETE[neutral] +
+VERIFICATION[neutral] +
+THEN[neutral] +
+I[neutral] +
+ASK[neutral] +
+WHETHER[neutral] +
+MY[neutral] +
+CARD[neutral] +
+CAN[neutral] +
+BE[neutral] +
+UNBLOCK[neutral] +
+TODAY[?][neutral] +
+OFFICER[neutral] +
+SAY[neutral] +
+NO[negation][neutral] +
+IT[neutral] +
+CAN[neutral] +
+ONLY[neutral] +
+BE[neutral] +
+UNBLOCK[neutral] +
+AFTER[neutral] +
+SECURITY[neutral] +
+CHECK[neutral] +
+COMPLETE[neutral] +
+I[neutral] +
+THANK[neutral] +
+THEM[neutral] +
+AND[neutral] +
+LEAVE[neutral] +
+BANK[neutral] +
+THEN[neutral] +
+ON[neutral] +
+WAY[neutral] +
+I[neutral] +
+CALL[neutral] +
+MY[neutral] +
+BROTHER[neutral] +
+AND[neutral] +
+TELL[neutral] +
+HIM[neutral] +
+EVERYTHING[neutral] +
+HE[neutral] +
+SAY[neutral] +
+IF[neutral] +
+BANK[neutral] +
+NEED[neutral] +
+EXTRA[neutral] +
+DOCUMENT[neutral] +
+HE[neutral] +
+CAN[neutral] +
+BRING[neutral] +
+IT[neutral] +
+FOR[neutral] +
+ME[neutral] +
+BUT[neutral] +
+I[neutral] +
+SAY[neutral] +
+FIRST[neutral] +
+I[neutral] +
+MUST[neutral] +
+CHECK[neutral] +
+WHETHER[neutral] +
+THE[neutral] +
+TRANSACTION[neutral] +
+REALLY[neutral] +
+FRAUD[neutral] +
+OR[neutral] +
+NOT[negation][neutral] +
+BEFORE[neutral] +
+MAKING[neutral] +
+ANY[neutral] +
+DECISION[neutral] +
+THAT[neutral] +
+EVENING[neutral] +
+BANK[neutral] +
+SEND[neutral] +
+ME[neutral] +
+MESSAGE[neutral] +
+SAY[neutral] +
+THE[neutral] +
+TRANSACTION[neutral] +
+IS[neutral] +
+UNDER[neutral] +
+REVIEW[neutral] +
+I[neutral] +
+DO-NOT[negation][neutral] +
+NEED[negation][neutral] +
+TO[neutral] +
+VISIT[neutral] +
+BANK[neutral] +
+AGAIN[neutral] +
+UNTIL[neutral] +
+THEY[neutral] +
+CALL[neutral] +
+ME[neutral] +
+I[concern] +
+STILL[neutral] +
+FEEL[neutral] +
+UNCERTAIN[concern] +
+BECAUSE[neutral] +
+I[neutral] +
+DO-NOT[negation][neutral] +
+KNOW[negation][neutral] +
+WHETHER[neutral] +
+MY[neutral] +
+MONEY[neutral] +
+WILL[neutral] +
+RETURN[neutral] +
+BUT[happy] +
+I[happy] +
+HOPE[happy] +
+THEY[happy] +
+WILL[happy]
 ```
 
-The original prompt caused the model to summarize the long gloss.
-The optimized prompt significantly improved **information preservation and long-sequence Bengali generation**.
+### Latest Observed Performance
+
+```text
+Prompt processing: ~37.84 tok/s
+Generation:        ~5.76 tok/s
+Total time:        ~131.98 sec
+Generated tokens:  ~450
+```
+
+### Latest Observed Output Quality
+
+```text
+Bengali fluency:        Good
+Question handling:      Good / imperfect
+Negation handling:      Moderate
+Speaker tracking:       Moderate
+IF/THEN preservation:   Moderate
+WHETHER scope:          Moderate
+Long-range semantics:   Moderate
+No hallucination:       Fairly good
+Overall:                Good, but semantic scope still needs improvement
+```
+
+### Main Remaining Weakness
+
+```text
+Semantic scope tracking
+        ↓
+Negation scope
+Speaker binding
+WHETHER scope
+IF / THEN scope
+Event segmentation
+Tense consistency
+```
 
 ---
 
-# 7. Inference Configuration
+# 6. Speed Summary
 
-### KoboldCpp
-
-```text
-Context Size:
-4096
-```
-
-### API
-
-```json
-{
-  "max_context_length": 4096
-}
-```
-
-Do not request `32768` when KoboldCpp is running with a `4096` context.
-
-Observed long-test performance:
+Latest selected model:
 
 ```text
-Prompt processing: ~38 tok/s
-Generation:        ~6.2 tok/s
-RAM:                ~10 GB
-```
-
----
-
-# Final Selection
-
-```text
-Reference Model:
-gemma-4-12b-it-Q4_0.gguf
-
-Deployment Model:
+Model:
 gemma-4-E4B-it-Q4_K_M.gguf
 ```
 
-**Final deployment model:** `gemma-4-E4B-it-Q4_K_M.gguf`
+Latest stress test:
 
-**Reason:** Strong Bengali NLG, good long-gloss handling with the optimized prompt, faster CPU inference, and significantly lower RAM usage, making it the most practical model for the WBSL Bridge system.
+```text
+Prompt processing: ~37.84 tok/s
+Generation:        ~5.76 tok/s
+Total:             ~131.98 sec
+RAM:               ~10 GB
+```
+
+Previous long-test result:
+
+```text
+Generation: ~4.27 tok/s
+Total:      ~249.68 sec
+```
+
+Current prompt/model setup therefore shows a significant practical speed improvement.
+
+---
+
+# 7. Final Selection
+
+## Reference
+
+```text
+gemma-4-12b-it-Q4_0.gguf
+```
+
+Best quality reference model.
+
+## Deployment
+
+```text
+gemma-4-E4B-it-Q4_K_M.gguf
+```
+
+**Selected model for WBSL Bridge Bengali NLG.**
+
+### Reason
+
+```text
+Strong Bengali quality
++
+Good semantic understanding
++
+Good question handling
++
+Good negation handling
++
+Good long-gloss performance
++
+Lower RAM usage
++
+Faster CPU inference
+```
+
+The current priority for further improvement is **semantic scope accuracy**, not basic Bengali fluency or generation speed.
