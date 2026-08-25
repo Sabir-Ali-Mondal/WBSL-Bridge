@@ -56,6 +56,20 @@ Main target: WBSL. Supporting data: ISL. ISL and WBSL must remain separately lab
 | 3 | Wikisigns WBSL (170 signs) | 170 | 1-3 videos each | Use as visual reference for re-recording |
 | 4 | Community collection via interface | 170 | Target: 10-15 per sign | Record using custom tool |
 
+### ISL datasets
+```
+https://huggingface.co/datasets/Exploration-Lab/iSign/tree/main
+```
+```
+https://data.mendeley.com/datasets/kcmpdxky7p/1
+```
+```
+https://cs.rkmvu.ac.in/~isl/
+```
+```
+https://universe.roboflow.com/niladri-basu-roy-qnrm4/indian-sign-language-detection/dataset/2
+```
+
 ## 5. Data Pipeline Logic
 
 If ready-made ISL/BdSL datasets provide sufficient coverage for a sign, no re-recording is needed. Wikisigns videos serve as visual reference material. Community recording via the interface is only required when:
