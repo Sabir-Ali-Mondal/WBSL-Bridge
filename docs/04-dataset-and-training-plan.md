@@ -76,6 +76,9 @@ https://universe.roboflow.com/niladri-basu-roy-qnrm4/indian-sign-language-detect
 ```
 https://www.kaggle.com/datasets/hasanssl/bdslw401/data
 ```
+```
+https://zenodo.org/records/6779843?preview_file=undefined
+```
 
 ## 5. Data Pipeline Logic
 
