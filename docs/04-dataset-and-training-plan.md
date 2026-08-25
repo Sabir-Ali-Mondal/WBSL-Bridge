@@ -72,6 +72,10 @@ https://cs.rkmvu.ac.in/~isl/
 ```
 https://universe.roboflow.com/niladri-basu-roy-qnrm4/indian-sign-language-detection/dataset/2
 ```
+### BdSL dataset
+```
+https://www.kaggle.com/datasets/hasanssl/bdslw401/data
+```
 
 ## 5. Data Pipeline Logic
 
