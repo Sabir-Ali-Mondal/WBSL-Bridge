@@ -1,5 +1,8 @@
 # WBSL Bridge: Data Strategy, Collection Plan, and Reference Resources
 
+## Read note
+https://www.researchgate.net/publication/305761433_Distinction_between_West_Bengal_Sign_Language_and_Indian_Sign_Language_Based_on_Statistical_Assessment
+
 ## 1. Data Pipeline Overview
 
 ```text
