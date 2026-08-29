@@ -4,9 +4,9 @@
 *   **1.1 MediaPipe Stream:** Open webcam, draw 540 landmarks (hand/face/pose), verify 30 FPS. [Done]
 *   **1.2 DeepFace Snapshot:** Capture static frame, run DeepFace.analyze(), verify emotion dict output. [Done - Replaced]
 *   **1.2b ViT-ONNX Emotion:** Export HuggingFace ViT model to ONNX, run live inference via onnxruntime. Replaces DeepFace due to glasses failure and TensorFlow/MediaPipe dependency conflict. [Done]
-*   **1.3 Geometry NMM:** Calculate eyebrow-eye distance and lip distance from landmarks; verify values change with facial expressions. [Pending]
+*   **1.3 Geometry NMM:** Calculate eyebrow-eye distance and lip distance from landmarks; verify values change with facial expressions. [ Tried and need to develop more or use ML/DL]
 
-## Phase 2: Temporal Modeling (The Memory)
+## Phase 2: Temporal Modeling (The Memory) [HALF Done ]
 *   **2.1 Data Recorder:** Save hand landmark sequences (x,y,z) to .npy files on keypress.
 *   **2.2 Tiny LSTM:** Train simple PyTorch LSTM on dummy data; export to model.onnx.
 *   **2.3 ONNX Inference:** Load model.onnx via onnxruntime; verify prediction < 5ms on CPU.
