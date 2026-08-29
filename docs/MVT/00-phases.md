@@ -47,3 +47,13 @@
 
 ## Noted for the future:
 word/clause-level fusion of gloss, NMM, and affect streams is technically real but not cheap — it needs three separate models running in parallel (hand/gloss recognizer, facial-landmark/NMM classifier, affect classifier), each with its own training data and timestamps, plus a fusion layer to align their outputs and resolve conflicts when windows don't overlap cleanly. Building and maintaining that pipeline (data collection, model training, alignment tuning, confidence calibration) is a high-budget, multi-team effort — realistic for a well-funded research lab or product team, not a lightweight or solo project. For now, skipping this and treating NMM/emotion as simplified, manually-specified inputs to the NLG layer is the reasonable choice; the fusion architecture is worth revisiting only if/when there's budget for real multi-model video pipelines.
+
+
+## Next Steps
+
+| Priority | Task | Reason |
+|:---|:---|:---|
+| **NOW** | 2B.1 Continuous Recorder | The temporal pipeline is the core of WBSL Bridge and the last unproven piece |
+| Next | 2B.2 Tiny LSTM + 2B.3 ONNX | Proves sequence-to-gloss recognition |
+| Then | Integration test | gloss + NMM + emotion packet -> LLM -> Bengali (the real demo) |
+| Anytime | 2A+ augmentation retrain | Only 10 minutes. Polish for an already-working model. Do it last |
