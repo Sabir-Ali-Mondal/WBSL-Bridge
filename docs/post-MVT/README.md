@@ -1,171 +1,25 @@
 # WBSL Bridge: Post-MVT Architecture Planning
 
-## The Question
+After all MVTs are complete, we should not jump directly into making the big app. The correct way is to build the full WBSL Bridge system in small safe steps. First we prove the complete pipeline works end to end one time in a simple script, where the webcam sees the signer, MediaPipe extracts hand body and face landmarks, the LSTM recognizes the gloss sequence, the geometry rules detect NMM flags like question and negation, the ViT model gives the emotion context, all of these combine into one time-aligned intent packet, and the local LLM converts that packet into natural West Bengal Bengali. Once this chain works one time, we freeze the data format so that all future collected data stays compatible forever. Then we move the whole system into a FastAPI backend and web UI, so that any person can collect data, check labels, train the model with one click, and use live translation without touching any code. Finally we open the platform to the community, so that Deaf people, teachers, students and family members can donate sign data, reviewers approve it, and the model retrains and improves day by day. This order protects us from the biggest mistake, which is spending months making a beautiful interface on top of a pipeline that does not work yet.
 
-After completing all minimum viable tests, should we immediately build the full automated
-architecture with UI-based training, data collection, labeling, and one-click retraining?
-Or are there things we must confirm first before going ahead?
+## Recommended Build Order (10 Points)
 
-## The Short Answer
+1. **Complete remaining MVTs and integration test** - Finish the web data collector (2.4), record 2 to 3 signs, train the tiny LSTM (2.5), export to ONNX and run live inference (2.6). After that run one full integration test where the webcam produces gloss plus NMM plus emotion, the packet goes to the LLM, and Bengali text comes out. This one successful run is the green signal to start building the real app.
 
-Yes, building the full architecture is the correct next step after MVT completion. But not
-all at once. There is a specific order that avoids wasted work and catches failures early.
+2. **Lock the data format and schema** - Freeze the per-frame feature vector (146 values: two hands 126 plus upper body 18 plus NMM 2), the file naming rule, the folder structure, and the JSON metadata format. Write it in one document. If we change the format after users start contributing data, all old data becomes useless and must be recorded again.
 
-## What We Must Confirm Before Building the Full App
+3. **Prove minimum accuracy on small data** - Before collecting thousands of samples, train the LSTM on 3 to 5 signs with around 10 clean repeats each and confirm 70 to 80 percent or better accuracy. If the model cannot learn this small task, then the architecture or features are wrong, and more data will not fix it. Fix the model first, then grow the data.
 
-### 1. End-to-End Pipeline Proof
+4. **Build the FastAPI backend** - Create one Python server with clean endpoints for record start, record stop, data list, data label, train start, train status, live inference, and translation. All the MediaPipe, training, ONNX inference and LLM logic sits behind these endpoints, so the frontend stays simple and can later be replaced with React without touching the backend.
 
-Before building any UI, the complete data flow must work once in a script:
+5. **Build the data collection web UI** - A browser page with live webcam video, a dropdown or text box for the sign label, big animated Start and Stop buttons, and a counter of saved samples. Any person can sit in front of the camera and record 10 to 20 samples of one sign in a few minutes. No terminal, no Python, no coding.
 
-```text
-webcam -> landmarks -> LSTM -> gloss -> NMM flags -> emotion -> intent packet -> LLM -> Bengali text
-```
+6. **Build the labeling and review UI** - A second page where a reviewer, such as you, a teacher, or a Deaf community member, can watch each recorded video, check the saved label, correct wrong labels, and delete bad samples like blurred frames, wrong signs, or hidden hands. Only approved samples enter the training pool, so bad data never poisons the model.
 
-If this chain breaks at any point, building a UI around it is wasted effort. This is what
-the remaining MVTs (2.4 through 2.6 and the integration test) are meant to prove. Once
-the chain runs end-to-end even once, the architecture is validated.
+7. **Build the one-click training page** - A page with a Train Now button that loads all approved data, runs training in the background, shows a live progress bar and accuracy number, automatically exports the new ONNX model, and saves a training log with date, sample count, accuracy, and model version number. The user never writes code, only clicks and waits.
 
-### 2. Data Format Lock
+8. **Build the live recognition and translation page** - The main product page with live webcam, recognized gloss shown as a sequence, NMM flags like question negation and emphasis shown as badges, emotion context, and the final Bengali translation generated by the local LLM, with an optional text-to-speech button to speak it out. This is the page that demonstrates the whole project.
 
-The landmark format (currently 146 features per frame) must be finalized before building
-the training UI. If the format changes after users have contributed data, all previously
-collected data becomes unusable. So the feature vector design (which landmarks, which
-normalization, which extra signals) must be settled before opening data collection to
-users.
+9. **Add the community contribution pipeline** - Open the data collection UI to real users with a simple name tag. Every donated sample goes into a review queue, and after approval it joins the training pool. As more people contribute, the data covers more signers, ages, lighting conditions and regional variations, so signer independence improves naturally. This turns the project into a community-owned system that gets better day by day.
 
-### 3. Minimum Viable Accuracy
-
-The LSTM must achieve at least 70-80 percent accuracy on 3-5 sign classes before
-scaling up. If the model architecture itself is wrong (too small, wrong sequence length,
-wrong features), collecting 10,000 samples will not fix it. Fix the model first on small
-data, then scale the data.
-
-## What the Full Architecture Looks Like
-
-Once the above three checkpoints pass, the full system has these layers:
-
-### Layer 1: Data Collection UI (Web-Based)
-
-A browser-based interface where any user can:
-- See a live webcam feed
-- Select a sign label from a dropdown or type a new one
-- Press Start, perform the sign, press Stop
-- Review the recording before saving
-- The system automatically saves the video file, the landmark .npy file, and the metadata
-
-This is what MVT 2.4 (Web-Based Data Collector) already plans to build.
-
-### Layer 2: Labeling and Review UI
-
-A separate page where a reviewer (you, a teacher, or a Deaf community member) can:
-- Browse all collected samples
-- Play back the video
-- Confirm or correct the label
-- Mark bad samples for deletion
-- Add notes (for example: "this sample has occlusion" or "wrong hand used")
-
-This ensures data quality before training.
-
-### Layer 3: One-Click Training
-
-A page with a Train button that:
-- Loads all confirmed labeled data
-- Runs the training script (MLP for static, LSTM for continuous)
-- Shows a progress bar and live accuracy graph
-- Exports the new ONNX model automatically
-- Saves a training log (date, samples used, accuracy achieved, model version)
-
-No coding required at training time. The user just clicks Train.
-
-### Layer 4: Live Recognition and Translation
-
-The main user-facing page:
-- Webcam feed with real-time sign recognition
-- NMM flags displayed
-- Emotion context shown
-- Recognized gloss sequence displayed
-- Bengali translation generated by the LLM
-- Optional: text-to-speech for the Bengali output
-
-### Layer 5: Community Contribution Pipeline
-
-This is the long-term vision. The system becomes trainable by users:
-- Any literate person who knows sign language can contribute data through the web UI
-- Contributed data goes into a review queue
-- After review and approval, it enters the training pool
-- The model can be retrained periodically (daily, weekly, or on-demand)
-- Each retraining cycle uses more data and produces a better model
-- The model version is tracked so you can roll back if a new training produces worse results
-
-This is similar to how open-source translation projects work. People donate translations,
-reviewers verify quality, and the system improves over time.
-
-## Is More Data Always Better?
-
-No. This is a common misconception. More data helps only when:
-- The model architecture is already correct for the task
-- The data is correctly labeled
-- The data covers the actual variation the model will face in production
-- The data is balanced across classes (not 5000 samples of "hello" and 10 of "thank you")
-
-If the model is fundamentally wrong, or the labels are noisy, or the data is all from one
-person in one lighting condition, then 100,000 samples will still produce a bad model.
-
-The correct order is:
-1. Get the model working on small, clean, verified data (this is what MVT does)
-2. Identify what the model gets wrong
-3. Collect targeted data to fix those specific weaknesses
-4. Retrain and evaluate
-5. Repeat
-
-This is called iterative data collection and it is far more effective than bulk collection.
-
-## What Can Go Wrong If We Build the Full App Too Early
-
-| Risk | What Happens | How to Avoid |
-|:---|:---|:---|
-| Feature format changes | All collected data becomes incompatible | Lock format after MVT integration test |
-| Model architecture is wrong | Thousands of samples collected but accuracy stays low | Prove >70% on 3-5 classes first |
-| Labeling errors compound | Bad labels train bad models which accept more bad labels | Build review/approval step before bulk collection |
-| UI work delays core pipeline | Months spent on frontend while backend still broken | Get end-to-end pipeline working in scripts first |
-| Community data without quality control | Noisy data degrades model | Review queue is mandatory before training |
-
-## The Recommended Build Order After MVT
-
-| Step | What | Why |
-|:---|:---|:---|
-| 1 | Complete remaining MVTs (2.4 through 2.6 + integration) | Proves end-to-end chain works |
-| 2 | Lock feature format and data schema | Prevents future data incompatibility |
-| 3 | Build FastAPI backend with all endpoints | Recording, training, inference, LLM |
-| 4 | Build data collection web UI | Start collecting real data |
-| 5 | Build labeling and review UI | Ensure data quality |
-| 6 | Build one-click training UI | Remove coding requirement |
-| 7 | Build live recognition and translation UI | The actual product |
-| 8 | Add community contribution pipeline | Long-term scalability |
-| 9 | Add model versioning and rollback | Safety net for retraining |
-
-## The Community Contribution Vision
-
-The most powerful long-term feature of WBSL Bridge is that it can become a community-driven
-project. Deaf individuals, sign language teachers, students, and family members can all
-contribute data through a simple web interface. They do not need to understand machine
-learning. They just perform signs, label them, and the system learns.
-
-This creates a virtuous cycle:
-- More contributors means more diverse data
-- More diverse data means better signer independence
-- Better accuracy means more people want to use and contribute
-- The model improves continuously without any developer intervention
-
-This is realistic and achievable. The technical foundation (landmark extraction,
-normalization, ONNX export, web UI) is already proven through the MVTs. The remaining
-work is engineering (building the UI, adding the review queue, automating retraining)
-rather than research (figuring out whether the approach works at all).
-
-## Summary
-
-The full automated architecture with UI-based training and community contribution is the
-correct end goal. But it must be built in the right order: prove the pipeline first, lock
-the data format, achieve minimum accuracy on small data, then scale up the UI and data
-collection. Skipping these steps risks building a beautiful interface around a broken
-pipeline.
+10. **Add model versioning and rollback** - Every training run saves a new model file with a version number and its accuracy score, and the system always keeps the last few good models. If a new retraining performs worse than the old model, which can happen with noisy new data, one click rolls back to the previous best model. This makes continuous retraining safe and gives confidence to let the community train the system.
