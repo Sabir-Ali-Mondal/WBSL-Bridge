@@ -3,25 +3,48 @@
 ## 1. Problem
 Windows has no built-in Bengali voice. Mobile devices have Bengali TTS natively, but the desktop project needs a working solution for the reverse path (Bengali text to spoken audio).
 
-## 2. Solution Selected
+## 2. Engines Tested (test_all_tts.py)
 
-| Option | Offline | Quality | Speed | Decision |
-|:---|:---|:---|:---|:---|
-| IndicF5 (AI4Bharat) | Yes | High, voice cloning | Slow on CPU | Future offline option |
-| edge-tts (Microsoft) | No (internet) | High, natural | Instant | Selected for MVT |
-| Windows SAPI | Yes | No Bengali voice | - | Not usable |
+| Engine | Status | Generation Time | Offline | Quality | Verdict |
+|:---|:---|:---|:---|:---|:---|
+| edge-tts | OK | 2484 ms | No (internet) | Best, natural | **SELECTED - PRIMARY** |
+| BanglaTTS | OK | 50314 ms | Yes (after first download) | Lower | Offline fallback |
+| Windows SAPI | FAIL | - | Yes | No Bengali voice (only David, Zira English) | Not usable |
+| sherpa-onnx | FAIL | - | Yes | No Bengali ONNX model exists | Not usable |
+| IndicF5 (AI4Bharat) | Not tested | Estimated 10-30 sec on CPU | Yes | High, voice cloning | Future premium offline option |
 
-edge-tts selected because it produces natural Bengali speech instantly with zero setup. Voice used: `bn-BD-NabanitaNeural`.
+## 3. Final Decision
 
-## 3. Environment
+**edge-tts will be used as the TTS engine for WBSL Bridge.**
+
+Voice: `bn-BD-NabanitaNeural`
+
+Fallback chain built into the system:
+
+```text
+Try edge-tts (best quality, fast, needs internet)
+    If no internet -> BanglaTTS (offline, slow but works)
+        Future upgrade -> IndicF5 (offline, voice cloning, heavy)
+```
+
+This gives best quality when internet is available and guaranteed audio output when it is not.
+
+## 4. Why edge-tts Works When Windows Has No Bengali TTS
+
+- edge-tts is NOT pre-installed. It is a third-party open-source pip package installed by us in `.venv-tts`.
+- It connects to Microsoft Edge's online neural Read Aloud service, which hosts modern neural voices for 100+ languages including Bengali.
+- Windows offline SAPI voices are old English-only voices (confirmed: David, Zira). The Bengali voices live on Microsoft's servers, and edge-tts exposes them for free.
+- Internet is required every time. No offline cache.
+
+## 5. Environment
 
 ```powershell
 py -3.11 -m venv .venv-tts
 .\.venv-tts\Scripts\Activate.ps1
-pip install edge-tts mutagen
+pip install edge-tts mutagen BanglaTTS
 ```
 
-## 4. The Code (`test_tts.py`)
+## 6. The Code (`test_tts.py`)
 
 ```python
 import asyncio
@@ -53,14 +76,17 @@ async def main():
 asyncio.run(main())
 ```
 
-## 5. Results
+## 7. Results
 
-### Short Test
+### All-Engine Speed Test (same short sentence)
 ```text
-Text: নমস্কার, আমি সাবির। আজ আবহাওয়া খুব সুন্দর। আমি কলেজে যাচ্ছি। আপনার নাম কী? দয়া করে একটু অপেক্ষা করুন।
+edge-tts     OK     2484 ms     tts_edge.mp3
+BanglaTTS    OK     50314 ms    tts_banglatts.wav
+SAPI         FAIL   No Bengali voice
+sherpa-onnx  FAIL   No Bengali model
 ```
 
-### Long Stress Test (1164 words, 5151 characters)
+### Long Stress Test with edge-tts (1164 words, 5151 characters)
 ```text
 Total audio duration: 446328 ms
 Total characters: 5151
@@ -69,7 +95,7 @@ Ms per word: 383
 Ms per character: 87
 ```
 
-## 6. Timing Constants for Real-Time System
+## 8. Timing Constants for Real-Time System
 
 | Metric | Value | Use |
 |:---|:---|:---|
@@ -84,30 +110,46 @@ Estimated audio duration = 15 x 383 = 5745 ms (~5.7 seconds)
 
 This lets the UI show the Bengali text immediately and display an estimated speaking duration before audio playback starts.
 
-## 7. Integration into WBSL Bridge Pipeline
+## 9. Resource Comparison
+
+| Factor | edge-tts | BanglaTTS | IndicF5 |
+|:---|:---|:---|:---|
+| RAM usage | ~50 MB | ~500 MB - 1 GB | ~2-4 GB |
+| Disk space | ~5 MB | ~200 MB | ~1-2 GB |
+| CPU load | Near zero (server does the work) | Medium | Heavy |
+| Speed (short text) | ~2.5 sec | ~50 sec | ~10-30 sec |
+| Weight class | Lightest | Medium | Heaviest |
+
+## 10. Integration into WBSL Bridge Pipeline
 
 ```text
 Webcam -> MediaPipe -> LSTM -> Gloss + NMM + Emotion
     -> Intent Packet -> LLM -> Bengali Text
-        -> edge-tts -> bengali.mp3 -> Playback
+        -> edge-tts (primary) / BanglaTTS (offline fallback)
+            -> bengali.mp3 -> Playback
 ```
 
 The TTS module receives the LLM output string and returns an audio file. The timing constants allow the UI to estimate playback duration before the audio is ready.
 
-## 8. Future Upgrade Path
+## 11. Production Note
 
-When offline capability is required, replace edge-tts with IndicF5:
-- Same input (Bengali text string)
-- Same output (audio file)
-- Adds reference audio for voice cloning
-- Runs fully offline on CPU
-- Slower generation speed, acceptable for non-real-time use
+edge-tts is an unofficial open-source client for Microsoft's online speech service. It is free and high quality but requires internet and has no license or SLA. This is acceptable for an academic project and demo. For mass production deployment, the documented replacements are Microsoft Azure Neural TTS (official, licensed, low latency) for online use, or IndicF5 (AI4Bharat) for fully offline use. The architecture supports swapping the TTS backend without changing any other component.
 
-## 9. Success Criteria Checklist
+## 12. Future Upgrade Path
+
+- IndicF5 (AI4Bharat): fully offline, voice cloning from reference audio, higher quality than BanglaTTS, but heavy (~2-4 GB RAM, 10-30 sec per generation on CPU).
+- Azure Neural TTS: official licensed online option for production.
+- The fallback chain (edge-tts -> BanglaTTS -> IndicF5) remains the same regardless of which backend is swapped in.
+
+## 13. Success Criteria Checklist
 - [x] Bengali text converted to natural spoken audio
 - [x] Audio saved as mp3 file
+- [x] All 4 engines tested and compared in one script
+- [x] edge-tts selected as primary engine
+- [x] BanglaTTS confirmed as working offline fallback
+- [x] Windows SAPI and sherpa-onnx confirmed unusable for Bengali
 - [x] Timing metrics measured (ms per word, ms per character)
+- [x] Resource and weight comparison documented
 - [x] Works in isolated .venv-tts environment
-- [x] No coding required to change input text
 - [ ] IndicF5 offline test (future)
 - [ ] Auto-playback integration with UI (future)
