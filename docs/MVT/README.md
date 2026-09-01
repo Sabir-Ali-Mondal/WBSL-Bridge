@@ -22,10 +22,10 @@
 *   **3.5 Speed Benchmark:** Deployment model (gemma-4-E4B): prompt processing ~37.84 tok/s, generation ~5.76 tok/s, total ~132 sec for long test. [Done]
 *   **3.6 Identified Weakness:** Semantic scope tracking (negation scope, speaker binding, WHETHER scope, IF/THEN scope, event segmentation, tense consistency) is the primary remaining weakness. Bengali fluency and speed are acceptable. Future improvement priority: scope accuracy, not fluency. [Documented]
 
-## Phase 4: Reverse Path (The Voice) [No test needed]
-*   **4.1 FastAPI Backend:** Create /generate-sign endpoint; input text, output gloss JSON.
-*   **4.2 React UI:** Simple input box + button; display returned gloss sequence on screen.
-*   **4.3 TTS Test:** Convert Bengali string to audio; verify playback.
+## Phase 4: Reverse Path (The Voice) [In Progress]
+*   **4.1 FastAPI Backend:** Create /generate-sign endpoint; input text, output gloss JSON. [Pending]
+*   **4.2 React UI:** Simple input box + button; display returned gloss sequence on screen. [Pending]
+*   **4.3 Bengali TTS (Dual Engine):** Windows SAPI and sherpa-onnx confirmed unusable (no Bengali voice/model). edge-tts selected as PRIMARY (online, bn-BD-NabanitaNeural, ~2.5 sec generation, handles punctuation correctly). BanglaTTS selected as OFFLINE FALLBACK (silero model, ~2.4 sec generation after cache, ignores punctuation; mitigated by text cleaning). Automatic fallback chain coded in tts_engine.py. Timing constants measured: edge-tts ~604 ms/word, BanglaTTS ~453 ms/word. [Done]
 
 ---
 
@@ -43,6 +43,7 @@
 | gemma-4-E4B for deployment | Best balance of Bengali quality, semantic understanding, RAM usage, and CPU inference speed among 6 tested models |
 | gemma-4-12b as reference | Highest quality benchmark for evaluating future model or prompt improvements |
 | Constrained NLG prompt | Explicit rules for question/negation/WHETHER/IF-THEN scope prevent the most common semantic errors in gloss-to-Bengali conversion |
+| TTS dual engine (edge-tts + BanglaTTS) | Windows has no Bengali SAPI voice. edge-tts gives best quality online; BanglaTTS guarantees audio output offline. Punctuation limitation of BanglaTTS mitigated by text cleaning |
 | Python 3.11 enforced | Python 3.14 unsupported by MediaPipe/TensorFlow; dummy package risk on PyPI |
 | mediapipe==0.10.14 pinned | Unpinned pip install resolves to unrelated 1.0.1 package |
 
@@ -52,13 +53,15 @@
 |:---|:---|:---|
 | .venv | Active - Primary | mediapipe 0.10.14, torch, onnxruntime, onnxscript, transformers, opencv |
 | .venv-deepface | Retired | tensorflow 2.13, deepface (superseded by ViT-ONNX) |
+| .venv-tts | Active - TTS | edge-tts, BanglaTTS, mutagen |
 
 ## Noted for the future:
 word/clause-level fusion of gloss, NMM, and affect streams is technically real but not cheap — it needs three separate models running in parallel (hand/gloss recognizer, facial-landmark/NMM classifier, affect classifier), each with its own training data and timestamps, plus a fusion layer to align their outputs and resolve conflicts when windows don't overlap cleanly. Building and maintaining that pipeline (data collection, model training, alignment tuning, confidence calibration) is a high-budget, multi-team effort — realistic for a well-funded research lab or product team, not a lightweight or solo project. For now, skipping this and treating NMM/emotion as simplified, manually-specified inputs to the NLG layer is the reasonable choice; the fusion architecture is worth revisiting only if/when there's budget for real multi-model video pipelines.
 
 ---
-
-## Session Log: 29 August 2026
+## Session Log: 1 September 2026 (TTS Session)
+Session Log: 29 August 2026      -> Phase 2.1 static ISL pipeline
+Session Log: 1 September 2026    -> Phase 4.3 TTS dual engine
 
 ### Completed This Session
 - Phase 2.1 full pipeline: image-to-landmark conversion (two-hand, 126-dim), MLP training (99.9% val), ONNX export, live webcam inference with majority vote smoothing
@@ -81,8 +84,31 @@ word/clause-level fusion of gloss, NMM, and affect streams is technically real b
 | sign_classes.json | 35 class labels |
 | dataset_landmarks/*.npy | 35 files, ~300 samples each, 126-dim |
 
+---
+
+## Session Log: TTS Session
+
+### Completed This Session
+- Confirmed Windows SAPI has no Bengali voice (only English David and Zira)
+- Tested 4 engines in one script: edge-tts (OK), BanglaTTS (OK), SAPI (FAIL), sherpa-onnx (FAIL, no Bengali model)
+- Selected edge-tts as primary TTS (best quality, handles punctuation, ~2.5 sec generation)
+- Selected BanglaTTS as offline fallback (works without internet, ~2.4 sec generation after model cache)
+- Discovered BanglaTTS ignores punctuation (comma, full stop, danda); mitigated with text cleaning in fallback path
+- Measured timing constants on same example text for both engines
+- Built automatic fallback chain (tts_engine.py): edge-tts first, BanglaTTS if no internet
+
+### Files Created This Session
+| File | Purpose |
+|:---|:---|
+| test_tts.py | edge-tts generation + timing metrics |
+| test_banglatts.py | BanglaTTS offline generation + timing metrics |
+| test_all_tts.py | 4-engine comparison test |
+| tts_engine.py | Automatic fallback chain (edge-tts -> BanglaTTS) |
+| bengali.mp3 / tts_edge.mp3 | edge-tts output samples |
+| bengali_offline.wav / tts_banglatts.wav | BanglaTTS output samples |
+
 ### Resume Point
-When resuming, start with **2.4 Web-Based Data Collector** (FastAPI + HTML). The backend reuses the exact extract_frame() logic from phase2b_recorder.py. After collecting 2-3 signs (~10 reps each), proceed to 2.5 LSTM training.
+When resuming, start with **2.4 Web-Based Data Collector** (FastAPI + HTML). The backend reuses the exact extract_frame() logic from phase2b_recorder.py. After collecting 2-3 signs (~10 reps each), proceed to 2.5 LSTM training. TTS module (tts_engine.py) is ready to plug into the final pipeline after LLM Bengali output.
 
 ## Next Steps (Priority Order)
 
@@ -92,6 +118,7 @@ When resuming, start with **2.4 Web-Based Data Collector** (FastAPI + HTML). The
 | 2 | Collect 2-3 signs, ~10 reps each via web UI | Pending |
 | 3 | 2.5 Tiny LSTM train + ONNX export | Pending |
 | 4 | 2.6 Live LSTM ONNX inference | Pending |
-| 5 | Integration: gloss + NMM + emotion packet -> LLM -> Bengali | Pending |
-| 6 | 2.2 Augmentation retrain (10 min polish) | Pending - do last |
-| 7 | 3.x Scope accuracy improvement | Documented - future work |
+| 5 | Integration: gloss + NMM + emotion packet -> LLM -> Bengali -> TTS playback | Pending |
+| 6 | 4.1 FastAPI reverse endpoint + 4.2 React UI | Pending |
+| 7 | 2.2 Augmentation retrain (10 min polish) | Pending - do last |
+| 8 | 3.x Scope accuracy improvement | Documented - future work |
