@@ -180,16 +180,16 @@ This ablation is itself a proposed evaluation protocol for unknown-sign interpre
 | # | Source | Link |
 |:---|:---|:---|
 | [1] | Multi-scale context-aware network for continuous sign language recognition, ScienceDirect 2023 | https://www.sciencedirect.com/science/article/pii/S2096579623000414 |
-| [2] | Delving into out-of-distribution detection with vision transformers, ACM 2022 | https://dl.acm.org/doi/10.5555/3600270.3602813 |
+| [2] | Delving into out-of-distribution detection with vision transformers | https://dl.acm.org/doi/10.5555/3600270.3602813 |
 | [3] | Language-Enhanced Latent Representations for OOD Detection, arXiv 2024 | https://arxiv.org/abs/2405.01691 |
-| [4] | Towards Sign Understanding for Robot Autonomy (open-set detector + VLM), arXiv 2025 | https://arxiv.org/html/2506.02556v1 |
+| [4] | Towards Sign Understanding for Robot Autonomy (open-set detector + VLM), arXiv 2025 | https://arxiv.org/abs/2506.02556 |
 | [5] | SignLLM: Sign Language Production Large Language Models, arXiv 2024 | https://arxiv.org/abs/2405.10718 |
 | [6] | Factorized Learning Assisted with LLM for Gloss-free Sign Language Translation, ACL 2024 | https://aclanthology.org/2024.lrec-main.620/ |
 | [7] | Google DeepMind — Putting sign language AI into users' hands | https://deepmind.google/blog/putting-sign-language-ai-into-users-hands/ |
-| [8] | Continuous SLR using Multimodal Input and Handshape-aware Boundary Detection, sign-lang@LREC | https://www.sign-lang.uni-hamburg.de/lrec/pub/26014.html |
-| [9] | Continuous SLR through a Context-Aware Generative Adversarial Network, PMC | https://pmc.ncbi.nlm.nih.gov/articles/PMC8038055/ |
+| [8] | Continuous SLR using Multimodal Input and Handshape-aware Boundary Detection | https://www.sign-lang.uni-hamburg.de/lrec/pub/26014.html |
+| [9] | Continuous SLR through a Context-Aware Generative Adversarial Network | https://pmc.ncbi.nlm.nih.gov/articles/PMC8038055/ |
 | [10] | Guo et al., On Calibration of Modern Neural Networks (temperature scaling), 2017 | https://arxiv.org/abs/1706.04599 |
-| [11] | Lee et al., A Simple Unified Framework for OOD Detection (Mahalanobis), 2018 | https://arxiv.org/abs/1807.03888 |
+| [11] | Lee et al., Mahalanobis-distance OOD detection, NeurIPS 2018 | https://arxiv.org/abs/1807.03888 |
 | [12] | Liu et al., Energy-based Out-of-distribution Detection, 2020 | https://arxiv.org/abs/2010.03759 |
-| [13] | Shafer & Vovk, A Tutorial on Conformal Prediction, 2007 | https://arxiv.org/abs/0707.0381 |
+| [13] | Shafer & Vovk, A Tutorial on Conformal Prediction | https://arxiv.org/abs/0707.0381 |
 | [14] | Bendale & Boult, Towards Open Set Deep Networks (OpenMax), 2016 | https://arxiv.org/abs/1511.06261 |
