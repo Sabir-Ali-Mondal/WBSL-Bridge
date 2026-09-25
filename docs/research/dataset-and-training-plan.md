@@ -72,6 +72,10 @@ https://cs.rkmvu.ac.in/~isl/
 ```
 https://universe.roboflow.com/niladri-basu-roy-qnrm4/indian-sign-language-detection/dataset/2
 ```
+```
+https://huggingface.co/datasets/ivedant123/Indian_sign_anguage/tree/main
+```
+
 ### BdSL dataset
 ```
 https://www.kaggle.com/datasets/hasanssl/bdslw401/data
