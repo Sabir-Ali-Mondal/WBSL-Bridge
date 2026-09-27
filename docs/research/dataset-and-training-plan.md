@@ -61,6 +61,13 @@ Main target: WBSL. Supporting data: ISL. ISL and WBSL must remain separately lab
 
 ### ISL datasets
 ```
+https://www.kaggle.com/datasets/prasadshet/indian-sign-language-video-dataset?select=Sample+Videos
+
+i think it will be best
+```
+
+
+```
 https://huggingface.co/datasets/Exploration-Lab/iSign/tree/main
 ```
 ```
