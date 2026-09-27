@@ -1,0 +1,87 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 4%;
+    --foreground: 240 5% 96%;
+    --card: 240 4% 8%;
+    --card-foreground: 240 5% 96%;
+    --popover: 240 4% 11%;
+    --popover-foreground: 240 5% 96%;
+    --primary: 142 71% 45%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 239 84% 67%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 240 4% 16%;
+    --muted-foreground: 240 5% 65%;
+    --accent: 240 4% 16%;
+    --accent-foreground: 240 5% 96%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 4% 16%;
+    --input: 240 4% 16%;
+    --ring: 142 71% 45%;
+    --radius: 0.5rem;
+  }
+}
+
+body {
+  background-color: #0A0A0B;
+  color: #F4F4F5;
+  font-family: var(--font-inter), sans-serif;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #0A0A0B;
+}
+::-webkit-scrollbar-thumb {
+  background: #1C1C1F;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #27272A;
+}
+
+/* Bengali Output Styling */
+.bengali-text {
+  font-family: var(--font-noto-bengali), sans-serif;
+  line-height: 1.8;
+  letter-spacing: 0.02em;
+}
+
+/* Technical Monospace Elements */
+.tech-mono {
+  font-family: var(--font-jetbrains-mono), monospace;
+}
+
+/* Premium background video blur — enough to sit behind content,
+   not so much that the footage stops reading as footage. */
+.bg-video-premium-blur {
+  filter: blur(1px) saturate(125%) contrast(106%) brightness(0.72);
+  transform: scale(1.06);
+  transform-origin: center;
+  will-change: transform, filter;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bg-video-premium-blur {
+    filter: blur(1px) brightness(0.62);
+  }
+}
+
+/* Grid background for simulation */
+.canvas-grid-bg {
+  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 20px 20px;
+}

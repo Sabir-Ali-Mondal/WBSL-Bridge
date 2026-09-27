@@ -1,0 +1,208 @@
+# =============================================================================
+# WBSL Bridge — root .gitignore
+# =============================================================================
+# This is a monorepo-style layout:
+#   frontend/  -> Next.js app. NOTE: frontend/ is its own git repo with its own
+#                 .gitignore; that one wins for anything inside it.
+#   backend/   -> Python (FastAPI) service
+#   models/    -> ONNX + GGUF model weights  (~6.3 GB, never commit)
+#   dataset/   -> sample data
+#   tests/     -> experiment scripts + several virtualenvs + raw datasets
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# Secrets / environment  (NEVER commit these)
+# -----------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+
+# -----------------------------------------------------------------------------
+# Python
+# -----------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments (tests/ holds three of them, ~5 GB total)
+.venv/
+.venv-*/
+venv/
+env/
+ENV/
+.conda/
+pyvenv.cfg
+
+# Packaging / builds
+build/
+dist/
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Test & type-checker caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.coverage
+.coverage.*
+htmlcov/
+*.cover
+coverage.xml
+
+
+# -----------------------------------------------------------------------------
+# Model weights & binaries  (large — fetch/rebuild, do not commit)
+# -----------------------------------------------------------------------------
+# GGUF quantised LLMs + the koboldcpp runtime (~6.3 GB under models/llm/)
+models/llm/
+*.gguf
+
+# ONNX graphs, external tensor data, and compiled model artifacts
+# (e.g. tests/vit_emotion.onnx.data is 327 MB)
+*.onnx
+*.onnx.data
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.h5
+*.tflite
+*.mlmodel
+*.bin
+*.pb
+
+# Native binaries / shared libs shipped with models
+*.exe
+*.dll
+*.dylib
+
+# Local model download caches
+.cache/
+huggingface/
+torch/
+*.model
+
+
+# -----------------------------------------------------------------------------
+# Datasets & generated media  (large / regenerable — do not commit)
+# -----------------------------------------------------------------------------
+# Raw sign-language corpora (tests/Indian Sign Language_Dataset is ~269 MB)
+tests/Indian Sign Language_Dataset/
+tests/dataset_landmarks/
+tests/dataset_continuous/
+dataset/samples/
+
+# Generated TTS audio output (regenerated on every request)
+backend/tts_output/*
+!backend/tts_output/.gitkeep
+
+# Uploaded / captured media (keep the folder, drop the contents)
+backend/media/*
+!backend/media/.gitkeep
+
+# Common media blobs produced by capture & synthesis pipelines.
+# NOTE: *.mp4 / *.png are deliberately NOT listed here — they are project
+# assets (e.g. frontend/public/background.mp4, the WBSL logo). Generated audio
+# is covered by the backend/tts_output/* rule above.
+*.wav
+*.m4a
+*.flac
+*.pkl
+*.npz
+*.npy
+*.hdf5
+*.parquet
+*.arrow
+
+
+# -----------------------------------------------------------------------------
+# Node / Next.js  (frontend has its own .gitignore too — this is a backstop
+# for when the root repo is initialised over the whole tree)
+# -----------------------------------------------------------------------------
+node_modules/
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+.next/
+out/
+.vercel
+.turbo/
+*.tsbuildinfo
+next-env.d.ts
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+
+
+# -----------------------------------------------------------------------------
+# Logs & runtime output
+# -----------------------------------------------------------------------------
+*.log
+logs/
+*.pid
+*.seed
+frontend_dev.log
+frontend_dev.err.log
+
+
+# -----------------------------------------------------------------------------
+# Notebooks
+# -----------------------------------------------------------------------------
+.ipynb_checkpoints/
+
+
+# -----------------------------------------------------------------------------
+# Editors & IDEs
+# -----------------------------------------------------------------------------
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+!.vscode/launch.json
+.idea/
+*.swp
+*.swo
+*.suo
+*.user
+*~
+
+
+# -----------------------------------------------------------------------------
+# OS cruft
+# -----------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+
+# -----------------------------------------------------------------------------
+# Scratch / temporary
+# -----------------------------------------------------------------------------
+*.tmp
+*.temp
+*.bak
+*.orig
+*.rej
+tmp/
+temp/
+scratch/
+frontend/.git-frontend-backup/

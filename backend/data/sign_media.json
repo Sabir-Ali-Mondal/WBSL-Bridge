@@ -1,0 +1,12 @@
+{
+  "1": {
+    "type": "image",
+    "filename": "1.jpg",
+    "url": "/api/media/1.jpg"
+  },
+  "2": {
+    "type": "image",
+    "filename": "2.jpg",
+    "url": "/api/media/2.jpg"
+  }
+}
