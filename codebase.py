@@ -57,7 +57,8 @@ SKIP_DIRS = {
     "generated",
 
     "tests",
-    "llm"
+    "llm",
+    "docs"
 }
 
 
@@ -102,6 +103,8 @@ COLLAPSE_TREE_DIRS = {
 # ============================================================
 
 SKIP_FILES = {
+    "implementation.md",
+    "README.md",
     "codebase.md",
     "project-tree.txt",
     "implementation.md"
