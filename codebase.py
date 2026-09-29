@@ -83,6 +83,7 @@ SKIP_DIR_PREFIXES = {
 #
 
 COLLAPSE_TREE_DIRS = {
+    "dataset_train",
     "datasets",
     "dataset",
     "data",
@@ -103,6 +104,7 @@ COLLAPSE_TREE_DIRS = {
 # ============================================================
 
 SKIP_FILES = {
+    "codebase.py",
     "implementation.md",
     "README.md",
     "codebase.md",

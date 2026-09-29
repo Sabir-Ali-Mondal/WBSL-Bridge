@@ -7,6 +7,9 @@ import { LandmarkSimulation } from "@/components/simulation/LandmarkSimulation";
 import { TableRowSkeleton } from "@/components/skeletons";
 import { Contribution } from "@/lib/types";
 import { toast } from "sonner";
+import axios from "axios";
+
+const API_BASE = "http://localhost:8000";
 
 export default function AdminContributionsPage() {
   const { data: contributions, isLoading, refetch } = useQuery({
@@ -20,6 +23,17 @@ export default function AdminContributionsPage() {
     queryKey: ["evidence", selectedContribution?.sample_id],
     queryFn: () => contributionService.getEvidence(selectedContribution!.sample_id),
     enabled: !!selectedContribution,
+  });
+
+  // Real extracted landmarks of the submitted sample (no synthetic fallback).
+  const { data: sim } = useQuery({
+    queryKey: ["sim-frames-sample", selectedContribution?.sample_id],
+    queryFn: async () =>
+      (await axios.get(`${API_BASE}/api/simulation/frames`, {
+        params: { sample_id: selectedContribution!.sample_id },
+      })).data,
+    enabled: !!selectedContribution,
+    retry: false,
   });
 
   const handleVerify = async (action: "accepted" | "rejected" | "needs_review", notes?: string) => {
@@ -102,7 +116,7 @@ export default function AdminContributionsPage() {
                 <div className="text-xs font-mono uppercase text-text-muted">
                   Kinematic Skeleton Replay: {selectedContribution.label}
                 </div>
-                <LandmarkSimulation showHands showFace showPose fps={30} />
+                <LandmarkSimulation frames={sim?.frames} fps={15} title={sim?.source} />
               </div>
 
               {/* Evidence Panel with Reasoning Layer */}

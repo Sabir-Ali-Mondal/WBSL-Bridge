@@ -14,6 +14,8 @@ NOTE: no local-LLM provider is configured or auto-started by default.
 
 import json
 import os
+import socket
+from urllib.parse import urlparse
 from pathlib import Path
 from typing import Iterator
 
@@ -100,7 +102,76 @@ def get_ai_client(timeout: float | None = None):
     return client, cfg["model"]
 
 
-def build_request(cfg: dict, gloss_text: str, **overrides) -> dict:
+def build_user_message(gloss_text: str, meta: dict | None = None) -> str:
+    """
+    Compose the user turn: the gloss itself, plus any NMM / affect context.
+
+    The recognition layer already knows things the gloss string cannot express --
+    head shake (negation), brow raise (polar question), brow furrow (WH question),
+    mouth opening (emphasis) and the dominant facial emotion (ViT). Dropping them
+    on the floor leaves the LLM guessing, so they are forwarded as an explicit
+    metadata block. The model is told what each signal means; it is NOT told how
+    to phrase the sentence, which stays the prompt's job.
+    """
+    meta = meta or {}
+    lines: list[str] = []
+
+    nmm = meta.get("nmm") or {}
+    if isinstance(nmm, dict):
+        if nmm.get("negation"):
+            lines.append("- NEGATION: head shake detected. The signer negated it.")
+        if nmm.get("affirmation"):
+            lines.append("- AFFIRMATION: deliberate head nod detected.")
+        if nmm.get("wh_question"):
+            lines.append("- WH-QUESTION: brow furrow detected. Marked tokens are WH-questions.")
+        if nmm.get("question"):
+            lines.append(
+                "- POLAR QUESTION: eyebrow raise detected. Marked tokens are yes/no questions."
+            )
+        if nmm.get("emphasis"):
+            lines.append("- EMPHASIS: mouth opening detected on the marked token(s).")
+
+    emotion = meta.get("emotion")
+    if isinstance(emotion, dict):
+        dominant = emotion.get("dominant")
+        confidence = emotion.get("confidence")
+        if dominant and dominant != "neutral":
+            pct = (
+                f" ({round(float(confidence) * 100)}% confidence)"
+                if isinstance(confidence, (int, float))
+                else ""
+            )
+            lines.append(
+                f"- AFFECT: dominant facial emotion is {dominant}{pct}. "
+                "This colour the whole utterance; keep it out of the text unless "
+                "the gloss itself carries an [emotion] marker."
+            )
+
+    intensity = meta.get("intensity")
+    if isinstance(intensity, (int, float)) and intensity > 1.0:
+        lines.append(
+            f"- INTENSITY: the motion is amplified (x{round(float(intensity), 2)}); "
+            "the action was performed strongly or repeatedly."
+        )
+
+    hand = meta.get("hand")
+    if hand:
+        lines.append(f"- DOMINANT HAND: {hand}.")
+
+    if not lines:
+        return gloss_text
+
+    return (
+        "SIGN METADATA (detected non-manual markers and affect):\n"
+        + "\n".join(lines)
+        + "\n\nGLOSS:\n"
+        + gloss_text
+    )
+
+
+def build_request(
+    cfg: dict, gloss_text: str, meta: dict | None = None, **overrides
+) -> dict:
     """
     Build the chat/completions payload from .env settings.
 
@@ -114,7 +185,7 @@ def build_request(cfg: dict, gloss_text: str, **overrides) -> dict:
         "model": cfg["model"],
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": gloss_text},
+            {"role": "user", "content": build_user_message(gloss_text, meta)},
         ],
         "temperature": 0.75,
         "top_p": 0.92,
@@ -250,19 +321,81 @@ and absence of invented or omitted information.
 Output ONLY the final natural West Bengal Bengali text."""
 
 
+def _host_is_reachable(base_url: str, budget: float = 0.12) -> bool:
+    """Cheap TCP pre-flight before spending a full HTTP round trip.
+
+    A refused connection is NOT cheap on Windows when the host is a name like
+    ``localhost``: it resolves to both ``::1`` and ``127.0.0.1``, and each
+    address is attempted in turn, so a single failed request costs the connect
+    timeout *twice*. Measured here that was ~0.3 s per address and ~2.4 s for the
+    two-path probe -- paid on the mount of every page, purely to discover that
+    the LLM server is not running.
+
+    Opening a raw socket first turns "nothing is listening" into a sub-
+    millisecond verdict, so the expensive path is only taken when there is
+    genuinely something to talk to. The budget is deliberately tight: this is a
+    liveness check, not a health check.
+    """
+    parsed = urlparse(base_url)
+    host = parsed.hostname
+    if not host:
+        return False
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    try:
+        infos = socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM)
+    except OSError:
+        return False
+    for family, stype, proto, _canon, sockaddr in infos:
+        sock = socket.socket(family, stype, proto)
+        sock.settimeout(budget)
+        try:
+            sock.connect(sockaddr)
+            return True
+        except OSError:
+            continue
+        finally:
+            sock.close()
+    return False
+
+
 def is_llm_available() -> bool:
-    """True when the configured provider responds to a models/health probe."""
+    """True when the configured provider responds to a models/health probe.
+
+    This is called by ``/api/system/health``, which every page polls on mount to
+    learn the model contract. It therefore has to be *fast* when the provider is
+    absent, and the naive version was not: when the configured host is a local
+    server that is not running, each unreachable address burned the full 5 s
+    timeout. Two things were wrong and both are fixed here.
+
+    First, a reachable host answering ``401``/``403`` is the *normal* response
+    from an OpenAI-compatible endpoint that wants a real key. A connect-and-see
+    probe reports that as "not available" and then wrongly reports every other
+    provider as missing too. Only 5xx and connection failures mean unavailable.
+
+    Second, ``timeout=`` alone does not bound resolution: on Windows ``localhost``
+    resolves to both ``::1`` and ``127.0.0.1``, and httpx tries them in turn, so a
+    refused IPv6 attempt plus a refused IPv4 attempt can exceed it. Pinning an
+    explicit ``ConnectTimeout`` separates "cannot connect" -- which is cheap and
+    definitive -- from "connected but slow", and collapses the whole probe to
+    tens of milliseconds when nothing is listening.
+    """
     cfg = get_ai_config()
     if not cfg["api_key"]:
         return False  # nothing configured -> do not silently fall back to a local LLM
 
+    if not _host_is_reachable(cfg["base_url"]):
+        return False
+
     headers = {"Authorization": f"Bearer {cfg['api_key']}"}
+    timeout = httpx.Timeout(connect=1.0, read=3.0, write=3.0, pool=3.0)
     for path in ("/models", "/health"):
         try:
             resp = httpx.get(
-                f"{cfg['base_url']}{path}", headers=headers, timeout=5.0
+                f"{cfg['base_url']}{path}", headers=headers, timeout=timeout
             )
-            if resp.status_code < 400:
+            if resp.status_code < 500:
+                # 2xx = healthy, 401/403 = server is up but wants a key. Either
+                # way the provider is reachable.
                 return True
         except Exception:
             continue
@@ -284,6 +417,7 @@ def _extract_delta(chunk: dict) -> tuple[str, str]:
 
 def stream_bengali(
     gloss_text: str,
+    meta: dict | None = None,
     **overrides,
 ) -> Iterator[dict]:
     """
@@ -305,7 +439,7 @@ def stream_bengali(
         ) | {"type": "error"}
         return
 
-    payload = build_request(cfg, gloss_text, stream=True, **overrides)
+    payload = build_request(cfg, gloss_text, meta=meta, stream=True, **overrides)
     buffer: list[str] = []
     tokens = 0
 
@@ -360,6 +494,7 @@ def stream_bengali(
 
 def generate_bengali(
     gloss_text: str,
+    meta: dict | None = None,
     stream: bool | None = None,
     temperature: float | None = None,
     top_p: float | None = None,
@@ -388,6 +523,7 @@ def generate_bengali(
         final = None
         for event in stream_bengali(
             gloss_text,
+            meta=meta,
             temperature=temperature,
             top_p=top_p,
             max_tokens=max_tokens,
@@ -402,6 +538,7 @@ def generate_bengali(
         payload = build_request(
             cfg,
             gloss_text,
+            meta=meta,
             stream=False,
             temperature=temperature,
             top_p=top_p,

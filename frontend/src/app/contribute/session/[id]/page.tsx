@@ -10,6 +10,9 @@ import { useRecordingStore } from "@/store/recording-store";
 import { contributionService } from "@/services/contributions";
 import { Video, Square, RotateCcw, Check } from "lucide-react";
 import { toast } from "sonner";
+import axios from "axios";
+
+const API_BASE = "http://localhost:8000";
 
 export default function ContributeSessionPage() {
   const params = useParams();
@@ -34,6 +37,7 @@ export default function ContributeSessionPage() {
 
   const [countdown, setCountdown] = useState<number | null>(null);
   const [uploadError, setUploadError] = useState(false);
+  const [refMedia, setRefMedia] = useState<{ type: string; url: string } | null>(null);
 
   useEffect(() => {
     if (consentGiven && !isReady) {
@@ -41,13 +45,19 @@ export default function ContributeSessionPage() {
     }
   }, [consentGiven, isReady, startCamera]);
 
-  // FIX: returning signer (consent already stored) must land on READY_TO_RECORD,
-  // otherwise the page shows only the camera with no controls.
+  // A sign chosen on /contribute lands in SIGN_SELECTED — advance into the
+  // reference step so the signer can watch the real sample before recording.
   useEffect(() => {
-    if (consentGiven && (state === "SIGN_SELECTED" || state === "REFERENCE_VIEW")) {
-      setState("READY_TO_RECORD");
-    }
+    if (consentGiven && state === "SIGN_SELECTED") setState("REFERENCE_VIEW");
   }, [consentGiven, state, setState]);
+
+  // Real reference sample for the sign being collected (404 -> honest empty state).
+  useEffect(() => {
+    if (!currentSignLabel) return;
+    axios.get(`${API_BASE}/api/dataset/reference`, { params: { label: currentSignLabel } })
+      .then((r) => setRefMedia(r.data))
+      .catch(() => setRefMedia(null));
+  }, [currentSignLabel]);
 
   // Handle countdown before recording starts
   useEffect(() => {
@@ -162,6 +172,42 @@ export default function ContributeSessionPage() {
           </div>
         )}
       </div>
+
+      {/* Watch & copy the real reference sample before recording */}
+      {state === "REFERENCE_VIEW" && (
+        <div className="p-4 bg-surface rounded-lg border border-border space-y-3">
+          <div className="text-xs font-mono uppercase text-text-muted">
+            REFERENCE SAMPLE — watch it, then copy the sign
+          </div>
+          {refMedia?.type === "video" ? (
+            <video
+              src={`${API_BASE}${refMedia.url}`}
+              controls
+              loop
+              autoPlay
+              muted
+              playsInline
+              className="w-full aspect-video object-contain rounded border border-border bg-background"
+            />
+          ) : refMedia?.type === "image" ? (
+            <img
+              src={`${API_BASE}${refMedia.url}`}
+              alt={currentSignLabel || "reference"}
+              className="w-full aspect-video object-contain rounded border border-border bg-background"
+            />
+          ) : (
+            <div className="aspect-video w-full bg-background border border-border rounded flex items-center justify-center text-xs font-mono text-text-muted">
+              No reference sample yet — record the first one
+            </div>
+          )}
+          <button
+            onClick={() => setState("READY_TO_RECORD")}
+            className="w-full py-2.5 rounded bg-accent-primary text-black font-mono text-xs uppercase font-bold hover:bg-accent-primary/90 transition-colors"
+          >
+            I have seen it — start recording
+          </button>
+        </div>
+      )}
 
       {/* Workflow Controls based on State Machine */}
       {state === "READY_TO_RECORD" && (

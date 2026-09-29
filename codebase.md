@@ -2,7 +2,7 @@
 
 > Compact project architecture followed by relevant source and configuration files.
 
-**Included files:** `73`  
+**Included files:** `75`  
 **Maximum source file size:** `2 MB`
 
 ---
@@ -25,6 +25,7 @@ WBSL Bridge
 │   ├── nmm.py
 │   └── tts_engine.py
 ├── dataset
+├── dataset_train
 ├── frontend
 │   ├── public
 │   ├── src
@@ -130,14 +131,22 @@ WBSL Bridge
 │   ├── sign_classes.json
 │   ├── sign_mlp.onnx
 │   └── sign_mlp.onnx.data
+├── tools
+│   ├── build_index.py
+│   └── build_reference_samples.py
+├── _probe.onnx.data
 ├── codebase.md
 ├── codebase.py
+├── dataset_train_run.err.log
+├── dataset_train_run.log
+├── dataset_train_train.log
 ├── frontend_dev.err.log
 ├── frontend_dev.log
 ├── HOW_TO_RUN.md
 ├── implementation.md
 ├── README.md
-└── start.ps1
+├── start.ps1
+└── train_unified.py
 ```
 
 ---
@@ -152,7 +161,6 @@ WBSL Bridge
 - `backend\main.py`
 - `backend\nmm.py`
 - `backend\tts_engine.py`
-- `codebase.py`
 - `frontend\eslint.config.mjs`
 - `frontend\next.config.ts`
 - `frontend\package.json`
@@ -217,6 +225,9 @@ WBSL Bridge
 - `HOW_TO_RUN.md`
 - `models\sign_classes.json`
 - `start.ps1`
+- `tools\build_index.py`
+- `tools\build_reference_samples.py`
+- `train_unified.py`
 
 ---
 
@@ -238,73 +249,119 @@ WBSL Bridge
   "hi": "HELLO",
   "নমস্কার": "HELLO",
   "হ্যালো": "HELLO",
-  "thank": "THANK",
-  "thanks": "THANK",
-  "ধন্যবাদ": "THANK",
-  "yes": "YES",
-  "হ্যাঁ": "YES",
-  "no": "NO",
-  "না": "NO",
-  "water": "W",
-  "জল": "W",
-  "পানি": "W",
-  "i": "I",
-  "আমি": "I",
-  "you": "YOU",
-  "তুমি": "YOU",
-  "আপনি": "YOU",
-  "good": "GOOD",
-  "ভালো": "GOOD",
-  "ভাল": "GOOD",
-  "how": "HOW",
-  "কেমন": "HOW",
-  "what": "WHAT",
-  "কি": "WHAT",
-  "কী": "WHAT",
-  "where": "WHERE",
-  "কোথায়": "WHERE",
-  "school": "SCHOOL",
-  "স্কুল": "SCHOOL",
-  "গিয়ে": "GO",
-  "যাই": "GO",
-  "যাচ্ছি": "GO",
-  "go": "GO",
-  "come": "COME",
-  "আসি": "COME",
-  "আসছি": "COME",
-  "eat": "EAT",
-  "খাই": "EAT",
-  "খাইছি": "EAT",
+  "thank": "THANK_YOU",
+  "thanks": "THANK_YOU",
+  "ধন্যবাদ": "THANK_YOU",
+  "good morning": "GOOD_MORNING",
+  "সুপ্রভাত": "GOOD_MORNING",
+  "শুভ সকাল": "GOOD_MORNING",
+  "good afternoon": "GOOD_AFTERNOON",
+  "শুভ অপরাহ্ন": "GOOD_AFTERNOON",
   "drink": "DRINK",
   "পান": "DRINK",
-  "mother": "MOTHER",
-  "মা": "MOTHER",
-  "father": "FATHER",
-  "বাবা": "FATHER",
-  "friend": "FRIEND",
-  "বন্ধু": "FRIEND",
-  "today": "TODAY",
-  "আজ": "TODAY",
-  "tomorrow": "TOMORROW",
-  "আগামীকাল": "TOMORROW",
-  "yesterday": "YESTERDAY",
-  "গতকাল": "YESTERDAY",
-  "home": "HOME",
-  "বাড়ি": "HOME",
-  "ঘর": "HOME",
-  "help": "HELP",
-  "সাহায্য": "HELP",
-  "please": "PLEASE",
-  "দয়া": "PLEASE",
-  "sorry": "SORRY",
-  "দুঃখিত": "SORRY",
-  "name": "NAME",
-  "নাম": "NAME",
-  "my": "MY",
-  "আমার": "MY",
-  "your": "YOUR",
-  "তোমার": "YOUR",
-  "আপনার": "YOUR"
+  "পান করা": "DRINK",
+  "tea": "TEA",
+  "চা": "TEA",
+  "come": "COME",
+  "আসো": "COME",
+  "আসছি": "COME",
+  "give": "GIVE",
+  "দাও": "GIVE",
+  "দেওয়া": "GIVE",
+  "cook": "COOK",
+  "রান্না": "COOK",
+  "clean": "CLEAN",
+  "পরিষ্কার": "CLEAN",
+  "close": "CLOSE",
+  "বন্ধ": "CLOSE",
+  "jump": "JUMP",
+  "লাফ": "JUMP",
+  "cry": "CRY",
+  "কান্না": "CRY",
+  "wrong": "WRONG",
+  "ভুল": "WRONG",
+  "maybe": "MAYBE",
+  "হয়তো": "MAYBE",
+  "key": "KEY",
+  "চাবি": "KEY",
+  "knife": "KNIFE",
+  "ছুরি": "KNIFE",
+  "lemon": "LEMON",
+  "লেবু": "LEMON",
+  "onion": "ONION",
+  "পেঁয়াজ": "ONION",
+  "carrot": "CARROT",
+  "গাজর": "CARROT",
+  "vegetables": "VEGETABLES",
+  "সবজি": "VEGETABLES",
+  "man": "MAN",
+  "মানুষ": "MAN",
+  "wife": "WIFE",
+  "বউ": "WIFE",
+  "স্ত্রী": "WIFE",
+  "uncle": "UNCLE",
+  "কাকা": "UNCLE",
+  "মামা": "UNCLE",
+  "what is your name": "WHAT_IS_YOUR_NAME",
+  "তোমার নাম কি": "WHAT_IS_YOUR_NAME",
+  "i": "I",
+  "আমি": "I",
+  "you": [
+    "Y",
+    "O",
+    "U"
+  ],
+  "আপনি": [
+    "Y",
+    "O",
+    "U"
+  ],
+  "tumi": [
+    "Y",
+    "O",
+    "U"
+  ],
+  "তুমি": [
+    "Y",
+    "O",
+    "U"
+  ],
+  "tiger": "TIGER",
+  "বাঘ": "TIGER",
+  "elephant": "ELEPHANT",
+  "হাতি": "ELEPHANT",
+  "monkey": "MONKEY",
+  "বাঁদর": "MONKEY",
+  "lion": "LION",
+  "সিংহ": "LION",
+  "turtle": "TURTLE",
+  "কচ্ছপ": "TURTLE",
+  "crocodile": "CROCODILE",
+  "কুমির": "CROCODILE",
+  "deer": "DEER",
+  "হরিণ": "DEER",
+  "peacock": "PEACOCK",
+  "ময়ূর": "PEACOCK",
+  "pigeon": "PIGEON",
+  "পায়রা": "PIGEON",
+  "sparrow": "SPARROW",
+  "চড়ুই": "SPARROW",
+  "umbrella": "UMBRELLA",
+  "ছাতা": "UMBRELLA",
+  "temple": "TEMPLE",
+  "মন্দির": "TEMPLE",
+  "exam": "EXAM",
+  "পরীক্ষা": "EXAM",
+  "maths": "MATHS",
+  "অঙ্ক": "MATHS",
+  "fever": "FEVER",
+  "জ্বর": "FEVER",
+  "pour": "POUR",
+  "ঢালা": "POUR",
+  "hug": "HUG",
+  "জড়িয়ে": "HUG",
+  "busy": "BUSY",
+  "ব্যস্ত": "BUSY"
 }
 ```
 
@@ -995,6 +1052,25 @@ print(f"[WBSL Backend] Classes: {len(CLASSES)}")
 print(f"[WBSL Backend] Input: {INPUT_NAME}, shape: {session.get_inputs()[0].shape}")
 
 # ─────────────────────────────────────────────
+# UNIFIED TEMPORAL MODEL (optional upgrade)
+# Trained by train_unified.py. When present it is the ACTIVE model for
+# the catalog and for all clip / evidence prediction.
+# ─────────────────────────────────────────────
+UNIFIED_MODEL_PATH = ROOT / "models" / "sign_unified_lstm.onnx"
+UNIFIED_CLASSES_PATH = ROOT / "models" / "sign_unified_classes.json"
+unified_session, UNIFIED_CLASSES, UNIFIED_INPUT = None, [], None
+SEQ_T = 32
+if UNIFIED_MODEL_PATH.exists() and UNIFIED_CLASSES_PATH.exists():
+    unified_session = ort.InferenceSession(str(UNIFIED_MODEL_PATH), providers=["CPUExecutionProvider"])
+    UNIFIED_INPUT = unified_session.get_inputs()[0].name
+    UNIFIED_CLASSES = json.loads(UNIFIED_CLASSES_PATH.read_text(encoding="utf-8"))
+    print(f"[WBSL Backend] Unified temporal model loaded: {len(UNIFIED_CLASSES)} classes")
+ACTIVE_CLASSES = UNIFIED_CLASSES if unified_session else CLASSES
+WORD_BENGALI = {}
+for k, v in WORD_MAP.items():
+    WORD_BENGALI.setdefault(v, k)
+
+# ─────────────────────────────────────────────
 # FASTAPI APP
 # ─────────────────────────────────────────────
 app = FastAPI(title="WBSL Bridge Backend", version="0.2.0")
@@ -1026,7 +1102,7 @@ sign_catalog = [
         "reference_video_url": None,
         "language": "ISL",
     }
-    for i, c in enumerate(CLASSES)
+    for i, c in enumerate(ACTIVE_CLASSES)
 ]
 
 _bengali_map = {
@@ -1041,6 +1117,9 @@ _bengali_map = {
 for s in sign_catalog:
     if s["label"] in _bengali_map:
         s["bengali_meaning"] = _bengali_map[s["label"]]
+    elif s["label"] in WORD_BENGALI:
+        s["bengali_meaning"] = WORD_BENGALI[s["label"]]
+        s["category"] = "ISL Word"
 
 # Attach any stored reference media to the catalog
 for s in sign_catalog:
@@ -1063,7 +1142,9 @@ def health():
         "inference_mode": ai["provider"],
         "llm_model": ai["model"],
         "dataset_version": "v0.1",
-        "model_version": "MLP-static",
+        "model_version": "LSTM-unified" if unified_session else "MLP-static",
+        "unified": unified_session is not None,
+        "active_classes": len(ACTIVE_CLASSES),
     }
 
 
@@ -1192,6 +1273,97 @@ async def predict_frame(file: UploadFile = File(...)):
 
 
 # ─────────────────────────────────────────────
+# PREDICTION: 32-frame clip → unified temporal model (97 classes)
+# ─────────────────────────────────────────────
+@app.post("/api/predict/clip")
+async def predict_clip(files: list[UploadFile] = File(...)):
+    if unified_session is None:
+        raise HTTPException(status_code=503, detail="Unified model not trained yet")
+    vecs, last = [], None
+    for f in files:
+        raw = await f.read()
+        fr = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
+        if fr is None:
+            continue
+        v = process_bgr_frame(fr)
+        if v is not None:
+            last = v
+        vecs.append(v if v is not None else last)
+    vecs = [v for v in vecs if v is not None]
+    if len(vecs) < 8:
+        return {"ready": False, "detail": "No hands detected in clip"}
+    arr = np.array(vecs, np.float32)
+    if len(arr) != SEQ_T:
+        arr = arr[np.linspace(0, len(arr) - 1, SEQ_T).astype(int)]
+    logits = unified_session.run(None, {UNIFIED_INPUT: arr[None]})[0][0]
+    probs = np.exp(logits - logits.max())
+    probs /= probs.sum()
+    order = np.argsort(probs)[::-1][:3]
+    return {"ready": True, "label": ACTIVE_CLASSES[int(order[0])],
+            "confidence": float(probs[order[0]]),
+            "top3": [{"label": ACTIVE_CLASSES[i], "confidence": float(probs[i])} for i in order]}
+
+
+# ─────────────────────────────────────────────
+# REAL LANDMARK REPLAY (no synthetic skeletons anywhere)
+# ─────────────────────────────────────────────
+@app.get("/api/simulation/frames")
+def simulation_frames(label: str = "", sample_id: str = ""):
+    arr = None
+    source = ""
+    if sample_id:
+        rec = next((r for r in _load_manifest() if r["sample_id"] == sample_id), None)
+        if rec and (ROOT / rec["landmark_path"]).exists():
+            arr = np.load(ROOT / rec["landmark_path"])
+            source = f"community:{sample_id}"
+    elif label:
+        safe = label.upper().replace(" ", "_")
+        for p in (ROOT / "dataset_train" / "unified_video" / f"{safe}.npy",
+                  ROOT / "dataset_train" / "unified_static" / f"{safe}.npy"):
+            if p.exists():
+                arr = np.load(p)[0]
+                source = f"extracted:{p.parent.name}"
+                break
+        if arr is None:
+            rec = next((r for r in _load_manifest()
+                        if r["label"].upper() == safe and (ROOT / r["landmark_path"]).exists()), None)
+            if rec:
+                arr = np.load(ROOT / rec["landmark_path"])
+                source = f"community:{rec['sample_id']}"
+    if arr is None:
+        raise HTTPException(status_code=404, detail="No extracted landmark sequence for this sign yet")
+    arr = arr[:64]
+    return {"frames": arr.reshape(len(arr), 42, 3).tolist(), "points": 42,
+            "count": int(len(arr)), "source": source}
+
+
+@app.get("/api/dataset/reference")
+def dataset_reference(label: str):
+    m = SIGN_MEDIA.get(label) or SIGN_MEDIA.get(label.upper().replace(" ", "_"))
+    if not m:
+        raise HTTPException(status_code=404, detail="No reference sample for this sign")
+    return {"label": label, "type": m["type"], "url": m["url"]}
+
+
+@app.get("/api/dataset/index")
+def dataset_index(label: str = "", kind: str = ""):
+    idx = ROOT / "dataset" / "index.jsonl"
+    if not idx.exists():
+        return {"items": []}
+    items = []
+    for line in idx.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        r = json.loads(line)
+        if label and r.get("label", "").upper() != label.upper():
+            continue
+        if kind and r.get("kind") != kind:
+            continue
+        items.append(r)
+    return {"items": items}
+
+
+# ─────────────────────────────────────────────
 # NLG: Gloss → Bengali via Gemma 4 E4B
 # ─────────────────────────────────────────────
 class NLGRequest(BaseModel):
@@ -1257,15 +1429,36 @@ class TextToSignRequest(BaseModel):
 
 @app.post("/api/text-to-sign")
 def text_to_sign(payload: TextToSignRequest):
-    words = payload.text.lower().replace("।", "").replace("?", "").split()
+    raw = (payload.text.lower()
+           .replace("।", " ").replace("?", " ")
+           .replace(",", " ").replace("!", " "))
+    tokens = raw.split()
+    max_n = max((len(k.split()) for k in WORD_MAP), default=1)
     gloss_sequence = []
-    for w in words:
-        if w in WORD_MAP:
-            gloss_sequence.append(WORD_MAP[w])
-        elif w.upper() in CLASSES:
-            gloss_sequence.append(w.upper())
+    i = 0
+    while i < len(tokens):
+        hit = None
+        # longest phrase match first ("good morning", "তোমার নাম কি")
+        for n in range(min(max_n, len(tokens) - i), 1, -1):
+            phrase = " ".join(tokens[i:i + n])
+            if phrase in WORD_MAP:
+                hit = WORD_MAP[phrase]
+                i += n
+                break
+        if hit is None:
+            w = tokens[i]
+            if w in WORD_MAP:
+                hit = WORD_MAP[w]
+            elif w.upper() in ACTIVE_CLASSES:
+                hit = w.upper()
+            else:
+                hit = f"[{w}]"
+            i += 1
+        # A value may be a list of glosses (e.g. pronouns fingerspelled as letters)
+        if isinstance(hit, list):
+            gloss_sequence.extend(hit)
         else:
-            gloss_sequence.append(f"[{w}]")
+            gloss_sequence.append(hit)
     media = []
     for g in gloss_sequence:
         m = SIGN_MEDIA.get(g)
@@ -1277,7 +1470,7 @@ def text_to_sign(payload: TextToSignRequest):
     return {
         "input_text": payload.text,
         "gloss_sequence": gloss_sequence,
-        "available_signs": len(CLASSES),
+        "available_signs": len(ACTIVE_CLASSES),
         "media": media,
     }
 
@@ -1529,6 +1722,16 @@ def get_contributions():
     return _load_manifest()
 
 
+def resample_arr(arr, t):
+    """Linear resample of a landmark sequence to a fixed frame count."""
+    if len(arr) == t:
+        return arr
+    ix = np.linspace(0, len(arr) - 1, t)
+    i0, i1 = ix.astype(int), np.minimum(ix.astype(int) + 1, len(arr) - 1)
+    f = (ix - i0)[:, None]
+    return arr[i0] * (1 - f) + arr[i1] * f
+
+
 @app.get("/api/admin/contributions/{sample_id}/evidence")
 def get_evidence(sample_id: str):
     rec = next((r for r in _load_manifest() if r["sample_id"] == sample_id), None)
@@ -1545,12 +1748,16 @@ def get_evidence(sample_id: str):
         frames = int(arr.shape[0])
         if frames > 1:
             mean_vel = float(np.linalg.norm(np.diff(arr[:, :63], axis=0), axis=1).mean())
-        mid = arr[frames // 2]
-        logits = session.run(None, {INPUT_NAME: mid.reshape(1, 126)})[0][0]
+        if unified_session is not None:
+            seq = resample_arr(arr, SEQ_T)[None].astype(np.float32)
+            logits = unified_session.run(None, {UNIFIED_INPUT: seq})[0][0]
+        else:
+            mid = arr[frames // 2]
+            logits = session.run(None, {INPUT_NAME: mid.reshape(1, 126)})[0][0]
         probs = np.exp(logits - logits.max())
         probs /= probs.sum()
         order = np.argsort(probs)[::-1][:3]
-        preds = [{"label": CLASSES[i], "confidence": round(float(probs[i]), 3)} for i in order]
+        preds = [{"label": ACTIVE_CLASSES[i], "confidence": round(float(probs[i]), 3)} for i in order]
         top_conf = float(probs[order[0]])
 
     agree = round(top_conf * 100, 1) if preds and preds[0]["label"] == rec["label"] else round(top_conf * 60, 1)
@@ -1859,712 +2066,6 @@ def speak(text: str, output_name: str = "bengali_speech", voice_id: str = "1") -
             "voice_id": str(voice_id),
             "status": "tts_unavailable",
         }
-```
-
----
-
-# FILE: `codebase.py`
-
-```python
-from pathlib import Path
-import os
-
-
-# ============================================================
-# CONFIGURATION
-# ============================================================
-
-PROJECT_ROOT = Path(__file__).resolve().parent
-OUTPUT_FILE = PROJECT_ROOT / "codebase.md"
-
-MAX_FILE_SIZE_MB = 2
-MAX_FILE_SIZE = MAX_FILE_SIZE_MB * 1024 * 1024
-
-
-# ============================================================
-# FOLDERS TO COMPLETELY IGNORE
-# ============================================================
-#
-# These folders are not scanned at all.
-# Add project-specific large/unnecessary folders here.
-#
-
-SKIP_DIRS = {
-    ".git",
-    ".svn",
-    ".hg",
-
-    "node_modules",
-
-    ".venv",
-    "venv",
-    "env",
-
-    "__pycache__",
-    ".pytest_cache",
-    ".mypy_cache",
-
-    ".next",
-    "dist",
-    "build",
-    "out",
-    "coverage",
-
-    ".cache",
-    ".turbo",
-    ".parcel-cache",
-
-    ".vscode",
-    ".idea",
-
-    "logs",
-    "tmp",
-    "temp",
-
-    "uploads",
-    "generated",
-
-    "tests",
-    "llm",
-    "docs"
-}
-
-
-# ============================================================
-# FOLDER PREFIXES TO IGNORE
-# ============================================================
-
-SKIP_DIR_PREFIXES = {
-    ".venv",
-}
-
-
-# ============================================================
-# FOLDERS TO SHOW IN TREE BUT NOT EXPAND
-# ============================================================
-#
-# Example:
-#
-#     ├── datasets
-#
-# The folder is visible, but its internal structure is hidden.
-#
-
-COLLAPSE_TREE_DIRS = {
-    "datasets",
-    "dataset",
-    "data",
-
-    "assets",
-    "asset",
-
-    "public",
-    "static",
-    "media",
-
-    "cache",
-}
-
-
-# ============================================================
-# FILES TO EXCLUDE FROM CODE CONTENT
-# ============================================================
-
-SKIP_FILES = {
-    "implementation.md",
-    "README.md",
-    "codebase.md",
-    "project-tree.txt",
-    "implementation.md"
-    "frontend\package-lock.json",
-    # Dependency locks
-    "package-lock.json",
-    "yarn.lock",
-    "pnpm-lock.yaml",
-    "bun.lock",
-
-    # Generated
-    "tsconfig.tsbuildinfo",
-    "next-env.d.ts",
-
-    # OS
-    ".DS_Store",
-    "Thumbs.db",
-
-    # Logs
-    "debug.log",
-    "error.log",
-    "server.log",
-    "server-out.log",
-
-    # Secrets
-    ".env",
-    ".env.local",
-    ".env.development",
-    ".env.production",
-    ".env.test",
-
-    # Credentials
-    "credentials.json",
-    "service-account.json",
-    "secrets.json",
-
-    # Optional AI instructions
-    "AGENTS.md",
-    "CLAUDE.md",
-}
-
-
-# ============================================================
-# FILE EXTENSIONS TO EXCLUDE
-# ============================================================
-
-SKIP_EXTENSIONS = {
-    # Images
-    ".png",
-    ".jpg",
-    ".jpeg",
-    ".gif",
-    ".webp",
-    ".bmp",
-    ".tiff",
-    ".ico",
-    ".svg",
-
-    # Audio
-    ".mp3",
-    ".wav",
-    ".flac",
-    ".ogg",
-    ".m4a",
-
-    # Video
-    ".mp4",
-    ".webm",
-    ".avi",
-    ".mov",
-    ".mkv",
-
-    # Documents
-    ".pdf",
-
-    # Archives
-    ".zip",
-    ".rar",
-    ".7z",
-    ".tar",
-    ".gz",
-
-    # Data
-    ".csv",
-    ".xlsx",
-    ".xls",
-    ".parquet",
-    ".feather",
-
-    # Databases
-    ".db",
-    ".sqlite",
-    ".sqlite3",
-
-    # ML models
-    ".onnx",
-    ".pt",
-    ".pth",
-    ".ckpt",
-    ".safetensors",
-    ".gguf",
-    ".bin",
-
-    # Compiled Python
-    ".pyc",
-    ".pyo",
-
-    # Temporary
-    ".bak",
-    ".tmp",
-
-    # Fonts
-    ".woff",
-    ".woff2",
-    ".ttf",
-    ".otf",
-
-    # Certificates / keys
-    ".pem",
-    ".key",
-    ".p12",
-    ".pfx",
-    ".jks",
-    ".crt",
-    ".cert",
-}
-
-
-# ============================================================
-# SOURCE FILE EXTENSIONS
-# ============================================================
-
-INCLUDE_EXTENSIONS = {
-    # Python
-    ".py",
-    ".pyi",
-
-    # JavaScript / TypeScript
-    ".js",
-    ".jsx",
-    ".ts",
-    ".tsx",
-    ".mjs",
-    ".cjs",
-
-    # Web
-    ".html",
-    ".css",
-    ".scss",
-    ".sass",
-
-    # Config
-    ".json",
-    ".yaml",
-    ".yml",
-    ".toml",
-    ".ini",
-    ".conf",
-
-    # Shell
-    ".sh",
-    ".bat",
-    ".cmd",
-    ".ps1",
-
-    # Documentation
-    ".md",
-    ".txt",
-}
-
-
-# ============================================================
-# LANGUAGE MAP
-# ============================================================
-
-LANGUAGE_MAP = {
-    ".py": "python",
-    ".pyi": "python",
-
-    ".js": "javascript",
-    ".jsx": "jsx",
-    ".mjs": "javascript",
-    ".cjs": "javascript",
-
-    ".ts": "typescript",
-    ".tsx": "tsx",
-
-    ".html": "html",
-    ".css": "css",
-    ".scss": "scss",
-    ".sass": "sass",
-
-    ".json": "json",
-    ".yaml": "yaml",
-    ".yml": "yaml",
-    ".toml": "toml",
-    ".ini": "ini",
-    ".conf": "text",
-
-    ".sh": "bash",
-    ".bat": "bat",
-    ".cmd": "bat",
-    ".ps1": "powershell",
-
-    ".md": "markdown",
-    ".txt": "text",
-}
-
-
-# ============================================================
-# HELPERS
-# ============================================================
-
-def rel(path):
-    return path.relative_to(PROJECT_ROOT)
-
-
-def is_skip_dir(name):
-    name_lower = name.lower()
-
-    if name_lower in {
-        x.lower()
-        for x in SKIP_DIRS
-    }:
-        return True
-
-    for prefix in SKIP_DIR_PREFIXES:
-        if name_lower.startswith(prefix.lower()):
-            return True
-
-    return False
-
-
-def is_secret(path):
-
-    if path.name.lower() in {
-        ".env",
-        ".env.local",
-        ".env.development",
-        ".env.production",
-        ".env.test",
-    }:
-        return True
-
-    if path.suffix.lower() in {
-        ".pem",
-        ".key",
-        ".p12",
-        ".pfx",
-        ".jks",
-    }:
-        return True
-
-    return False
-
-
-# ============================================================
-# SCAN SOURCE FILES
-# ============================================================
-
-def scan_project():
-
-    files = []
-
-    for current_dir, dirs, filenames in os.walk(
-        PROJECT_ROOT
-    ):
-
-        current_path = Path(current_dir)
-
-        # ----------------------------------------------------
-        # PRUNE DIRECTORIES
-        # ----------------------------------------------------
-
-        dirs[:] = [
-            d
-            for d in dirs
-            if not d.startswith(".")
-            and not is_skip_dir(d)
-        ]
-
-        # ----------------------------------------------------
-        # FILES
-        # ----------------------------------------------------
-
-        for filename in filenames:
-
-            path = current_path / filename
-
-            # Hidden files
-            if filename.startswith("."):
-                continue
-
-            # Generated output
-            if path.resolve() == OUTPUT_FILE.resolve():
-                continue
-
-            # Explicit file skip
-            if filename in SKIP_FILES:
-                continue
-
-            # Secrets
-            if is_secret(path):
-                continue
-
-            extension = path.suffix.lower()
-
-            # Binary / data / model
-            if extension in SKIP_EXTENSIONS:
-                continue
-
-            # Not a source/config file
-            if extension not in INCLUDE_EXTENSIONS:
-                continue
-
-            # File size
-            try:
-                size = path.stat().st_size
-            except OSError:
-                continue
-
-            if size > MAX_FILE_SIZE:
-                continue
-
-            files.append(path)
-
-    return sorted(
-        files,
-        key=lambda p: str(rel(p)).lower()
-    )
-
-
-# ============================================================
-# BUILD COMPACT PROJECT TREE
-# ============================================================
-
-def build_tree():
-
-    lines = [PROJECT_ROOT.name]
-
-    collapsed = {
-        x.lower()
-        for x in COLLAPSE_TREE_DIRS
-    }
-
-    def walk(directory, prefix=""):
-
-        try:
-            items = list(directory.iterdir())
-        except (PermissionError, OSError):
-            return
-
-        visible = []
-
-        for item in items:
-
-            # Hide dot files/folders
-            if item.name.startswith("."):
-                continue
-
-            # Completely ignored directory
-            if item.is_dir() and is_skip_dir(item.name):
-                continue
-
-            visible.append(item)
-
-        # Directories first, then files
-        visible.sort(
-            key=lambda x: (
-                x.is_file(),
-                x.name.lower()
-            )
-        )
-
-        for index, item in enumerate(visible):
-
-            last = index == len(visible) - 1
-
-            connector = (
-                "└── "
-                if last
-                else "├── "
-            )
-
-            lines.append(
-                prefix + connector + item.name
-            )
-
-            # File
-            if not item.is_dir():
-                continue
-
-            # Show folder but don't expand it
-            if item.name.lower() in collapsed:
-                continue
-
-            next_prefix = (
-                prefix
-                + ("    " if last else "│   ")
-            )
-
-            walk(
-                item,
-                next_prefix
-            )
-
-    walk(PROJECT_ROOT)
-
-    return lines
-
-
-# ============================================================
-# READ FILE
-# ============================================================
-
-def read_text(path):
-
-    try:
-        return path.read_text(
-            encoding="utf-8",
-            errors="replace"
-        )
-    except Exception:
-        return ""
-
-
-# ============================================================
-# LANGUAGE
-# ============================================================
-
-def language_for(path):
-
-    return LANGUAGE_MAP.get(
-        path.suffix.lower(),
-        "text"
-    )
-
-
-# ============================================================
-# WRITE SOURCE FILE
-# ============================================================
-
-def write_file(md, path):
-
-    text = read_text(path)
-
-    md.write(
-        f"# FILE: `{rel(path)}`\n\n"
-    )
-
-    md.write(
-        f"```{language_for(path)}\n"
-    )
-
-    md.write(text)
-
-    if not text.endswith("\n"):
-        md.write("\n")
-
-    md.write(
-        "```\n\n"
-        "---\n\n"
-    )
-
-
-# ============================================================
-# MAIN
-# ============================================================
-
-def main():
-
-    print("Scanning project...")
-
-    included_files = scan_project()
-
-    print(
-        f"Found {len(included_files)} source files."
-    )
-
-    print("Building project tree...")
-
-    tree = build_tree()
-
-    print("Writing codebase.md...")
-
-    with OUTPUT_FILE.open(
-        "w",
-        encoding="utf-8"
-    ) as md:
-
-        # ----------------------------------------------------
-        # HEADER
-        # ----------------------------------------------------
-
-        md.write(
-            f"# {PROJECT_ROOT.name} — AI Codebase Context\n\n"
-        )
-
-        md.write(
-            "> Compact project architecture followed by "
-            "relevant source and configuration files.\n\n"
-        )
-
-        md.write(
-            f"**Included files:** `{len(included_files)}`  \n"
-        )
-
-        md.write(
-            f"**Maximum source file size:** "
-            f"`{MAX_FILE_SIZE_MB} MB`\n\n"
-        )
-
-        md.write(
-            "---\n\n"
-        )
-
-        # ----------------------------------------------------
-        # PROJECT TREE
-        # ----------------------------------------------------
-
-        md.write(
-            "# Project Structure\n\n"
-        )
-
-        md.write(
-            "```text\n"
-        )
-
-        md.write(
-            "\n".join(tree)
-        )
-
-        md.write(
-            "\n```\n\n"
-        )
-
-        md.write(
-            "---\n\n"
-        )
-
-        # ----------------------------------------------------
-        # INCLUDED FILES
-        # ----------------------------------------------------
-
-        md.write(
-            "# Included Files\n\n"
-        )
-
-        for path in included_files:
-
-            md.write(
-                f"- `{rel(path)}`\n"
-            )
-
-        md.write(
-            "\n---\n\n"
-        )
-
-        # ----------------------------------------------------
-        # SOURCE FILES
-        # ----------------------------------------------------
-
-        md.write(
-            "# Source Files\n\n"
-        )
-
-        for index, path in enumerate(
-            included_files,
-            start=1
-        ):
-
-            print(
-                f"  [{index}/{len(included_files)}] "
-                f"{rel(path)}"
-            )
-
-            write_file(
-                md,
-                path
-            )
-
-    print()
-    print("=" * 60)
-    print("CODEBASE CREATED")
-    print("=" * 60)
-    print(f"Output         : {OUTPUT_FILE}")
-    print(f"Included files : {len(included_files)}")
-    print("=" * 60)
-
-
-if __name__ == "__main__":
-    main()
 ```
 
 ---
@@ -3150,6 +2651,9 @@ import { LandmarkSimulation } from "@/components/simulation/LandmarkSimulation";
 import { TableRowSkeleton } from "@/components/skeletons";
 import { Contribution } from "@/lib/types";
 import { toast } from "sonner";
+import axios from "axios";
+
+const API_BASE = "http://localhost:8000";
 
 export default function AdminContributionsPage() {
   const { data: contributions, isLoading, refetch } = useQuery({
@@ -3163,6 +2667,17 @@ export default function AdminContributionsPage() {
     queryKey: ["evidence", selectedContribution?.sample_id],
     queryFn: () => contributionService.getEvidence(selectedContribution!.sample_id),
     enabled: !!selectedContribution,
+  });
+
+  // Real extracted landmarks of the submitted sample (no synthetic fallback).
+  const { data: sim } = useQuery({
+    queryKey: ["sim-frames-sample", selectedContribution?.sample_id],
+    queryFn: async () =>
+      (await axios.get(`${API_BASE}/api/simulation/frames`, {
+        params: { sample_id: selectedContribution!.sample_id },
+      })).data,
+    enabled: !!selectedContribution,
+    retry: false,
   });
 
   const handleVerify = async (action: "accepted" | "rejected" | "needs_review", notes?: string) => {
@@ -3245,7 +2760,7 @@ export default function AdminContributionsPage() {
                 <div className="text-xs font-mono uppercase text-text-muted">
                   Kinematic Skeleton Replay: {selectedContribution.label}
                 </div>
-                <LandmarkSimulation showHands showFace showPose fps={30} />
+                <LandmarkSimulation frames={sim?.frames} fps={15} title={sim?.source} />
               </div>
 
               {/* Evidence Panel with Reasoning Layer */}
@@ -4074,6 +3589,9 @@ import { useRecordingStore } from "@/store/recording-store";
 import { contributionService } from "@/services/contributions";
 import { Video, Square, RotateCcw, Check } from "lucide-react";
 import { toast } from "sonner";
+import axios from "axios";
+
+const API_BASE = "http://localhost:8000";
 
 export default function ContributeSessionPage() {
   const params = useParams();
@@ -4098,6 +3616,7 @@ export default function ContributeSessionPage() {
 
   const [countdown, setCountdown] = useState<number | null>(null);
   const [uploadError, setUploadError] = useState(false);
+  const [refMedia, setRefMedia] = useState<{ type: string; url: string } | null>(null);
 
   useEffect(() => {
     if (consentGiven && !isReady) {
@@ -4105,13 +3624,19 @@ export default function ContributeSessionPage() {
     }
   }, [consentGiven, isReady, startCamera]);
 
-  // FIX: returning signer (consent already stored) must land on READY_TO_RECORD,
-  // otherwise the page shows only the camera with no controls.
+  // A sign chosen on /contribute lands in SIGN_SELECTED — advance into the
+  // reference step so the signer can watch the real sample before recording.
   useEffect(() => {
-    if (consentGiven && (state === "SIGN_SELECTED" || state === "REFERENCE_VIEW")) {
-      setState("READY_TO_RECORD");
-    }
+    if (consentGiven && state === "SIGN_SELECTED") setState("REFERENCE_VIEW");
   }, [consentGiven, state, setState]);
+
+  // Real reference sample for the sign being collected (404 -> honest empty state).
+  useEffect(() => {
+    if (!currentSignLabel) return;
+    axios.get(`${API_BASE}/api/dataset/reference`, { params: { label: currentSignLabel } })
+      .then((r) => setRefMedia(r.data))
+      .catch(() => setRefMedia(null));
+  }, [currentSignLabel]);
 
   // Handle countdown before recording starts
   useEffect(() => {
@@ -4226,6 +3751,42 @@ export default function ContributeSessionPage() {
           </div>
         )}
       </div>
+
+      {/* Watch & copy the real reference sample before recording */}
+      {state === "REFERENCE_VIEW" && (
+        <div className="p-4 bg-surface rounded-lg border border-border space-y-3">
+          <div className="text-xs font-mono uppercase text-text-muted">
+            REFERENCE SAMPLE — watch it, then copy the sign
+          </div>
+          {refMedia?.type === "video" ? (
+            <video
+              src={`${API_BASE}${refMedia.url}`}
+              controls
+              loop
+              autoPlay
+              muted
+              playsInline
+              className="w-full aspect-video object-contain rounded border border-border bg-background"
+            />
+          ) : refMedia?.type === "image" ? (
+            <img
+              src={`${API_BASE}${refMedia.url}`}
+              alt={currentSignLabel || "reference"}
+              className="w-full aspect-video object-contain rounded border border-border bg-background"
+            />
+          ) : (
+            <div className="aspect-video w-full bg-background border border-border rounded flex items-center justify-center text-xs font-mono text-text-muted">
+              No reference sample yet — record the first one
+            </div>
+          )}
+          <button
+            onClick={() => setState("READY_TO_RECORD")}
+            className="w-full py-2.5 rounded bg-accent-primary text-black font-mono text-xs uppercase font-bold hover:bg-accent-primary/90 transition-colors"
+          >
+            I have seen it — start recording
+          </button>
+        </div>
+      )}
 
       {/* Workflow Controls based on State Machine */}
       {state === "READY_TO_RECORD" && (
@@ -4358,6 +3919,9 @@ import { datasetService } from "@/services/dataset";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Video, CheckCircle, Clock } from "lucide-react";
 import Link from "next/link";
+import axios from "axios";
+
+const API_BASE = "http://localhost:8000";
 
 export default function SignDetailPage() {
   const params = useParams();
@@ -4366,6 +3930,15 @@ export default function SignDetailPage() {
   const { data: sign, isLoading } = useQuery({
     queryKey: ["sign-detail", signId],
     queryFn: () => datasetService.getSignById(signId),
+  });
+
+  // Real extracted landmark sequence for this sign (no synthetic fallback).
+  const { data: sim } = useQuery({
+    queryKey: ["sim-frames", sign?.label],
+    queryFn: async () =>
+      (await axios.get(`${API_BASE}/api/simulation/frames`, { params: { label: sign!.label } })).data,
+    enabled: !!sign,
+    retry: false,
   });
 
   if (isLoading || !sign) {
@@ -4427,7 +4000,7 @@ export default function SignDetailPage() {
         <div className="text-xs font-mono uppercase text-text-muted">
           Canonical Landmark Coordinate Reference
         </div>
-        <LandmarkSimulation showHands showFace showPose fps={30} />
+        <LandmarkSimulation frames={sim?.frames} fps={15} title={sim?.source} />
       </div>
     </PageContainer>
   );
@@ -5608,11 +5181,20 @@ export default function SignToTextPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
   const [voiceId, setVoiceId] = useState<"1" | "2">("1");
+  const [clipResult, setClipResult] = useState<{ label: string; confidence: number; top3: { label: string; confidence: number }[] } | null>(null);
+  const [isCapturingClip, setIsCapturingClip] = useState(false);
+  const [unifiedActive, setUnifiedActive] = useState(false);
+  const [activeClasses, setActiveClasses] = useState(35);
 
   useEffect(() => {
     let cancelled = false;
     axios.get(`${API_BASE}/api/system/health`)
-      .then(() => { if (!cancelled) setBackendOnline(true); })
+      .then((res) => {
+        if (cancelled) return;
+        setBackendOnline(true);
+        setUnifiedActive(!!res.data.unified);
+        if (typeof res.data.active_classes === "number") setActiveClasses(res.data.active_classes);
+      })
       .catch(() => { if (!cancelled) setBackendOnline(false); });
     return () => { cancelled = true; };
   }, []);
@@ -5836,6 +5418,41 @@ export default function SignToTextPage() {
     setPrediction(null);
     setNmmFlags(null);
     setBengaliOutput("");
+    setClipResult(null);
+  };
+
+  // ─── Unified 97-class clip recognition (32 frames over ~3 s) ───
+  const handleCaptureClip = async () => {
+    if (isCapturingClip || !cameraActive) return;
+    const video = videoRef.current, canvas = canvasRef.current;
+    if (!video || !canvas) return;
+    setIsCapturingClip(true);
+    setClipResult(null);
+    try {
+      const fd = new FormData();
+      for (let i = 0; i < 32; i++) {
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) break;
+        ctx.drawImage(video, 0, 0);
+        const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", 0.7));
+        if (blob) fd.append("files", blob, `f${i}.jpg`);
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      const res = await axios.post(`${API_BASE}/api/predict/clip`, fd,
+        { headers: { "Content-Type": "multipart/form-data" }, timeout: 30000 });
+      if (res.data.ready) {
+        setClipResult(res.data);
+        toast.success(`Unified ${activeClasses}-class: ${res.data.label}`);
+      } else {
+        toast.error(res.data.detail || "No hands in clip");
+      }
+    } catch {
+      toast.error("Unified model unavailable — run train_unified.py first");
+    } finally {
+      setIsCapturingClip(false);
+    }
   };
 
   const anyQuestion = detectedHistory.some((h) => h.question || h.wh_question);
@@ -5854,8 +5471,8 @@ export default function SignToTextPage() {
         </div>
 
         <div className="text-xs font-mono text-text-secondary">
-          MODEL: <strong className="text-text-primary">sign_mlp.onnx</strong> |
-          CLASSES: <strong className="text-text-primary">35</strong>
+          MODEL: <strong className="text-text-primary">{unifiedActive ? "sign_unified_lstm.onnx" : "sign_mlp.onnx"}</strong> |
+          CLASSES: <strong className="text-text-primary">{activeClasses}</strong>
         </div>
       </div>
 
@@ -6006,6 +5623,30 @@ export default function SignToTextPage() {
                   EMPHASIS: {nmmFlags.emphasis ? "ON" : "OFF"}
                 </span>
               </div>
+            </div>
+          )}
+
+          <button
+            onClick={handleCaptureClip}
+            disabled={!cameraActive || isCapturingClip}
+            className="w-full py-2.5 rounded bg-surface-elevated border border-border text-text-primary font-mono text-xs uppercase font-bold hover:border-accent-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isCapturingClip ? "Capturing 3 s clip — perform the sign NOW" : `Recognize 3 s Clip (${activeClasses} classes)`}
+          </button>
+
+          {clipResult && (
+            <div className="p-3 bg-surface-elevated rounded border border-border space-y-2">
+              <div className="text-[11px] font-mono uppercase text-text-muted">UNIFIED {activeClasses}-CLASS RESULT</div>
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-lg font-bold text-accent-secondary">{clipResult.label}</span>
+                <span className="font-mono text-sm text-text-secondary">{Math.round(clipResult.confidence * 100)}%</span>
+              </div>
+              {clipResult.top3.map((t, i) => (
+                <div key={i} className="flex justify-between text-xs font-mono">
+                  <span className={i === 0 ? "text-text-primary font-semibold" : "text-text-muted"}>{t.label}</span>
+                  <span className={i === 0 ? "text-accent-secondary" : "text-text-muted"}>{Math.round(t.confidence * 100)}%</span>
+                </div>
+              ))}
             </div>
           )}
 
@@ -7357,33 +6998,34 @@ export function UploadRecovery({ onRetry, pendingCount = 1 }: UploadRecoveryProp
 ```tsx
 "use client";
 import React, { useRef, useEffect, useState } from "react";
-import { Play, Pause, RotateCcw } from "lucide-react";
+import { Play, Pause, RotateCcw, Database } from "lucide-react";
+
+const HAND_CONN: [number, number][] = [
+  [0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 8], [5, 9], [9, 10],
+  [10, 11], [11, 12], [9, 13], [13, 14], [14, 15], [15, 16], [13, 17], [17, 18],
+  [18, 19], [19, 20], [0, 17],
+];
 
 interface LandmarkSimulationProps {
-  landmarkFrames?: number[][][]; // frames x points x 3
-  showHands?: boolean;
-  showFace?: boolean;
-  showPose?: boolean;
+  frames?: number[][][];   // F x 42 x 3 (real extracted landmarks)
   fps?: number;
+  title?: string;
 }
 
 export function LandmarkSimulation({
-  landmarkFrames,
-  showHands = true,
-  showFace = true,
-  showPose = true,
-  fps = 30,
+  frames,
+  fps = 15,
+  title,
 }: LandmarkSimulationProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [currentFrame, setCurrentFrame] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
 
-  // Generate synthetic MediaPipe skeleton landmarks if none provided
-  const totalFrames = landmarkFrames?.length || 60;
+  const totalFrames = frames?.length ?? 0;
 
   useEffect(() => {
-    if (!isPlaying) return;
+    if (!isPlaying || totalFrames === 0) return;
 
     const interval = setInterval(() => {
       setCurrentFrame((prev) => (prev + 1) % totalFrames);
@@ -7420,106 +7062,54 @@ export function LandmarkSimulation({
       ctx.stroke();
     }
 
-    const t = (currentFrame / totalFrames) * Math.PI * 2;
+    // Render ONLY real extracted landmarks. No synthetic fallback.
+    const frame = frames?.[currentFrame];
+    if (!frame) return;
 
-    // Draw Pose (33 points subset) - Color Gray #6b7280 per spec
-    if (showPose) {
-      ctx.strokeStyle = "#6b7280";
-      ctx.fillStyle = "#6b7280";
-      ctx.lineWidth = 2;
+    const S = width / 5;
+    const cx = width / 2;
+    const cy = height / 2;
+    const px = (p: number[]) => cx + p[0] * S;
+    const py = (p: number[]) => cy + p[1] * S;
 
-      const nose = { x: width * 0.5, y: height * 0.28 };
-      const leftShoulder = { x: width * 0.38, y: height * 0.42 };
-      const rightShoulder = { x: width * 0.62, y: height * 0.42 };
-      const leftElbow = { x: width * 0.32, y: height * 0.56 + Math.sin(t) * 15 };
-      const rightElbow = { x: width * 0.68, y: height * 0.56 + Math.cos(t) * 15 };
-      const leftWrist = { x: width * 0.35 + Math.sin(t * 2) * 20, y: height * 0.72 - Math.abs(Math.sin(t)) * 40 };
-      const rightWrist = { x: width * 0.65 - Math.cos(t * 2) * 20, y: height * 0.72 - Math.abs(Math.cos(t)) * 40 };
-
-      // Bones
-      ctx.beginPath();
-      ctx.moveTo(leftShoulder.x, leftShoulder.y);
-      ctx.lineTo(rightShoulder.x, rightShoulder.y);
-      ctx.lineTo(rightElbow.x, rightElbow.y);
-      ctx.lineTo(rightWrist.x, rightWrist.y);
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.moveTo(leftShoulder.x, leftShoulder.y);
-      ctx.lineTo(leftElbow.x, leftElbow.y);
-      ctx.lineTo(leftWrist.x, leftWrist.y);
-      ctx.stroke();
-
-      [nose, leftShoulder, rightShoulder, leftElbow, rightElbow, leftWrist, rightWrist].forEach((pt) => {
-        ctx.beginPath();
-        ctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2);
-        ctx.fill();
-      });
-    }
-
-    // Draw Face Mesh Points (Blue #3b82f6 per spec)
-    if (showFace) {
-      ctx.fillStyle = "#3b82f6";
-      const faceCenter = { x: width * 0.5, y: height * 0.26 };
-      for (let i = 0; i < 28; i++) {
-        const angle = (i / 28) * Math.PI * 2;
-        const fx = faceCenter.x + Math.cos(angle) * 32;
-        const fy = faceCenter.y + Math.sin(angle) * 40;
-        ctx.beginPath();
-        ctx.arc(fx, fy, 2, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      // Eyes and Mouth
-      ctx.fillRect(faceCenter.x - 14, faceCenter.y - 8, 4, 2);
-      ctx.fillRect(faceCenter.x + 10, faceCenter.y - 8, 4, 2);
-      ctx.fillRect(faceCenter.x - 8, faceCenter.y + 14, 16, 2);
-    }
-
-    // Draw Hands (All 21 points per hand - Green #22c55e per spec)
-    if (showHands) {
-      ctx.strokeStyle = "#22c55e";
-      ctx.fillStyle = "#22c55e";
+    // Slot 0 = left hand (21 pts), slot 1 = right hand (21 pts)
+    for (const off of [0, 21]) {
+      ctx.strokeStyle = off === 0 ? "#22c55e" : "#4ade80";
+      ctx.fillStyle = ctx.strokeStyle;
       ctx.lineWidth = 1.5;
 
-      const drawHand = (wristX: number, wristY: number, flip: boolean) => {
-        const sign = flip ? -1 : 1;
+      for (const [a, b] of HAND_CONN) {
+        const p1 = frame[off + a];
+        const p2 = frame[off + b];
+        if (!p1 || !p2) continue;
         ctx.beginPath();
-        ctx.arc(wristX, wristY, 5, 0, Math.PI * 2);
+        ctx.moveTo(px(p1), py(p1));
+        ctx.lineTo(px(p2), py(p2));
+        ctx.stroke();
+      }
+
+      for (let i = 0; i < 21; i++) {
+        const p = frame[off + i];
+        if (!p) continue;
+        ctx.beginPath();
+        ctx.arc(px(p), py(p), i === 0 ? 4 : 2.5, 0, Math.PI * 2);
         ctx.fill();
-
-        // 5 fingers, 4 segments each = 20 points + 1 wrist = 21 points
-        for (let f = 0; f < 5; f++) {
-          const fingerAngle = ((-40 + f * 20) * Math.PI) / 180;
-          let prevX = wristX;
-          let prevY = wristY;
-
-          for (let seg = 1; seg <= 4; seg++) {
-            const segDist = seg * 9;
-            const px = wristX + Math.cos(fingerAngle) * segDist * sign + Math.sin(t + f) * (seg * 1.2);
-            const py = wristY - Math.sin(fingerAngle) * segDist * 0.5 - seg * 8;
-
-            ctx.beginPath();
-            ctx.moveTo(prevX, prevY);
-            ctx.lineTo(px, py);
-            ctx.stroke();
-
-            ctx.beginPath();
-            ctx.arc(px, py, 2.5, 0, Math.PI * 2);
-            ctx.fill();
-
-            prevX = px;
-            prevY = py;
-          }
-        }
-      };
-
-      const leftWrist = { x: width * 0.35 + Math.sin(t * 2) * 20, y: height * 0.72 - Math.abs(Math.sin(t)) * 40 };
-      const rightWrist = { x: width * 0.65 - Math.cos(t * 2) * 20, y: height * 0.72 - Math.abs(Math.cos(t)) * 40 };
-
-      drawHand(leftWrist.x, leftWrist.y, false);
-      drawHand(rightWrist.x, rightWrist.y, true);
+      }
     }
-  }, [currentFrame, showHands, showFace, showPose, totalFrames]);
+  }, [currentFrame, frames]);
+
+  // Honest empty state: this sign simply has no extracted sequence yet.
+  if (totalFrames === 0) {
+    return (
+      <div className="aspect-video w-full bg-background border border-border rounded-md flex flex-col items-center justify-center space-y-2">
+        <Database size={28} className="text-text-muted" />
+        <div className="text-xs font-mono text-text-secondary">NO LANDMARK DATA</div>
+        <div className="text-[11px] text-text-muted max-w-xs text-center">
+          No extracted sequence exists for this sign yet. Run training extraction or accept a community sample.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-surface border border-border rounded-md overflow-hidden flex flex-col">
@@ -7532,21 +7122,23 @@ export function LandmarkSimulation({
           className="w-full h-full object-contain"
         />
 
-        {/* Overlay Metadata Panel per Section 8.5 */}
+        {/* Overlay Metadata Panel */}
         <div className="absolute top-3 left-3 bg-surface/90 border border-border/80 px-2.5 py-1.5 rounded tech-mono text-[11px] text-text-secondary space-x-2">
           <span>Frame: <strong className="text-text-primary">{currentFrame + 1}/{totalFrames}</strong></span>
           <span>|</span>
           <span>FPS: <strong className="text-accent-primary">{fps}</strong></span>
           <span>|</span>
-          <span>Hands: <strong className="text-status-approved">{showHands ? "2 (21 pts)" : "0"}</strong></span>
-          <span>|</span>
-          <span>Face: <strong className="text-accent-secondary">{showFace ? "Mesh Active" : "Off"}</strong></span>
-          <span>|</span>
-          <span>Pose: <strong className="text-text-primary">{showPose ? "True" : "False"}</strong></span>
+          <span>Hands: <strong className="text-status-approved">2 (21 pts each)</strong></span>
+          {title && (
+            <>
+              <span>|</span>
+              <span className="text-accent-secondary">{title}</span>
+            </>
+          )}
         </div>
       </div>
 
-      {/* Video Editor Timeline Controls per Section 8.5 */}
+      {/* Timeline Controls */}
       <div className="p-3 bg-surface-elevated/50 border-t border-border flex items-center justify-between tech-mono text-xs">
         <div className="flex items-center space-x-2">
           <button
@@ -9169,6 +8761,478 @@ $wtArgs = @(
 )
 
 & wt.exe @wtArgs
+```
+
+---
+
+# FILE: `tools\build_index.py`
+
+```python
+"""
+tools/build_index.py
+
+Writes ONE coordinated master index at dataset/index.jsonl covering every data
+coordinate in the project: raw sources, extracted hold-sequences, video
+sequences, reference media, community samples and trained models.
+
+Every record carries sample_id / kind / label / source / path / split /
+verification so downstream tooling can join on a single key.
+
+Run:
+    cd "d:\\Download\\Projects\\WBSL Bridge"
+    & "tests\\.venv\\Scripts\\python.exe" tools\\build_index.py
+"""
+import json
+from pathlib import Path
+
+import numpy as np
+
+ROOT = Path(__file__).resolve().parent.parent
+DS = ROOT / "dataset" / "Indian Sign Language_Dataset"
+DT = ROOT / "dataset_train"
+OUT = ROOT / "dataset" / "index.jsonl"
+recs = []
+
+
+def rel(p):
+    return str(Path(p).relative_to(ROOT))
+
+
+# ── 1. Raw static images (ISL_STATIC1 + ISL_STATIC2) ──
+for cd in sorted(d for d in (DS / "ISL_STATIC2").iterdir() if d.is_dir()):
+    n = len(list(cd.glob("*.jpg")))
+    if (DS / "ISL_STATIC1" / cd.name).exists():
+        n += len(list((DS / "ISL_STATIC1" / cd.name).glob("*.jpg")))
+    recs.append({"sample_id": f"RAW_STATIC_{cd.name}", "kind": "raw_static_images", "label": cd.name,
+                 "source": "ISL_STATIC1+ISL_STATIC2", "path": rel(cd), "count": n,
+                 "split": "unassigned", "verification": "n/a"})
+
+# ── 2. Raw videos (ISL_VIDEO) ──
+for vd in sorted(d for d in (DS / "ISL_VIDEO").iterdir() if d.is_dir()):
+    g = vd.name.upper().replace(" ", "_")
+    recs.append({"sample_id": f"RAW_VIDEO_{g}", "kind": "raw_videos", "label": g,
+                 "source": "ISL_VIDEO", "path": rel(vd), "count": len(list(vd.glob("*.mp4"))),
+                 "split": "unassigned", "verification": "n/a"})
+
+# ── 3. Extracted static hold-sequences ──
+for p in sorted((DT / "unified_static").glob("*.npy")):
+    a = np.load(p)
+    recs.append({"sample_id": f"HOLD_{p.stem}", "kind": "static_hold_sequences", "label": p.stem,
+                 "source": "extracted", "path": rel(p), "sequences": int(a.shape[0]),
+                 "frames": int(a.shape[1]), "split": "train+val", "verification": "n/a"})
+
+# ── 4. Extracted video sequences ──
+for p in sorted((DT / "unified_video").glob("*.npy")):
+    a = np.load(p)
+    recs.append({"sample_id": f"VSEQ_{p.stem}", "kind": "video_sequences", "label": p.stem,
+                 "source": "extracted", "path": rel(p), "sequences": int(a.shape[0]),
+                 "frames": int(a.shape[1]), "split": "train+val", "verification": "n/a"})
+
+# ── 5. Reference media (one auto-copied sample per class) ──
+sm = ROOT / "backend" / "data" / "sign_media.json"
+if sm.exists():
+    for label, m in json.loads(sm.read_text(encoding="utf-8")).items():
+        recs.append({"sample_id": f"REF_{label}", "kind": "reference_media", "label": label,
+                     "source": "auto-copied", "path": f"backend/media/{m['filename']}",
+                     "media_type": m["type"], "url": m["url"],
+                     "split": "n/a", "verification": "admin-approved"})
+
+# ── 6. Community samples (real uploads: video -> landmarks -> npy) ──
+man = ROOT / "dataset" / "manifest.jsonl"
+if man.exists():
+    for line in man.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        r = json.loads(line)
+        recs.append({"sample_id": f"COM_{r['sample_id']}", "kind": "community_sample", "label": r["label"],
+                     "source": f"community:{r['signer_id']}", "signer": r["signer_id"],
+                     "path": r["landmark_path"], "frames": r["frames"],
+                     "split": r.get("split", "unassigned"),
+                     "verification": r.get("verification", "pending")})
+
+# ── 7. Trained models ──
+for mp_ in [("sign_mlp.onnx", "MLP-static"), ("sign_unified_lstm.onnx", "LSTM-unified")]:
+    if (ROOT / "models" / mp_[0]).exists():
+        recs.append({"sample_id": f"MODEL_{mp_[1]}", "kind": "model", "label": mp_[1],
+                     "source": "trained", "path": f"models/{mp_[0]}",
+                     "split": "n/a", "verification": "n/a"})
+
+rep = DT / "unified_report.json"
+if rep.exists():
+    for r in recs:
+        if r["kind"] == "model" and "unified" in r["label"]:
+            r["metrics"] = json.loads(rep.read_text(encoding="utf-8"))
+
+OUT.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in recs), encoding="utf-8")
+kinds = {}
+for r in recs:
+    kinds[r["kind"]] = kinds.get(r["kind"], 0) + 1
+print(f"index written: {len(recs)} records")
+for k, v in kinds.items():
+    print(f"  {k}: {v}")
+```
+
+---
+
+# FILE: `tools\build_reference_samples.py`
+
+```python
+"""
+tools/build_reference_samples.py
+
+Copies ONE real sample per class into backend/media/ and registers it in
+backend/data/sign_media.json, so Text->Sign playback and the Contribute
+"watch & copy" panel both show real data instead of nothing.
+
+Run:
+    cd "d:\\Download\\Projects\\WBSL Bridge"
+    & "tests\\.venv\\Scripts\\python.exe" tools\\build_reference_samples.py
+"""
+import json
+import shutil
+from pathlib import Path
+
+import cv2
+import mediapipe as mp
+
+ROOT = Path(__file__).resolve().parent.parent
+DS = ROOT / "dataset" / "Indian Sign Language_Dataset"
+MEDIA = ROOT / "backend" / "media"
+MEDIA.mkdir(parents=True, exist_ok=True)
+MP = ROOT / "backend" / "data" / "sign_media.json"
+MP.parent.mkdir(parents=True, exist_ok=True)
+media = json.loads(MP.read_text(encoding="utf-8")) if MP.exists() else {}
+hands = mp.solutions.hands.Hands(static_image_mode=True, max_num_hands=2)
+
+
+def both_hands(img):
+    res = hands.process(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+    return bool(res.multi_hand_landmarks) and len(res.multi_hand_landmarks) == 2
+
+
+for cd in sorted(d for d in (DS / "ISL_STATIC2").iterdir() if d.is_dir()):
+    imgs = sorted(cd.glob("*.jpg"))
+    if not imgs:
+        print(f"  REF {cd.name} <- SKIPPED (no images)")
+        continue
+    best = None
+    for f in imgs[:15]:
+        img = cv2.imread(str(f))
+        if img is not None and both_hands(img):
+            best = f
+            break
+    best = best or imgs[0]
+    dest = MEDIA / f"{cd.name}.jpg"
+    shutil.copy(best, dest)
+    media[cd.name] = {"type": "image", "filename": dest.name, "url": f"/api/media/{dest.name}"}
+    print(f"  REF {cd.name} <- {best.name}")
+
+for vd in sorted(d for d in (DS / "ISL_VIDEO").iterdir() if d.is_dir()):
+    gloss = vd.name.upper().replace(" ", "_")
+    vids = sorted(vd.glob("*.mp4"))
+    if not vids:
+        continue
+    dest = MEDIA / f"{gloss}.mp4"
+    shutil.copy(vids[0], dest)
+    media[gloss] = {"type": "video", "filename": dest.name, "url": f"/api/media/{dest.name}"}
+    print(f"  REF {gloss} <- {vids[0].name}")
+
+MP.write_text(json.dumps(media, ensure_ascii=False, indent=2), encoding="utf-8")
+print(f"reference samples registered: {len(media)}")
+```
+
+---
+
+# FILE: `train_unified.py`
+
+```python
+"""
+train_unified.py — ONE model for all 97 classes (36 static + 61 video).
+Modes: 1=extract static hold-sequences  2=extract video sequences
+       3=train + export ONNX            4=ALL
+Run:  & "tests\\.venv\\Scripts\\python.exe" train_unified.py
+"""
+import json
+import time
+from pathlib import Path
+
+import cv2
+import mediapipe as mp
+import numpy as np
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader, Dataset
+
+ROOT = Path(__file__).resolve().parent
+DS_CANDIDATES = [
+    Path(r"D:\Download\Projects\Indian Sign Language_Dataset"),   # external location
+    ROOT / "dataset" / "Indian Sign Language_Dataset",            # in-repo copy
+]
+DS = next((p for p in DS_CANDIDATES if p.exists()), DS_CANDIDATES[0])
+S1, S2, VD = DS / "ISL_STATIC1", DS / "ISL_STATIC2", DS / "ISL_VIDEO"
+OUT = ROOT / "dataset_train"
+RAW_S, RAW_V = OUT / "unified_static", OUT / "unified_video"
+MODELS = ROOT / "models"
+for d in (OUT, RAW_S, RAW_V, MODELS):
+    d.mkdir(parents=True, exist_ok=True)
+
+# Folder name -> official gloss token
+GLOSS_OVERRIDE = {"Fedup": "FED_UP"}
+
+
+def video_gloss(folder_name: str) -> str:
+    return GLOSS_OVERRIDE.get(folder_name, folder_name.upper().replace(" ", "_"))
+
+
+# Expected vocabulary (safety check)
+EXPECTED_STATIC = [str(i) for i in range(10)] + [chr(c) for c in range(65, 91)]  # 0-9 A-Z = 36
+
+SEQ_T, DIM = 32, 126
+STATIC_SEQ_PER_CLASS = 100     # hold-sequences per static class
+AUG_STATIC, AUG_VIDEO = 2, 4
+EPOCHS, BS, LR = 20, 64, 1e-3
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
+_hands = mp.solutions.hands.Hands(static_image_mode=True, max_num_hands=2,
+                                  min_detection_confidence=0.5)
+
+
+def extract_two_hands(res):
+    """IDENTICAL to backend/extract.py — do not change."""
+    if not res.multi_hand_landmarks:
+        return None
+    left = right = None
+    for hlm, hn in zip(res.multi_hand_landmarks, res.multi_handedness):
+        lab = hn.classification[0].label
+        pts = np.array([[p.x, p.y, p.z] for p in hlm.landmark], np.float32)
+        if lab == "Left" and left is None:
+            left = pts
+        if lab == "Right" and right is None:
+            right = pts
+    ref = right if right is not None else left
+    if ref is None:
+        return None
+    r0, scale = ref[0], np.linalg.norm(ref[9] - ref[0]) + 1e-6
+    ol = (left - r0) / scale if left is not None else np.zeros((21, 3), np.float32)
+    or_ = (right - r0) / scale if right is not None else np.zeros((21, 3), np.float32)
+    return np.concatenate([ol.flatten(), or_.flatten()]).astype(np.float32)
+
+
+def vec_from_bgr(frame):
+    return extract_two_hands(_hands.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)))
+
+
+def make_hold(v, rng):
+    """One hold-sequence = one REAL detected hand pose held for SEQ_T frames
+    plus small jitter/drift. One image -> one sequence (see build_static)."""
+    seq = np.repeat(v[None, :], SEQ_T, 0).astype(np.float32)
+    seq += rng.normal(0, 0.006, seq.shape).astype(np.float32)
+    seq += (np.linspace(0, 1, SEQ_T)[:, None] * rng.normal(0, 0.008, v.shape)).astype(np.float32)
+    return seq
+
+
+def resample(seq, t):
+    if len(seq) == t:
+        return seq.astype(np.float32)
+    ix = np.linspace(0, len(seq) - 1, t)
+    i0, i1 = ix.astype(int), np.minimum(ix.astype(int) + 1, len(seq) - 1)
+    f = (ix - i0)[:, None]
+    return (seq[i0] * (1 - f) + seq[i1] * f).astype(np.float32)
+
+
+def extract_video_sequence(path):
+    cap = cv2.VideoCapture(str(path))
+    F = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    if F < 8:
+        cap.release()
+        return None
+    frames, last, good = [], None, 0
+    for ix in np.linspace(0, F - 1, SEQ_T).astype(int):
+        cap.set(cv2.CAP_PROP_POS_FRAMES, int(ix))
+        ok, fr = cap.read()
+        if not ok:
+            frames.append(None)
+            continue
+        v = vec_from_bgr(fr)
+        if v is not None:
+            last = v
+            good += 1
+        frames.append(v if v is not None else last)
+    cap.release()
+    if good < SEQ_T // 2:
+        return None
+    return np.array([f if f is not None else np.zeros(DIM, np.float32) for f in frames], np.float32)
+
+
+def augment(seq, is_static, rng):
+    s = seq.copy()
+    if rng.random() < 0.5:
+        L = s[:, :63].reshape(SEQ_T, 21, 3)
+        R = s[:, 63:].reshape(SEQ_T, 21, 3)
+        L[:, :, 0] *= -1
+        R[:, :, 0] *= -1
+        s = np.concatenate([R.reshape(SEQ_T, 63), L.reshape(SEQ_T, 63)], axis=1)
+    if rng.random() < 0.6:
+        th = rng.uniform(-0.35, 0.35)
+        c, sn = np.cos(th), np.sin(th)
+        p = s.reshape(-1, 42, 3)
+        p[:, :2] = p[:, :2] @ np.array([[c, -sn], [sn, c]]).T
+        s = p.reshape(SEQ_T, DIM)
+    if rng.random() < 0.6:
+        s *= rng.uniform(0.85, 1.15)
+    if rng.random() < 0.5:
+        p = s.reshape(-1, 42, 3)
+        p[:, :2] += rng.uniform(-0.12, 0.12, 2)
+        s = p.reshape(SEQ_T, DIM)
+    s += rng.normal(0, 0.008 if is_static else 0.006, s.shape).astype(np.float32)
+    if not is_static and rng.random() < 0.6:
+        s = resample(s, int(rng.integers(24, 41)))
+        s = resample(s, SEQ_T)
+    return s.astype(np.float32)
+
+
+def build_static():
+    rng = np.random.default_rng(7)
+    classes = sorted({d.name for d in S1.iterdir() if d.is_dir()} |
+                     {d.name for d in S2.iterdir() if d.is_dir()})
+    for c in classes:
+        picks = []
+        for src in (S1, S2):
+            cd = src / c
+            if not cd.exists():
+                continue
+            imgs = sorted(cd.glob("*.jpg"))
+            rng.shuffle(imgs)
+            picks += imgs[:STATIC_SEQ_PER_CLASS // 2]
+        seqs = []
+        for f in picks:
+            img = cv2.imread(str(f))
+            if img is None:
+                continue
+            v = vec_from_bgr(img)
+            if v is not None:
+                seqs.append(make_hold(v, rng))
+        if seqs:
+            np.save(RAW_S / f"{c}.npy", np.stack(seqs))
+        print(f"  STATIC {c}: {len(seqs)} hold-sequences")
+
+
+def build_video():
+    for vd in sorted(d for d in VD.iterdir() if d.is_dir()):
+        gloss = video_gloss(vd.name)
+        vids = sorted(vd.glob("*.mp4"))
+        seqs = [s for s in (extract_video_sequence(f) for f in vids) if s is not None]
+        if seqs:
+            np.save(RAW_V / f"{gloss}.npy", np.stack(seqs))
+        print(f"  VIDEO {gloss}: {len(seqs)}/{len(vids)} usable")
+
+
+class UniDS(Dataset):
+    def __init__(self, pools, aug_k, rng):
+        self.pools, self.rng = pools, rng
+        self.items = [(ci, r, 0) for ci, (arr, _) in enumerate(pools) for r in range(len(arr))]
+        self.items += [(ci, r, k + 1) for ci, (arr, _) in enumerate(pools)
+                       for r in range(len(arr)) for k in range(aug_k)]
+
+    def __len__(self):
+        return len(self.items)
+
+    def __getitem__(self, i):
+        ci, r, copy = self.items[i]
+        seq = self.pools[ci][0][r].copy()
+        if copy > 0:
+            seq = augment(seq, self.pools[ci][1], self.rng)
+        return torch.from_numpy(seq), ci
+
+
+class UniLSTM(nn.Module):
+    def __init__(self, din, hid, n):
+        super().__init__()
+        self.lstm = nn.LSTM(din, hid, 2, batch_first=True, dropout=0.3)
+        self.fc = nn.Linear(hid, n)
+
+    def forward(self, x):
+        o, _ = self.lstm(x)
+        return self.fc(o[:, -1])
+
+
+def train():
+    static_names = sorted(p.stem for p in RAW_S.glob("*.npy"))
+    video_names = sorted(p.stem for p in RAW_V.glob("*.npy"))
+    classes = static_names + video_names
+    n_static = len(static_names)
+    missing_static = [c for c in EXPECTED_STATIC if c not in static_names]
+    if missing_static:
+        print(f"  WARNING: static classes missing from data: {missing_static}")
+    print(f"  VOCABULARY: {len(static_names)} static + {len(video_names)} video = {len(classes)} classes")
+    print(f"  video glosses: {video_names}")
+    rng = np.random.default_rng(42)
+    train_pools, val_pools = [], []
+    for i, c in enumerate(classes):
+        src = RAW_S if i < n_static else RAW_V
+        arr = np.load(src / f"{c}.npy")
+        arr = arr[rng.permutation(len(arr))]
+        nv = max(5, int(0.15 * len(arr)))
+        val_pools.append((arr[:nv], i < n_static))
+        train_pools.append((arr[nv:], i < n_static))
+    tr_s = UniDS(train_pools[:n_static], AUG_STATIC, np.random.default_rng(1))
+    tr_v = UniDS(train_pools[n_static:], AUG_VIDEO, np.random.default_rng(2))
+    tr_v.items = [(ci + n_static, r, k) for ci, r, k in tr_v.items]
+    va_s = UniDS(val_pools[:n_static], 0, np.random.default_rng(3))
+    va_v = UniDS(val_pools[n_static:], 0, np.random.default_rng(4))
+    va_v.items = [(ci + n_static, r, k) for ci, r, k in va_v.items]
+    dl_tr = DataLoader(torch.utils.data.ConcatDataset([tr_s, tr_v]), BS, shuffle=True)
+    dl_va = DataLoader(torch.utils.data.ConcatDataset([va_s, va_v]), 128)
+    model = UniLSTM(DIM, 128, len(classes)).to(DEVICE)
+    crit, opt = nn.CrossEntropyLoss(), torch.optim.Adam(model.parameters(), LR)
+    best = 0.0
+    for e in range(EPOCHS):
+        model.train()
+        t0 = time.time()
+        for xb, yb in dl_tr:
+            xb, yb = xb.to(DEVICE), yb.to(DEVICE)
+            opt.zero_grad()
+            loss = crit(model(xb), yb)
+            loss.backward()
+            opt.step()
+        model.eval()
+        c = t = cs = ts = 0
+        with torch.no_grad():
+            for xb, yb in dl_va:
+                pr = model(xb.to(DEVICE)).argmax(1)
+                yb = yb.to(DEVICE)
+                c += (pr == yb).sum().item()
+                t += len(yb)
+                m = yb < n_static
+                cs += (pr[m] == yb[m]).sum().item()
+                ts += int(m.sum())
+        acc = c / t * 100
+        best = max(best, acc)
+        print(f"  epoch {e+1:2d} | val {acc:5.1f}% (static {cs/ts*100 if ts else 0:5.1f}% / "
+              f"video {(c-cs)/(t-ts)*100 if t-ts else 0:5.1f}%) {time.time()-t0:.0f}s")
+    print(f"  BEST VAL {best:.1f}% over {len(classes)} classes")
+    model.eval().cpu()
+    torch.onnx.export(model, torch.randn(1, SEQ_T, DIM), str(MODELS / "sign_unified_lstm.onnx"),
+                      opset_version=18, input_names=["sequence"], output_names=["logits"],
+                      dynamic_axes={"sequence": {0: "batch"}, "logits": {0: "batch"}})
+    json.dump(classes, open(MODELS / "sign_unified_classes.json", "w", encoding="utf-8"),
+              ensure_ascii=False, indent=1)
+    json.dump({"classes": len(classes), "static": n_static, "video": len(classes) - n_static,
+               "best_val_acc": best, "seq_len": SEQ_T, "feat": DIM},
+              open(OUT / "unified_report.json", "w", encoding="utf-8"), indent=1)
+    print("  saved models/sign_unified_lstm.onnx + sign_unified_classes.json")
+
+
+if __name__ == "__main__":
+    print("1=static 2=video 3=train 4=ALL")
+    ch = input("Choose: ").strip()
+    if ch in ("1", "4"):
+        build_static()
+    if ch in ("2", "4"):
+        build_video()
+    if ch in ("3", "4"):
+        train()
+    print("DONE")
 ```
 
 ---

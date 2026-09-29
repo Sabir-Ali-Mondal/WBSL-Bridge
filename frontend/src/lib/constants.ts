@@ -8,7 +8,6 @@ export const APP_CONFIG = {
 };
 
 export const NAVIGATION_LINKS = [
-  { label: "Explore", href: "/dataset" },
   { label: "Text → Sign", href: "/text-to-sign" },
   { label: "Sign → Text", href: "/sign-to-text" },
   { label: "Contribute", href: "/contribute" },
@@ -19,11 +18,8 @@ export const ADMIN_NAVIGATION_LINKS = [
   { label: "Overview", href: "/admin", icon: "LayoutDashboard" },
   { label: "Contributions", href: "/admin/contributions", icon: "CheckSquare" },
   { label: "Signs Catalog", href: "/admin/signs", icon: "BookOpen" },
-  { label: "Dataset Management", href: "/admin/dataset", icon: "Database" },
-  { label: "Training Console", href: "/admin/training", icon: "Terminal" },
-  { label: "Model Evaluation", href: "/admin/evaluation", icon: "BarChart3" },
+  { label: "Dataset Explorer", href: "/admin/dataset", icon: "Database" },
   { label: "Models Registry", href: "/admin/models", icon: "Cpu" },
-  { label: "Unknown Queue", href: "/community/unknown-signs", icon: "HelpCircle" },
   { label: "Video Inspector", href: "/admin/videos", icon: "Video" },
   { label: "Settings", href: "/admin/settings", icon: "Settings" },
 ];

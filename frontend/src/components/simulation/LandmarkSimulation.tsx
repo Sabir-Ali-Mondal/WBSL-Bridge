@@ -1,32 +1,33 @@
 "use client";
 import React, { useRef, useEffect, useState } from "react";
-import { Play, Pause, RotateCcw } from "lucide-react";
+import { Play, Pause, RotateCcw, Database } from "lucide-react";
+
+const HAND_CONN: [number, number][] = [
+  [0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 8], [5, 9], [9, 10],
+  [10, 11], [11, 12], [9, 13], [13, 14], [14, 15], [15, 16], [13, 17], [17, 18],
+  [18, 19], [19, 20], [0, 17],
+];
 
 interface LandmarkSimulationProps {
-  landmarkFrames?: number[][][]; // frames x points x 3
-  showHands?: boolean;
-  showFace?: boolean;
-  showPose?: boolean;
+  frames?: number[][][];   // F x 42 x 3 (real extracted landmarks)
   fps?: number;
+  title?: string;
 }
 
 export function LandmarkSimulation({
-  landmarkFrames,
-  showHands = true,
-  showFace = true,
-  showPose = true,
-  fps = 30,
+  frames,
+  fps = 15,
+  title,
 }: LandmarkSimulationProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [currentFrame, setCurrentFrame] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
 
-  // Generate synthetic MediaPipe skeleton landmarks if none provided
-  const totalFrames = landmarkFrames?.length || 60;
+  const totalFrames = frames?.length ?? 0;
 
   useEffect(() => {
-    if (!isPlaying) return;
+    if (!isPlaying || totalFrames === 0) return;
 
     const interval = setInterval(() => {
       setCurrentFrame((prev) => (prev + 1) % totalFrames);
@@ -63,106 +64,54 @@ export function LandmarkSimulation({
       ctx.stroke();
     }
 
-    const t = (currentFrame / totalFrames) * Math.PI * 2;
+    // Render ONLY real extracted landmarks. No synthetic fallback.
+    const frame = frames?.[currentFrame];
+    if (!frame) return;
 
-    // Draw Pose (33 points subset) - Color Gray #6b7280 per spec
-    if (showPose) {
-      ctx.strokeStyle = "#6b7280";
-      ctx.fillStyle = "#6b7280";
-      ctx.lineWidth = 2;
+    const S = width / 5;
+    const cx = width / 2;
+    const cy = height / 2;
+    const px = (p: number[]) => cx + p[0] * S;
+    const py = (p: number[]) => cy + p[1] * S;
 
-      const nose = { x: width * 0.5, y: height * 0.28 };
-      const leftShoulder = { x: width * 0.38, y: height * 0.42 };
-      const rightShoulder = { x: width * 0.62, y: height * 0.42 };
-      const leftElbow = { x: width * 0.32, y: height * 0.56 + Math.sin(t) * 15 };
-      const rightElbow = { x: width * 0.68, y: height * 0.56 + Math.cos(t) * 15 };
-      const leftWrist = { x: width * 0.35 + Math.sin(t * 2) * 20, y: height * 0.72 - Math.abs(Math.sin(t)) * 40 };
-      const rightWrist = { x: width * 0.65 - Math.cos(t * 2) * 20, y: height * 0.72 - Math.abs(Math.cos(t)) * 40 };
-
-      // Bones
-      ctx.beginPath();
-      ctx.moveTo(leftShoulder.x, leftShoulder.y);
-      ctx.lineTo(rightShoulder.x, rightShoulder.y);
-      ctx.lineTo(rightElbow.x, rightElbow.y);
-      ctx.lineTo(rightWrist.x, rightWrist.y);
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.moveTo(leftShoulder.x, leftShoulder.y);
-      ctx.lineTo(leftElbow.x, leftElbow.y);
-      ctx.lineTo(leftWrist.x, leftWrist.y);
-      ctx.stroke();
-
-      [nose, leftShoulder, rightShoulder, leftElbow, rightElbow, leftWrist, rightWrist].forEach((pt) => {
-        ctx.beginPath();
-        ctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2);
-        ctx.fill();
-      });
-    }
-
-    // Draw Face Mesh Points (Blue #3b82f6 per spec)
-    if (showFace) {
-      ctx.fillStyle = "#3b82f6";
-      const faceCenter = { x: width * 0.5, y: height * 0.26 };
-      for (let i = 0; i < 28; i++) {
-        const angle = (i / 28) * Math.PI * 2;
-        const fx = faceCenter.x + Math.cos(angle) * 32;
-        const fy = faceCenter.y + Math.sin(angle) * 40;
-        ctx.beginPath();
-        ctx.arc(fx, fy, 2, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      // Eyes and Mouth
-      ctx.fillRect(faceCenter.x - 14, faceCenter.y - 8, 4, 2);
-      ctx.fillRect(faceCenter.x + 10, faceCenter.y - 8, 4, 2);
-      ctx.fillRect(faceCenter.x - 8, faceCenter.y + 14, 16, 2);
-    }
-
-    // Draw Hands (All 21 points per hand - Green #22c55e per spec)
-    if (showHands) {
-      ctx.strokeStyle = "#22c55e";
-      ctx.fillStyle = "#22c55e";
+    // Slot 0 = left hand (21 pts), slot 1 = right hand (21 pts)
+    for (const off of [0, 21]) {
+      ctx.strokeStyle = off === 0 ? "#22c55e" : "#4ade80";
+      ctx.fillStyle = ctx.strokeStyle;
       ctx.lineWidth = 1.5;
 
-      const drawHand = (wristX: number, wristY: number, flip: boolean) => {
-        const sign = flip ? -1 : 1;
+      for (const [a, b] of HAND_CONN) {
+        const p1 = frame[off + a];
+        const p2 = frame[off + b];
+        if (!p1 || !p2) continue;
         ctx.beginPath();
-        ctx.arc(wristX, wristY, 5, 0, Math.PI * 2);
+        ctx.moveTo(px(p1), py(p1));
+        ctx.lineTo(px(p2), py(p2));
+        ctx.stroke();
+      }
+
+      for (let i = 0; i < 21; i++) {
+        const p = frame[off + i];
+        if (!p) continue;
+        ctx.beginPath();
+        ctx.arc(px(p), py(p), i === 0 ? 4 : 2.5, 0, Math.PI * 2);
         ctx.fill();
-
-        // 5 fingers, 4 segments each = 20 points + 1 wrist = 21 points
-        for (let f = 0; f < 5; f++) {
-          const fingerAngle = ((-40 + f * 20) * Math.PI) / 180;
-          let prevX = wristX;
-          let prevY = wristY;
-
-          for (let seg = 1; seg <= 4; seg++) {
-            const segDist = seg * 9;
-            const px = wristX + Math.cos(fingerAngle) * segDist * sign + Math.sin(t + f) * (seg * 1.2);
-            const py = wristY - Math.sin(fingerAngle) * segDist * 0.5 - seg * 8;
-
-            ctx.beginPath();
-            ctx.moveTo(prevX, prevY);
-            ctx.lineTo(px, py);
-            ctx.stroke();
-
-            ctx.beginPath();
-            ctx.arc(px, py, 2.5, 0, Math.PI * 2);
-            ctx.fill();
-
-            prevX = px;
-            prevY = py;
-          }
-        }
-      };
-
-      const leftWrist = { x: width * 0.35 + Math.sin(t * 2) * 20, y: height * 0.72 - Math.abs(Math.sin(t)) * 40 };
-      const rightWrist = { x: width * 0.65 - Math.cos(t * 2) * 20, y: height * 0.72 - Math.abs(Math.cos(t)) * 40 };
-
-      drawHand(leftWrist.x, leftWrist.y, false);
-      drawHand(rightWrist.x, rightWrist.y, true);
+      }
     }
-  }, [currentFrame, showHands, showFace, showPose, totalFrames]);
+  }, [currentFrame, frames]);
+
+  // Honest empty state: this sign simply has no extracted sequence yet.
+  if (totalFrames === 0) {
+    return (
+      <div className="aspect-video w-full bg-background border border-border rounded-md flex flex-col items-center justify-center space-y-2">
+        <Database size={28} className="text-text-muted" />
+        <div className="text-xs font-mono text-text-secondary">NO LANDMARK DATA</div>
+        <div className="text-[11px] text-text-muted max-w-xs text-center">
+          No extracted sequence exists for this sign yet. Run training extraction or accept a community sample.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-surface border border-border rounded-md overflow-hidden flex flex-col">
@@ -175,21 +124,23 @@ export function LandmarkSimulation({
           className="w-full h-full object-contain"
         />
 
-        {/* Overlay Metadata Panel per Section 8.5 */}
+        {/* Overlay Metadata Panel */}
         <div className="absolute top-3 left-3 bg-surface/90 border border-border/80 px-2.5 py-1.5 rounded tech-mono text-[11px] text-text-secondary space-x-2">
           <span>Frame: <strong className="text-text-primary">{currentFrame + 1}/{totalFrames}</strong></span>
           <span>|</span>
           <span>FPS: <strong className="text-accent-primary">{fps}</strong></span>
           <span>|</span>
-          <span>Hands: <strong className="text-status-approved">{showHands ? "2 (21 pts)" : "0"}</strong></span>
-          <span>|</span>
-          <span>Face: <strong className="text-accent-secondary">{showFace ? "Mesh Active" : "Off"}</strong></span>
-          <span>|</span>
-          <span>Pose: <strong className="text-text-primary">{showPose ? "True" : "False"}</strong></span>
+          <span>Hands: <strong className="text-status-approved">2 (21 pts each)</strong></span>
+          {title && (
+            <>
+              <span>|</span>
+              <span className="text-accent-secondary">{title}</span>
+            </>
+          )}
         </div>
       </div>
 
-      {/* Video Editor Timeline Controls per Section 8.5 */}
+      {/* Timeline Controls */}
       <div className="p-3 bg-surface-elevated/50 border-t border-border flex items-center justify-between tech-mono text-xs">
         <div className="flex items-center space-x-2">
           <button

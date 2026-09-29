@@ -1,16 +1,3 @@
-# =============================================================================
-# WBSL Bridge — root .gitignore
-# =============================================================================
-# This is a monorepo-style layout:
-#   frontend/  -> Next.js app. NOTE: frontend/ is its own git repo with its own
-#                 .gitignore; that one wins for anything inside it.
-#   backend/   -> Python (FastAPI) service
-#   models/    -> ONNX + GGUF model weights  (~6.3 GB, never commit)
-#   dataset/   -> sample data
-#   tests/     -> experiment scripts + several virtualenvs + raw datasets
-# =============================================================================
-
-
 # -----------------------------------------------------------------------------
 # Secrets / environment  (NEVER commit these)
 # -----------------------------------------------------------------------------
@@ -98,6 +85,14 @@ tests/Indian Sign Language_Dataset/
 tests/dataset_landmarks/
 tests/dataset_continuous/
 dataset/samples/
+
+dataset/Indian Sign Language_Dataset/ISL_STATIC1
+dataset/Indian Sign Language_Dataset/ISL_STATIC2
+dataset/Indian Sign Language_Dataset/ISL_VIDEO
+
+backend/media_fmp4_backup
+backend/media
+backend/tts_output
 
 # Generated TTS audio output (regenerated on every request)
 backend/tts_output/*

@@ -1,0 +1,6 @@
+{
+ "classes": 36,
+ "type": "static_mlp",
+ "best_val_acc": 97.9633401221996,
+ "feat": 126
+}

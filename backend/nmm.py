@@ -1,21 +1,44 @@
 """
 backend/nmm.py
-Geometry-based NMM detection from test_1_3_geometry_nmm.py.
-5 markers: eyebrow raise, eyebrow furrow, head shake, head nod, mouth open.
-All detection is pure geometry — no ML model, < 5ms latency.
+Enhanced Non-Manual Markers (NMM) and Affect/Emotion Detection.
+- 5 geometry markers: eyebrow raise (question), eyebrow furrow (wh_question),
+  head shake (negation), head nod (affirmation), mouth open (emphasis).
+- Facial Affect / Emotion recognition using ViT (Vision Transformer) ONNX model:
+  happy, sad, angry, fear, surprise, disgust, neutral.
+- Real-time configurable sensitivity thresholds with defaults calibrated to eliminate false triggers.
 """
 
-import numpy as np
-import mediapipe as mp
 from collections import deque
+from pathlib import Path
+import cv2
+import mediapipe as mp
+import numpy as np
+import onnxruntime as ort
 
-# Initialize ONCE at module load
+# Initialize MediaPipe FaceMesh ONCE
 _face_mesh = mp.solutions.face_mesh.FaceMesh(
     max_num_faces=1,
     refine_landmarks=True,
     min_detection_confidence=0.5,
-    min_tracking_confidence=0.5
+    min_tracking_confidence=0.5,
 )
+
+# Initialize ViT Emotion Model ONCE
+ROOT = Path(__file__).resolve().parent.parent
+VIT_PATH = ROOT / "tests" / "vit_emotion.onnx"
+_vit_session = None
+_vit_input_name = None
+
+if VIT_PATH.exists():
+    try:
+        _vit_session = ort.InferenceSession(str(VIT_PATH), providers=["CPUExecutionProvider"])
+        _vit_input_name = _vit_session.get_inputs()[0].name
+    except Exception as exc:
+        print(f"[NMM] Notice: Could not load ViT emotion model: {exc}")
+
+EMOTION_LABELS = ['angry', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise']
+NORM_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+NORM_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
 
 # Landmark indices
 LEFT_EYEBROW = [70, 63, 105, 66, 107]
@@ -29,18 +52,40 @@ LOWER_LIP = 14
 NOSE_TIP = 1
 FACE_LEFT = 234
 FACE_RIGHT = 454
+FACE_TOP = 10
+FACE_BOTTOM = 152
 
-# Thresholds
-BROW_RAISE_THRESHOLD = 0.060
-BROW_FURROW_THRESHOLD = 0.040
-MOUTH_THRESHOLD = 0.040
-HEAD_SHAKE_VAR_THRESHOLD = 0.0008
-HEAD_NOD_VAR_THRESHOLD = 0.0008
+# Default calibrated thresholds (raised to prevent wild false positives)
+DEFAULT_CONFIG = {
+    "brow_raise_thresh": 0.082,      # Raised from 0.060 (stops false questions during natural speech/expression)
+    "brow_furrow_thresh": 0.032,     # Lowered from 0.040 (requires genuine furrow for WH-question)
+    "mouth_thresh": 0.055,           # Raised from 0.040 (stops casual talking triggering emphasis)
+    "head_shake_var_thresh": 0.0018, # Raised from 0.0008 (requires deliberate head shake for negation)
+    "head_nod_var_thresh": 0.0018,   # Raised from 0.0008 (requires deliberate nod for affirmation)
+    "emotion_min_confidence": 0.35,  # Minimum confidence to accept a non-neutral emotion
+    "emotion_sensitivity": 1.0,      # Multiplier on emotion logits
+}
+
+# Runtime active config
+CONFIG = dict(DEFAULT_CONFIG)
+
 WINDOW = 15
-
-# State for temporal markers
 _nose_x_history = deque(maxlen=WINDOW)
 _nose_y_history = deque(maxlen=WINDOW)
+_last_emotion = {"dominant": "neutral", "confidence": 1.0, "scores": {"neutral": 1.0}}
+_frame_counter = 0
+
+
+def update_nmm_thresholds(new_thresholds: dict):
+    """Allows UI threshold controller to update sensitivity on the fly."""
+    for k, v in new_thresholds.items():
+        if k in CONFIG and isinstance(v, (int, float)):
+            CONFIG[k] = float(v)
+    return CONFIG
+
+
+def get_nmm_config() -> dict:
+    return dict(CONFIG)
 
 
 def _get_point(landmarks, idx, w, h):
@@ -52,11 +97,48 @@ def _dist(p1, p2):
     return np.linalg.norm(p1 - p2)
 
 
-def detect_nmm(frame_bgr: np.ndarray) -> dict:
+def predict_emotion(face_bgr: np.ndarray) -> dict:
+    """Predict emotion from face crop using ViT. Returns dict with dominant, confidence, scores."""
+    if _vit_session is None or face_bgr is None or face_bgr.size == 0:
+        return {"dominant": "neutral", "confidence": 1.0, "scores": {"neutral": 1.0}}
+
+    try:
+        img = cv2.resize(face_bgr, (224, 224))
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        img = img.astype(np.float32) / 255.0
+        img = (img - NORM_MEAN) / NORM_STD
+        img = np.transpose(img, (2, 0, 1))
+        img = np.expand_dims(img, axis=0)
+
+        outputs = _vit_session.run(None, {_vit_input_name: img})
+        logits = outputs[0][0] * CONFIG.get("emotion_sensitivity", 1.0)
+        exp_logits = np.exp(logits - np.max(logits))
+        probs = exp_logits / exp_logits.sum()
+
+        scores = {EMOTION_LABELS[i]: round(float(probs[i]), 3) for i in range(len(EMOTION_LABELS))}
+        idx = int(np.argmax(probs))
+        dom = EMOTION_LABELS[idx]
+        conf = float(probs[idx])
+
+        # If highest confidence is below minimum, fall back to neutral
+        min_conf = CONFIG.get("emotion_min_confidence", 0.35)
+        if dom != "neutral" and conf < min_conf:
+            dom = "neutral"
+
+        return {"dominant": dom, "confidence": round(conf, 3), "scores": scores}
+    except Exception:
+        return {"dominant": "neutral", "confidence": 1.0, "scores": {"neutral": 1.0}}
+
+
+def detect_nmm(frame_bgr: np.ndarray, custom_thresholds: dict | None = None) -> dict:
     """
-    Detect 5 geometry-based NMMs from a single BGR frame.
+    Detect geometry-based NMMs and affect/emotions from a single BGR frame.
     """
-    import cv2
+    global _frame_counter, _last_emotion
+
+    cfg = dict(CONFIG)
+    if custom_thresholds:
+        cfg.update(custom_thresholds)
 
     h, w, _ = frame_bgr.shape
     rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
@@ -68,52 +150,88 @@ def detect_nmm(frame_bgr: np.ndarray) -> dict:
         "negation": False,
         "affirmation": False,
         "emphasis": False,
+        "emotion": _last_emotion,
+        "metrics": {
+            "brow_ratio": 0.0,
+            "mouth_ratio": 0.0,
+            "shake_var": 0.0,
+            "nod_var": 0.0,
+        }
     }
 
     if not results.multi_face_landmarks:
         return flags
 
     lm = results.multi_face_landmarks[0]
-    fw = _dist(_get_point(lm, FACE_LEFT, w, h), _get_point(lm, FACE_RIGHT, w, h))
-    if fw == 0:
-        fw = 1
+    p_left = _get_point(lm, FACE_LEFT, w, h)
+    p_right = _get_point(lm, FACE_RIGHT, w, h)
+    fw = _dist(p_left, p_right)
+    if fw <= 0:
+        fw = 1.0
 
     # Eyebrow Raise / Furrow
     lb = np.mean([_get_point(lm, i, w, h) for i in LEFT_EYEBROW], axis=0)
     rb = np.mean([_get_point(lm, i, w, h) for i in RIGHT_EYEBROW], axis=0)
-    le = (_get_point(lm, LEFT_EYE_TOP, w, h) + _get_point(lm, LEFT_EYE_BOTTOM, w, h)) / 2
-    re = (_get_point(lm, RIGHT_EYE_TOP, w, h) + _get_point(lm, RIGHT_EYE_BOTTOM, w, h)) / 2
-    brow_ratio = (_dist(lb, le) + _dist(rb, re)) / 2 / fw
+    le = (_get_point(lm, LEFT_EYE_TOP, w, h) + _get_point(lm, LEFT_EYE_BOTTOM, w, h)) / 2.0
+    re = (_get_point(lm, RIGHT_EYE_TOP, w, h) + _get_point(lm, RIGHT_EYE_BOTTOM, w, h)) / 2.0
+    brow_ratio = float((_dist(lb, le) + _dist(rb, re)) / (2.0 * fw))
 
-    if brow_ratio > BROW_RAISE_THRESHOLD:
+    flags["metrics"]["brow_ratio"] = round(brow_ratio, 4)
+
+    if brow_ratio > cfg["brow_raise_thresh"]:
         flags["question"] = True
-    elif brow_ratio < BROW_FURROW_THRESHOLD:
+    elif brow_ratio < cfg["brow_furrow_thresh"]:
         flags["wh_question"] = True
 
-    # Head Shake / Nod
+    # Head Shake / Nod (temporal variance)
     nose = _get_point(lm, NOSE_TIP, w, h)
     _nose_x_history.append(nose[0] / fw)
     _nose_y_history.append(nose[1] / fw)
 
+    shake_var = 0.0
+    nod_var = 0.0
     if len(_nose_x_history) == WINDOW:
-        x_var = np.var(list(_nose_x_history))
-        if x_var > HEAD_SHAKE_VAR_THRESHOLD:
+        shake_var = float(np.var(list(_nose_x_history)))
+        flags["metrics"]["shake_var"] = round(shake_var, 6)
+        if shake_var > cfg["head_shake_var_thresh"]:
             flags["negation"] = True
 
     if len(_nose_y_history) == WINDOW:
-        y_var = np.var(list(_nose_y_history))
-        if y_var > HEAD_NOD_VAR_THRESHOLD:
+        nod_var = float(np.var(list(_nose_y_history)))
+        flags["metrics"]["nod_var"] = round(nod_var, 6)
+        if nod_var > cfg["head_nod_var_thresh"]:
             flags["affirmation"] = True
 
     # Mouth Open
-    mouth_ratio = _dist(_get_point(lm, UPPER_LIP, w, h), _get_point(lm, LOWER_LIP, w, h)) / fw
-    if mouth_ratio > MOUTH_THRESHOLD:
+    mouth_ratio = float(_dist(_get_point(lm, UPPER_LIP, w, h), _get_point(lm, LOWER_LIP, w, h)) / fw)
+    flags["metrics"]["mouth_ratio"] = round(mouth_ratio, 4)
+    if mouth_ratio > cfg["mouth_thresh"]:
         flags["emphasis"] = True
 
+    # Run Emotion ViT on cropped face every 4th frame
+    _frame_counter += 1
+    if _frame_counter % 4 == 0 or _last_emotion.get("dominant") == "neutral":
+        try:
+            p_top = _get_point(lm, FACE_TOP, w, h)
+            p_bottom = _get_point(lm, FACE_BOTTOM, w, h)
+            min_x = max(0, int(min(p_left[0], p_right[0]) - 0.1 * fw))
+            max_x = min(w, int(max(p_left[0], p_right[0]) + 0.1 * fw))
+            min_y = max(0, int(p_top[1] - 0.15 * fw))
+            max_y = min(h, int(p_bottom[1] + 0.1 * fw))
+
+            if max_x > min_x and max_y > min_y:
+                face_crop = frame_bgr[min_y:max_y, min_x:max_x]
+                _last_emotion = predict_emotion(face_crop)
+        except Exception:
+            pass
+
+    flags["emotion"] = _last_emotion
     return flags
 
 
 def reset_nmm_state():
     """Clear temporal history."""
+    global _last_emotion
     _nose_x_history.clear()
     _nose_y_history.clear()
+    _last_emotion = {"dominant": "neutral", "confidence": 1.0, "scores": {"neutral": 1.0}}

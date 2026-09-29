@@ -103,7 +103,7 @@ export default function StandaloneDemoPage() {
         <div className="text-xs font-mono uppercase text-text-muted">
           Pre-Recorded Coordinate Stream
         </div>
-        <LandmarkSimulation showHands showFace showPose fps={30} />
+        <LandmarkSimulation fps={30} />
       </div>
 
       {/* Output Display */}

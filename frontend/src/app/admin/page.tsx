@@ -2,7 +2,7 @@
 import React from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { CheckSquare, Terminal, BarChart3, ArrowUpRight } from "lucide-react";
+import { CheckSquare, Database, BookOpen, ArrowUpRight } from "lucide-react";
 import { statsService, AdminStats } from "@/services/stats";
 
 export default function AdminDashboardPage() {
@@ -72,39 +72,39 @@ export default function AdminDashboardPage() {
         </Link>
 
         <Link
-          href="/admin/training"
+          href="/admin/dataset"
           className="p-6 rounded-lg bg-surface border border-border hover:border-accent-secondary transition-all flex flex-col justify-between space-y-4"
         >
           <div>
             <div className="w-10 h-10 rounded bg-accent-secondary/10 text-accent-secondary flex items-center justify-center mb-3">
-              <Terminal size={20} />
+              <Database size={20} />
             </div>
-            <h3 className="font-semibold text-text-primary">ML Experiment Console</h3>
+            <h3 className="font-semibold text-text-primary">Dataset Explorer</h3>
             <p className="text-xs text-text-secondary mt-1">
-              Live training terminal monitoring epoch progress, loss decay, and validation curve.
+              Browse the sign lexicon, filter by category and dialect, and inspect per-sign sample counts.
             </p>
           </div>
           <div className="flex items-center space-x-1 text-xs font-mono text-accent-secondary font-bold">
-            <span>Open Console</span>
+            <span>Open Explorer</span>
             <ArrowUpRight size={14} />
           </div>
         </Link>
 
         <Link
-          href="/admin/evaluation"
+          href="/admin/signs"
           className="p-6 rounded-lg bg-surface border border-border hover:border-text-primary transition-all flex flex-col justify-between space-y-4"
         >
           <div>
             <div className="w-10 h-10 rounded bg-surface-elevated text-text-primary flex items-center justify-center mb-3">
-              <BarChart3 size={20} />
+              <BookOpen size={20} />
             </div>
-            <h3 className="font-semibold text-text-primary">Evaluation Matrix</h3>
+            <h3 className="font-semibold text-text-primary">Signs & Reference Media</h3>
             <p className="text-xs text-text-secondary mt-1">
-              Confusion matrix heatmap, per-sign precision/recall/F1, and OOD error diagnostics.
+              Attach or replace the reference video and image for each catalog sign.
             </p>
           </div>
           <div className="flex items-center space-x-1 text-xs font-mono text-text-primary font-bold">
-            <span>View Metrics</span>
+            <span>Manage Media</span>
             <ArrowUpRight size={14} />
           </div>
         </Link>

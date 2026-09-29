@@ -65,3 +65,26 @@ def process_bgr_frame(frame_bgr: np.ndarray) -> np.ndarray | None:
     rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
     results = _hands.process(rgb)
     return extract_two_hands(results)
+
+
+def process_bgr_frames(frames_bgr: list) -> list:
+    """Vectorised batch form of :func:`process_bgr_frame`.
+
+    Live sign detection walks a sliding window of ~32 frames every tick, so
+    calling ``process_bgr_frame`` in a loop would re-enter MediaPipe 32 times per
+    request. The Hands graph is built with ``max_num_hands=2`` and no face or
+    pose sub-model, so it is genuinely a single per-frame detection graph and
+    MediaPipe fans a list of images out over the same graph -- one call for the
+    whole window instead of 32.
+
+    Frames are returned in order, one entry each, ``None`` where no hand was
+    found. The caller decides how to fill those gaps; this function deliberately
+    does not carry a previous vector forward, so that a gap is still visible as
+    \"the signer's hands left the frame\" rather than being papered over.
+    """
+    import cv2
+
+    if not frames_bgr:
+        return []
+    rgb_list = [cv2.cvtColor(f, cv2.COLOR_BGR2RGB) for f in frames_bgr]
+    return [extract_two_hands(res) for res in _hands.process(rgb_list)]

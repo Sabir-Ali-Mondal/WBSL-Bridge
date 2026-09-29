@@ -8,5 +8,480 @@
     "type": "image",
     "filename": "2.jpg",
     "url": "/api/media/2.jpg"
+  },
+  "0": {
+    "type": "image",
+    "filename": "0.jpg",
+    "url": "/api/media/0.jpg"
+  },
+  "3": {
+    "type": "image",
+    "filename": "3.jpg",
+    "url": "/api/media/3.jpg"
+  },
+  "4": {
+    "type": "image",
+    "filename": "4.jpg",
+    "url": "/api/media/4.jpg"
+  },
+  "5": {
+    "type": "image",
+    "filename": "5.jpg",
+    "url": "/api/media/5.jpg"
+  },
+  "6": {
+    "type": "image",
+    "filename": "6.jpg",
+    "url": "/api/media/6.jpg"
+  },
+  "7": {
+    "type": "image",
+    "filename": "7.jpg",
+    "url": "/api/media/7.jpg"
+  },
+  "8": {
+    "type": "image",
+    "filename": "8.jpg",
+    "url": "/api/media/8.jpg"
+  },
+  "9": {
+    "type": "image",
+    "filename": "9.jpg",
+    "url": "/api/media/9.jpg"
+  },
+  "A": {
+    "type": "image",
+    "filename": "A.jpg",
+    "url": "/api/media/A.jpg"
+  },
+  "B": {
+    "type": "image",
+    "filename": "B.jpg",
+    "url": "/api/media/B.jpg"
+  },
+  "C": {
+    "type": "image",
+    "filename": "C.jpg",
+    "url": "/api/media/C.jpg"
+  },
+  "D": {
+    "type": "image",
+    "filename": "D.jpg",
+    "url": "/api/media/D.jpg"
+  },
+  "E": {
+    "type": "image",
+    "filename": "E.jpg",
+    "url": "/api/media/E.jpg"
+  },
+  "F": {
+    "type": "image",
+    "filename": "F.jpg",
+    "url": "/api/media/F.jpg"
+  },
+  "G": {
+    "type": "image",
+    "filename": "G.jpg",
+    "url": "/api/media/G.jpg"
+  },
+  "H": {
+    "type": "image",
+    "filename": "H.jpg",
+    "url": "/api/media/H.jpg"
+  },
+  "I": {
+    "type": "image",
+    "filename": "I.jpg",
+    "url": "/api/media/I.jpg"
+  },
+  "J": {
+    "type": "image",
+    "filename": "J.jpg",
+    "url": "/api/media/J.jpg"
+  },
+  "K": {
+    "type": "image",
+    "filename": "K.jpg",
+    "url": "/api/media/K.jpg"
+  },
+  "L": {
+    "type": "image",
+    "filename": "L.jpg",
+    "url": "/api/media/L.jpg"
+  },
+  "M": {
+    "type": "image",
+    "filename": "M.jpg",
+    "url": "/api/media/M.jpg"
+  },
+  "N": {
+    "type": "image",
+    "filename": "N.jpg",
+    "url": "/api/media/N.jpg"
+  },
+  "O": {
+    "type": "image",
+    "filename": "O.jpg",
+    "url": "/api/media/O.jpg"
+  },
+  "P": {
+    "type": "image",
+    "filename": "P.jpg",
+    "url": "/api/media/P.jpg"
+  },
+  "Q": {
+    "type": "image",
+    "filename": "Q.jpg",
+    "url": "/api/media/Q.jpg"
+  },
+  "R": {
+    "type": "image",
+    "filename": "R.jpg",
+    "url": "/api/media/R.jpg"
+  },
+  "S": {
+    "type": "image",
+    "filename": "S.jpg",
+    "url": "/api/media/S.jpg"
+  },
+  "T": {
+    "type": "image",
+    "filename": "T.jpg",
+    "url": "/api/media/T.jpg"
+  },
+  "U": {
+    "type": "image",
+    "filename": "U.jpg",
+    "url": "/api/media/U.jpg"
+  },
+  "V": {
+    "type": "image",
+    "filename": "V.jpg",
+    "url": "/api/media/V.jpg"
+  },
+  "W": {
+    "type": "image",
+    "filename": "W.jpg",
+    "url": "/api/media/W.jpg"
+  },
+  "X": {
+    "type": "image",
+    "filename": "X.jpg",
+    "url": "/api/media/X.jpg"
+  },
+  "Y": {
+    "type": "image",
+    "filename": "Y.jpg",
+    "url": "/api/media/Y.jpg"
+  },
+  "Z": {
+    "type": "image",
+    "filename": "Z.jpg",
+    "url": "/api/media/Z.jpg"
+  },
+  "BEAR": {
+    "type": "video",
+    "filename": "BEAR.mp4",
+    "url": "/api/media/BEAR.mp4"
+  },
+  "BREAK": {
+    "type": "video",
+    "filename": "BREAK.mp4",
+    "url": "/api/media/BREAK.mp4"
+  },
+  "BRINJAL": {
+    "type": "video",
+    "filename": "BRINJAL.mp4",
+    "url": "/api/media/BRINJAL.mp4"
+  },
+  "BUDGET": {
+    "type": "video",
+    "filename": "BUDGET.mp4",
+    "url": "/api/media/BUDGET.mp4"
+  },
+  "BUSY": {
+    "type": "video",
+    "filename": "BUSY.mp4",
+    "url": "/api/media/BUSY.mp4"
+  },
+  "CABBAGE": {
+    "type": "video",
+    "filename": "CABBAGE.mp4",
+    "url": "/api/media/CABBAGE.mp4"
+  },
+  "CARROT": {
+    "type": "video",
+    "filename": "CARROT.mp4",
+    "url": "/api/media/CARROT.mp4"
+  },
+  "CAULIFLOWER": {
+    "type": "video",
+    "filename": "CAULIFLOWER.mp4",
+    "url": "/api/media/CAULIFLOWER.mp4"
+  },
+  "CHILLI": {
+    "type": "video",
+    "filename": "CHILLI.mp4",
+    "url": "/api/media/CHILLI.mp4"
+  },
+  "CLEAN": {
+    "type": "video",
+    "filename": "CLEAN.mp4",
+    "url": "/api/media/CLEAN.mp4"
+  },
+  "CLOSE": {
+    "type": "video",
+    "filename": "CLOSE.mp4",
+    "url": "/api/media/CLOSE.mp4"
+  },
+  "COME": {
+    "type": "video",
+    "filename": "COME.mp4",
+    "url": "/api/media/COME.mp4"
+  },
+  "COOK": {
+    "type": "video",
+    "filename": "COOK.mp4",
+    "url": "/api/media/COOK.mp4"
+  },
+  "CROCODILE": {
+    "type": "video",
+    "filename": "CROCODILE.mp4",
+    "url": "/api/media/CROCODILE.mp4"
+  },
+  "CRY": {
+    "type": "video",
+    "filename": "CRY.mp4",
+    "url": "/api/media/CRY.mp4"
+  },
+  "CUCUMBER": {
+    "type": "video",
+    "filename": "CUCUMBER.mp4",
+    "url": "/api/media/CUCUMBER.mp4"
+  },
+  "DEER": {
+    "type": "video",
+    "filename": "DEER.mp4",
+    "url": "/api/media/DEER.mp4"
+  },
+  "DRINK": {
+    "type": "video",
+    "filename": "DRINK.mp4",
+    "url": "/api/media/DRINK.mp4"
+  },
+  "ELEPHANT": {
+    "type": "video",
+    "filename": "ELEPHANT.mp4",
+    "url": "/api/media/ELEPHANT.mp4"
+  },
+  "EXAM": {
+    "type": "video",
+    "filename": "EXAM.mp4",
+    "url": "/api/media/EXAM.mp4"
+  },
+  "FEVER": {
+    "type": "video",
+    "filename": "FEVER.mp4",
+    "url": "/api/media/FEVER.mp4"
+  },
+  "GIRAFFE": {
+    "type": "video",
+    "filename": "GIRAFFE.mp4",
+    "url": "/api/media/GIRAFFE.mp4"
+  },
+  "GIVE": {
+    "type": "video",
+    "filename": "GIVE.mp4",
+    "url": "/api/media/GIVE.mp4"
+  },
+  "GOOD_AFTERNOON": {
+    "type": "video",
+    "filename": "GOOD_AFTERNOON.mp4",
+    "url": "/api/media/GOOD_AFTERNOON.mp4"
+  },
+  "GOOD_MORNING": {
+    "type": "video",
+    "filename": "GOOD_MORNING.mp4",
+    "url": "/api/media/GOOD_MORNING.mp4"
+  },
+  "HELLO": {
+    "type": "video",
+    "filename": "HELLO.mp4",
+    "url": "/api/media/HELLO.mp4"
+  },
+  "HUG": {
+    "type": "video",
+    "filename": "HUG.mp4",
+    "url": "/api/media/HUG.mp4"
+  },
+  "INJURY": {
+    "type": "video",
+    "filename": "INJURY.mp4",
+    "url": "/api/media/INJURY.mp4"
+  },
+  "INTERVIEW": {
+    "type": "video",
+    "filename": "INTERVIEW.mp4",
+    "url": "/api/media/INTERVIEW.mp4"
+  },
+  "JUMP": {
+    "type": "video",
+    "filename": "JUMP.mp4",
+    "url": "/api/media/JUMP.mp4"
+  },
+  "KARNATAKA": {
+    "type": "video",
+    "filename": "KARNATAKA.mp4",
+    "url": "/api/media/KARNATAKA.mp4"
+  },
+  "KEY": {
+    "type": "video",
+    "filename": "KEY.mp4",
+    "url": "/api/media/KEY.mp4"
+  },
+  "KNIFE": {
+    "type": "video",
+    "filename": "KNIFE.mp4",
+    "url": "/api/media/KNIFE.mp4"
+  },
+  "LEMON": {
+    "type": "video",
+    "filename": "LEMON.mp4",
+    "url": "/api/media/LEMON.mp4"
+  },
+  "LION": {
+    "type": "video",
+    "filename": "LION.mp4",
+    "url": "/api/media/LION.mp4"
+  },
+  "MAN": {
+    "type": "video",
+    "filename": "MAN.mp4",
+    "url": "/api/media/MAN.mp4"
+  },
+  "MATHS": {
+    "type": "video",
+    "filename": "MATHS.mp4",
+    "url": "/api/media/MATHS.mp4"
+  },
+  "MAYBE": {
+    "type": "video",
+    "filename": "MAYBE.mp4",
+    "url": "/api/media/MAYBE.mp4"
+  },
+  "MONKEY": {
+    "type": "video",
+    "filename": "MONKEY.mp4",
+    "url": "/api/media/MONKEY.mp4"
+  },
+  "ONION": {
+    "type": "video",
+    "filename": "ONION.mp4",
+    "url": "/api/media/ONION.mp4"
+  },
+  "PEACOCK": {
+    "type": "video",
+    "filename": "PEACOCK.mp4",
+    "url": "/api/media/PEACOCK.mp4"
+  },
+  "PIGEON": {
+    "type": "video",
+    "filename": "PIGEON.mp4",
+    "url": "/api/media/PIGEON.mp4"
+  },
+  "POUR": {
+    "type": "video",
+    "filename": "POUR.mp4",
+    "url": "/api/media/POUR.mp4"
+  },
+  "RADISH": {
+    "type": "video",
+    "filename": "RADISH.mp4",
+    "url": "/api/media/RADISH.mp4"
+  },
+  "SPARROW": {
+    "type": "video",
+    "filename": "SPARROW.mp4",
+    "url": "/api/media/SPARROW.mp4"
+  },
+  "STILL": {
+    "type": "video",
+    "filename": "STILL.mp4",
+    "url": "/api/media/STILL.mp4"
+  },
+  "SWITCH": {
+    "type": "video",
+    "filename": "SWITCH.mp4",
+    "url": "/api/media/SWITCH.mp4"
+  },
+  "TEA": {
+    "type": "video",
+    "filename": "TEA.mp4",
+    "url": "/api/media/TEA.mp4"
+  },
+  "TEMPLE": {
+    "type": "video",
+    "filename": "TEMPLE.mp4",
+    "url": "/api/media/TEMPLE.mp4"
+  },
+  "THANK_YOU": {
+    "type": "video",
+    "filename": "THANK_YOU.mp4",
+    "url": "/api/media/THANK_YOU.mp4"
+  },
+  "TIGER": {
+    "type": "video",
+    "filename": "TIGER.mp4",
+    "url": "/api/media/TIGER.mp4"
+  },
+  "TURTLE": {
+    "type": "video",
+    "filename": "TURTLE.mp4",
+    "url": "/api/media/TURTLE.mp4"
+  },
+  "UMBRELLA": {
+    "type": "video",
+    "filename": "UMBRELLA.mp4",
+    "url": "/api/media/UMBRELLA.mp4"
+  },
+  "UNCLE": {
+    "type": "video",
+    "filename": "UNCLE.mp4",
+    "url": "/api/media/UNCLE.mp4"
+  },
+  "VEGETABLES": {
+    "type": "video",
+    "filename": "VEGETABLES.mp4",
+    "url": "/api/media/VEGETABLES.mp4"
+  },
+  "VOLCANO": {
+    "type": "video",
+    "filename": "VOLCANO.mp4",
+    "url": "/api/media/VOLCANO.mp4"
+  },
+  "WHAT_IS_YOUR_NAME": {
+    "type": "video",
+    "filename": "WHAT_IS_YOUR_NAME.mp4",
+    "url": "/api/media/WHAT_IS_YOUR_NAME.mp4"
+  },
+  "WIFE": {
+    "type": "video",
+    "filename": "WIFE.mp4",
+    "url": "/api/media/WIFE.mp4"
+  },
+  "WRITER": {
+    "type": "video",
+    "filename": "WRITER.mp4",
+    "url": "/api/media/WRITER.mp4"
+  },
+  "WRONG": {
+    "type": "video",
+    "filename": "WRONG.mp4",
+    "url": "/api/media/WRONG.mp4"
+  },
+  "FED_UP": {
+    "type": "video",
+    "filename": "FED_UP.mp4",
+    "url": "/api/media/FED_UP.mp4"
   }
 }

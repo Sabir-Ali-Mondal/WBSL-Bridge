@@ -1,3 +1,5 @@
+"use client";
+
 import React from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -19,9 +21,6 @@ export default function HomePage() {
           BACKGROUND
          ===================================================== */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        {/* =================================================
-            BACKGROUND VIDEO
-           ================================================= */}
         <video
           autoPlay
           loop
@@ -45,16 +44,10 @@ export default function HomePage() {
           <source src="/background.mp4" type="video/mp4" />
         </video>
 
-        {/* Legibility scrim — keeps text contrast high without hiding the video */}
-        <div
-          className="
-            absolute
-            inset-0
-            bg-background/35
-          "
-        />
+        {/* Legibility */}
+        <div className="absolute inset-0 bg-background/35" />
 
-        {/* Brand color wash */}
+        {/* Brand wash */}
         <div
           className="
             absolute
@@ -66,7 +59,7 @@ export default function HomePage() {
           "
         />
 
-        {/* Premium vignette — darkens edges, focuses the centre */}
+        {/* Vignette */}
         <div
           className="
             absolute
@@ -75,7 +68,7 @@ export default function HomePage() {
           "
         />
 
-        {/* Fine grain to remove blur banding */}
+        {/* Grain */}
         <div
           className="
             absolute
@@ -90,8 +83,8 @@ export default function HomePage() {
         <div
           className="
             absolute
-            top-[-10%]
             left-1/2
+            top-[-10%]
             h-[45vh]
             w-[70vw]
             -translate-x-1/2
@@ -156,241 +149,356 @@ export default function HomePage() {
       </div>
 
       {/* =====================================================
-          MAIN HERO
+          MAIN CONTENT
          ===================================================== */}
       <PageContainer className="relative z-10 h-full w-full">
-        <div className="flex h-full w-full flex-col items-center">
-          <div
-            className="
-    relative
-    flex
-    h-[52%]
-    w-full
-    shrink-0
-    items-center
-    justify-center
-    overflow-hidden
-    sm:h-[56%]
-    lg:h-[60%]
-  "
-          >
-            <Image
-              src="/WBSL%20Bridge%20logo.png"
-              alt="WBSL Bridge"
-              width={1300}
-              height={700}
-              priority
-              className="block h-full w-auto max-w-[98vw] object-contain object-center drop-shadow-[0_10px_50px_rgba(0,0,0,0.55)]"
-              sizes="98vw"
-            />
-          </div>
-
+        <div
+          className="
+            flex
+            h-full
+            w-full
+            flex-col
+            justify-center
+            py-5
+            sm:py-6
+            lg:py-8
+          "
+        >
           {/* =================================================
-              CONTENT
+              DESKTOP / RESPONSIVE HERO
              ================================================= */}
           <div
             className="
-              flex
-              min-h-0
-              flex-1
+              grid
               w-full
-              flex-col
               items-center
-              justify-start
-              overflow-hidden
-              px-4
-              pb-4
-              text-center
-              sm:px-6
+              gap-6
+              lg:grid-cols-[1fr_1fr]
+              lg:gap-10
+              xl:grid-cols-[1.05fr_0.95fr]
+              xl:gap-12
             "
           >
-            {/* Status */}
+            {/* =================================================
+                LEFT — LOGO
+               ================================================= */}
             <div
               className="
-                inline-flex
-                shrink-0
-                items-center
-                gap-2
-                rounded-full
-                border
-                border-emerald-500/25
-                bg-surface/80
-                px-3
-                py-1
-                shadow-[0_0_25px_rgba(34,197,94,0.08)]
-                backdrop-blur-xl
-              "
-            >
-              <Sparkles
-                size={12}
-                className="text-accent-primary"
-              />
-
-              <span className="font-mono text-[9px] font-semibold text-accent-primary sm:text-[10px]">
-                WBSL BRIDGE
-              </span>
-
-              <span className="text-[10px] text-text-muted">
-                /
-              </span>
-
-              <span className="text-[9px] text-text-secondary sm:text-[10px]">
-                Neural Sign Translation
-              </span>
-            </div>
-
-            {/* Heading */}
-            <div className="mt-2.5 shrink-0 sm:mt-3">
-              <h1
-                className="
-                  mx-auto
-                  max-w-4xl
-                  text-[1.85rem]
-                  font-extrabold
-                  leading-[1.08]
-                  tracking-[-0.035em]
-                  text-text-primary
-                  sm:text-3xl
-                  md:text-4xl
-                  lg:text-[2.25rem]
-                  xl:text-[2.5rem]
-                "
-              >
-                A Sign Language Bridge for{" "}
-                <br />
-                <span className="bg-gradient-to-r from-emerald-400 via-teal-300 to-indigo-400 bg-clip-text text-transparent">
-                  Every Signer in West Bengal
-                </span>
-              </h1>
-            </div>
-
-            {/* Feature badges */}
-            <div
-              className="
-                mt-3
+                relative
                 flex
-                max-w-4xl
-                shrink-0
-                flex-wrap
+                h-[30vh]
+                min-h-[190px]
+                w-full
+                items-center
                 justify-center
-                gap-1.5
-                sm:mt-4
-                sm:gap-2
+                lg:h-[62vh]
+                lg:min-h-[430px]
               "
             >
-              <Feature
-                icon={<Video size={12} />}
-                text="Sign → Bengali"
-                color="primary"
+              {/* Logo glow */}
+              <div
+                className="
+                  absolute
+                  left-1/2
+                  top-1/2
+                  h-[75%]
+                  w-[75%]
+                  -translate-x-1/2
+                  -translate-y-1/2
+                  rounded-full
+                  bg-emerald-400/[0.035]
+                  blur-[80px]
+                "
               />
 
-              <Feature
-                icon={<Volume2 size={12} />}
-                text="Bengali → Sign"
-                color="secondary"
-              />
-
-              <Feature
-                icon={<Users size={12} />}
-                text="Community Growth"
-                color="sky"
-              />
-
-              <Feature
-                icon={<HelpCircle size={12} />}
-                text="Unknown Sign Handling"
-                color="unknown"
+              <Image
+                src="/WBSL%20Bridge%20logo.png"
+                alt="WBSL Bridge"
+                width={1300}
+                height={700}
+                priority
+                className="
+                  relative
+                  z-10
+                  block
+                  h-full
+                  w-auto
+                  max-w-[92%]
+                  object-contain
+                  object-center
+                  drop-shadow-[0_15px_55px_rgba(0,0,0,0.58)]
+                "
+                sizes="(min-width: 1024px) 48vw, 95vw"
               />
             </div>
 
-            {/* Buttons */}
+            {/* =================================================
+                RIGHT — CONTENT
+               ================================================= */}
             <div
               className="
-                mt-4
                 flex
                 w-full
-                shrink-0
                 flex-col
                 items-center
-                justify-center
-                gap-2
-                sm:mt-5
-                sm:flex-row
-                sm:gap-3
+                text-center
+                lg:items-start
+                lg:text-left
               "
             >
-              <Link
-                href="/sign-to-text"
-                className="
-                  group
-                  inline-flex
-                  w-full
-                  items-center
-                  justify-center
-                  gap-2
-                  rounded-lg
-                  bg-accent-primary
-                  px-5
-                  py-2.5
-                  text-xs
-                  font-semibold
-                  text-black
-                  shadow-[0_0_22px_rgba(34,197,94,0.22)]
-                  transition-all
-                  hover:bg-emerald-400
-                  hover:shadow-[0_0_32px_rgba(34,197,94,0.4)]
-                  active:scale-[0.98]
-                  sm:w-auto
-                  sm:text-sm
-                "
-              >
-                <Video size={14} />
-
-                <span>
-                  Launch Live Sign Monitor
-                </span>
-
-                <ArrowRight
-                  size={14}
-                  className="transition-transform group-hover:translate-x-1"
-                />
-              </Link>
-
-              <Link
-                href="/text-to-sign"
+              {/* Status */}
+              <div
                 className="
                   inline-flex
-                  w-full
                   items-center
-                  justify-center
                   gap-2
-                  rounded-lg
+                  rounded-full
                   border
-                  border-border
-                  bg-surface/70
-                  px-5
-                  py-2.5
-                  text-xs
-                  font-medium
-                  text-text-primary
+                  border-emerald-500/25
+                  bg-surface/80
+                  px-3
+                  py-1
+                  shadow-[0_0_25px_rgba(34,197,94,0.08)]
                   backdrop-blur-xl
-                  transition-all
-                  hover:border-text-secondary/40
-                  hover:bg-surface-elevated
-                  active:scale-[0.98]
-                  sm:w-auto
-                  sm:text-sm
                 "
               >
-                <FileText
-                  size={14}
-                  className="text-text-secondary"
+                <Sparkles
+                  size={12}
+                  className="text-accent-primary"
+                />
+
+                <span
+                  className="
+                    font-mono
+                    text-[9px]
+                    font-semibold
+                    text-accent-primary
+                    sm:text-[10px]
+                  "
+                >
+                  WBSL BRIDGE
+                </span>
+
+                <span className="text-[10px] text-text-muted">
+                  /
+                </span>
+
+                <span className="text-[9px] text-text-secondary sm:text-[10px]">
+                  Neural Sign Translation
+                </span>
+              </div>
+
+              {/* Heading */}
+              <div className="mt-4 sm:mt-5">
+                <h1
+                  className="
+                    max-w-2xl
+                    text-[2rem]
+                    font-extrabold
+                    leading-[1.06]
+                    tracking-[-0.04em]
+                    text-text-primary
+                    sm:text-[2.4rem]
+                    md:text-[2.8rem]
+                    lg:text-[3rem]
+                    xl:text-[3.35rem]
+                  "
+                >
+                  A Sign Language
+                  <br />
+
+                  <span
+                    className="
+                      bg-gradient-to-r
+                      from-emerald-400
+                      via-teal-300
+                      to-indigo-400
+                      bg-clip-text
+                      text-transparent
+                    "
+                  >
+                    Bridge for Every Signer
+                  </span>
+
+                  <br />
+
+                  <span className="text-text-primary">
+                    in West Bengal
+                  </span>
+                </h1>
+              </div>
+
+              {/* Description */}
+              <p
+                className="
+                  mt-4
+                  max-w-xl
+                  text-sm
+                  leading-relaxed
+                  text-text-secondary
+                  sm:text-[15px]
+                "
+              >
+                Real-time sign language communication with Bengali
+                translation, reverse sign synthesis, and community-driven
+                vocabulary growth.
+              </p>
+
+              {/* =================================================
+                  FEATURE ROW
+                 ================================================= */}
+              <div
+                className="
+                  mt-5
+                  flex
+                  w-full
+                  max-w-[660px]
+                  gap-2
+                  overflow-visible
+                "
+              >
+                <Feature
+                  icon={<Video size={12} />}
+                  text="Sign → Bengali"
+                  color="primary"
+                />
+
+                <Feature
+                  icon={<Volume2 size={12} />}
+                  text="Bengali → Sign"
+                  color="secondary"
+                />
+
+                <Feature
+                  icon={<Users size={12} />}
+                  text="Community Growth"
+                  color="sky"
+                />
+
+                <Feature
+                  icon={<HelpCircle size={12} />}
+                  text="Unknown Signs"
+                  color="unknown"
+                />
+              </div>
+
+              {/* =================================================
+                  ACTION BUTTONS
+                 ================================================= */}
+              <div
+                className="
+                  mt-6
+                  flex
+                  w-full
+                  max-w-[660px]
+                  flex-col
+                  gap-2.5
+                  sm:flex-row
+                "
+              >
+                <Link
+                  href="/sign-to-text"
+                  className="
+                    group
+                    inline-flex
+                    flex-1
+                    items-center
+                    justify-center
+                    gap-2
+                    rounded-lg
+                    bg-accent-primary
+                    px-5
+                    py-3
+                    text-xs
+                    font-semibold
+                    text-black
+                    shadow-[0_0_22px_rgba(34,197,94,0.22)]
+                    transition-all
+                    hover:bg-emerald-400
+                    hover:shadow-[0_0_32px_rgba(34,197,94,0.4)]
+                    active:scale-[0.98]
+                    sm:text-sm
+                  "
+                >
+                  <Video size={14} />
+
+                  <span>
+                    Launch Live Sign Monitor
+                  </span>
+
+                  <ArrowRight
+                    size={14}
+                    className="
+                      transition-transform
+                      group-hover:translate-x-1
+                    "
+                  />
+                </Link>
+
+                <Link
+                  href="/text-to-sign"
+                  className="
+                    inline-flex
+                    flex-1
+                    items-center
+                    justify-center
+                    gap-2
+                    rounded-lg
+                    border
+                    border-border
+                    bg-surface/70
+                    px-5
+                    py-3
+                    text-xs
+                    font-medium
+                    text-text-primary
+                    backdrop-blur-xl
+                    transition-all
+                    hover:border-text-secondary/40
+                    hover:bg-surface-elevated
+                    active:scale-[0.98]
+                    sm:text-sm
+                  "
+                >
+                  <FileText
+                    size={14}
+                    className="text-text-secondary"
+                  />
+
+                  <span>
+                    Bengali → Sign Synthesis
+                  </span>
+                </Link>
+              </div>
+
+              {/* System status */}
+              <div
+                className="
+                  mt-5
+                  flex
+                  items-center
+                  gap-2
+                  font-mono
+                  text-[9px]
+                  uppercase
+                  tracking-[0.16em]
+                  text-text-muted
+                "
+              >
+                <span
+                  className="
+                    h-1.5
+                    w-1.5
+                    rounded-full
+                    bg-accent-primary
+                    shadow-[0_0_8px_rgba(34,197,94,0.6)]
+                  "
                 />
 
                 <span>
-                  Bengali → Sign Synthesis
+                  ISL or BdSL or WBSL or HomeSL? We support all!
                 </span>
-              </Link>
+              </div>
             </div>
           </div>
         </div>
@@ -434,15 +542,18 @@ function Feature({
   return (
     <div
       className={`
-        inline-flex
+        flex
+        min-w-[145px]
+        flex-1
         items-center
+        justify-center
         gap-1.5
         rounded-md
         border
         border-border
         bg-surface/70
         px-2.5
-        py-1
+        py-2
         backdrop-blur-xl
         transition-colors
         ${styles[color].hover}
@@ -450,6 +561,7 @@ function Feature({
     >
       <div
         className={`
+          shrink-0
           rounded
           p-1
           ${styles[color].icon}
@@ -458,7 +570,14 @@ function Feature({
         {icon}
       </div>
 
-      <span className="whitespace-nowrap text-[9px] font-medium text-text-primary sm:text-[10px]">
+      <span
+        className="
+          whitespace-nowrap
+          text-[10px]
+          font-medium
+          text-text-primary
+        "
+      >
         {text}
       </span>
     </div>

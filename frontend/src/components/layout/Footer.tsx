@@ -26,7 +26,6 @@ export function Footer() {
           <ul className="space-y-1.5 text-sm">
             <li><Link href="/sign-to-text" className="hover:text-text-primary transition-colors">Sign → Bengali</Link></li>
             <li><Link href="/text-to-sign" className="hover:text-text-primary transition-colors">Bengali → Sign</Link></li>
-            <li><Link href="/dataset" className="hover:text-text-primary transition-colors">Dataset Explorer</Link></li>
             <li><Link href="/contribute" className="hover:text-text-primary transition-colors">Signer Contribution</Link></li>
             <li><Link href="/demo" className="hover:text-text-primary transition-colors">Demo Mode</Link></li>
           </ul>

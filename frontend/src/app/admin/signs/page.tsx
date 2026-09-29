@@ -4,7 +4,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { datasetService } from "@/services/dataset";
 import { contributionService } from "@/services/contributions";
 import { TableRowSkeleton } from "@/components/skeletons";
-import { Upload, Trash2, Film, Image as ImageIcon } from "lucide-react";
+import { VideoPlayer } from "@/components/media/VideoPlayer";
+import { Upload, Trash2, Film, Image as ImageIcon, Play } from "lucide-react";
 import { toast } from "sonner";
 
 const API_BASE = "http://localhost:8000";
@@ -18,11 +19,22 @@ export default function AdminSignsPage() {
   const [uploading, setUploading] = useState<string | null>(null);
   const fileRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
+  /**
+   * At most ONE preview may play at a time.
+   *
+   * The table used to render a looping <video autoPlay> per row. With 100 rows
+   * that is 100 simultaneous decoders plus 100 HTTP streams, which stalls the
+   * page and can wedge the backend. A preview is now opt-in: rows show a poster
+   * and only the single `playingId` row mounts a video element at all.
+   */
+  const [playingId, setPlayingId] = useState<string | null>(null);
+
   const handleUpload = async (signId: string, label: string, file: File) => {
     setUploading(signId);
     try {
       await contributionService.uploadSignMedia(signId, file);
       toast.success(`Reference media attached to ${label}`);
+      setPlayingId(null);
       qc.invalidateQueries({ queryKey: ["admin-signs"] });
       qc.invalidateQueries({ queryKey: ["signs"] });
     } catch (e: any) {
@@ -37,6 +49,7 @@ export default function AdminSignsPage() {
     try {
       await contributionService.deleteSignMedia(signId);
       toast.success(`Reference media removed from ${label}`);
+      if (playingId === signId) setPlayingId(null);
       qc.invalidateQueries({ queryKey: ["admin-signs"] });
       qc.invalidateQueries({ queryKey: ["signs"] });
     } catch {
@@ -51,6 +64,7 @@ export default function AdminSignsPage() {
         <h1 className="text-2xl font-bold text-text-primary mt-1">Signs & Reference Media</h1>
         <p className="text-xs text-text-secondary mt-1">
           Attach one reference video (mp4/webm) or image (png/jpg) per sign. These play in Text → Sign sequential playback.
+          Previews load on demand — click a video thumbnail to play it.
         </p>
       </div>
 
@@ -74,12 +88,26 @@ export default function AdminSignsPage() {
                 return (
                   <tr key={sign.id} className="hover:bg-surface-elevated/50 transition-colors">
                     <td className="py-3 px-4">
-                      {media?.type === "video" ? (
-                        <video
+                      {media?.type === "video" && playingId === sign.id ? (
+                        <VideoPlayer
                           src={`${API_BASE}${media.url}`}
-                          muted loop autoPlay playsInline
-                          className="h-16 w-28 object-cover rounded border border-border"
+                          muted loop autoPlay
+                          onEnded={() => setPlayingId(null)}
+                          className="h-16 w-28 rounded border border-border overflow-hidden"
                         />
+                      ) : media?.type === "video" ? (
+                        <button
+                          type="button"
+                          onClick={() => setPlayingId(sign.id)}
+                          title="Play preview"
+                          className="group relative h-16 w-28 rounded border border-border overflow-hidden bg-black flex items-center justify-center"
+                        >
+                          <Film size={18} className="text-text-muted" />
+
+                          <span className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Play size={16} className="text-white" />
+                          </span>
+                        </button>
                       ) : media?.type === "image" ? (
                         <img
                           src={`${API_BASE}${media.url}`}

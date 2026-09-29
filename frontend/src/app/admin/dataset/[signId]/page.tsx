@@ -1,14 +1,16 @@
 "use client";
 import React, { useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { PageContainer } from "@/components/layout/PageContainer";
 import { LandmarkSimulation } from "@/components/simulation/LandmarkSimulation";
 import { datasetService } from "@/services/dataset";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, Video, CheckCircle, Clock } from "lucide-react";
 import Link from "next/link";
+import axios from "axios";
 
-export default function SignDetailPage() {
+const API_BASE = "http://localhost:8000";
+
+export default function AdminSignDetailPage() {
   const params = useParams();
   const signId = params.signId as string;
 
@@ -17,22 +19,31 @@ export default function SignDetailPage() {
     queryFn: () => datasetService.getSignById(signId),
   });
 
+  // Real extracted landmark sequence for this sign (no synthetic fallback).
+  const { data: sim } = useQuery({
+    queryKey: ["sim-frames", sign?.label],
+    queryFn: async () =>
+      (await axios.get(`${API_BASE}/api/simulation/frames`, { params: { label: sign!.label } })).data,
+    enabled: !!sign,
+    retry: false,
+  });
+
   if (isLoading || !sign) {
     return (
-      <PageContainer className="py-12 text-center text-xs font-mono text-text-muted">
+      <div className="py-12 text-center text-xs font-mono text-text-muted">
         Loading sign details...
-      </PageContainer>
+      </div>
     );
   }
 
   return (
-    <PageContainer className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-4xl">
       <Link
-        href="/dataset"
+        href="/admin/dataset"
         className="inline-flex items-center space-x-1.5 text-xs font-mono text-text-secondary hover:text-text-primary"
       >
         <ArrowLeft size={14} />
-        <span>Back to Signs Catalog</span>
+        <span>Back to Dataset Explorer</span>
       </Link>
 
       <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-border">
@@ -76,8 +87,8 @@ export default function SignDetailPage() {
         <div className="text-xs font-mono uppercase text-text-muted">
           Canonical Landmark Coordinate Reference
         </div>
-        <LandmarkSimulation showHands showFace showPose fps={30} />
+        <LandmarkSimulation frames={sim?.frames} fps={15} title={sim?.source} />
       </div>
-    </PageContainer>
+    </div>
   );
 }

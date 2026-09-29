@@ -1,0 +1,8 @@
+{
+ "classes": 62,
+ "static": 0,
+ "video": 62,
+ "best_val_acc": 98.01084990958408,
+ "seq_len": 32,
+ "feat": 126
+}
