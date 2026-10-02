@@ -84,6 +84,8 @@ tests/dataset_landmarks/
 tests/dataset_continuous/
 tests/HELLO
 dataset/samples/
+tests/vit_emotion.onnx.data
+tests/vit_emotion.onnx
 
 dataset/Indian Sign Language_Dataset/ISL_STATIC1
 dataset/Indian Sign Language_Dataset/ISL_STATIC2
