@@ -8,7 +8,7 @@ import { ArrowLeft, Video, CheckCircle, Clock } from "lucide-react";
 import Link from "next/link";
 import axios from "axios";
 
-const API_BASE = "http://localhost:8000";
+const API_BASE = "http://localhost:8200";
 
 export default function AdminSignDetailPage() {
   const params = useParams();
@@ -20,6 +20,8 @@ export default function AdminSignDetailPage() {
   });
 
   // Real extracted landmark sequence for this sign (no synthetic fallback).
+  // A 258-dim run also returns `pose`, which the canvas draws as the violet
+  // body layer; a 126-dim recording leaves it undefined.
   const { data: sim } = useQuery({
     queryKey: ["sim-frames", sign?.label],
     queryFn: async () =>
@@ -87,7 +89,7 @@ export default function AdminSignDetailPage() {
         <div className="text-xs font-mono uppercase text-text-muted">
           Canonical Landmark Coordinate Reference
         </div>
-        <LandmarkSimulation frames={sim?.frames} fps={15} title={sim?.source} />
+        <LandmarkSimulation frames={sim?.frames} pose={sim?.pose} fps={15} title={sim?.source} />
       </div>
     </div>
   );

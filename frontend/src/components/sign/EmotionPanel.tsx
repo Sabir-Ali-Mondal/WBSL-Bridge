@@ -30,9 +30,23 @@ const ORDER = ["happy", "sad", "angry", "fear", "surprise", "disgust", "neutral"
 interface Props {
   emotion: EmotionResult | null | undefined;
   compact?: boolean;
+  offline?: boolean;
 }
 
-export function EmotionPanel({ emotion, compact = false }: Props) {
+export function EmotionPanel({ emotion, compact = false, offline = false }: Props) {
+  if (offline) {
+    return (
+      <div className="rounded-xl border border-border/80 bg-surface/60 p-4">
+        <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-text-muted">
+          <AlertCircle size={13} />
+          Affect
+        </div>
+        <p className="text-[11px] text-text-muted mt-2 leading-relaxed">
+          Affect offline — tests/vit_emotion.onnx not installed.
+        </p>
+      </div>
+    );
+  }
   if (!emotion) {
     return (
       <div className="rounded-xl border border-border/80 bg-surface/60 p-4">

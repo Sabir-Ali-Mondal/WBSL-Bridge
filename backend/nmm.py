@@ -6,6 +6,8 @@ Enhanced Non-Manual Markers (NMM) and Affect/Emotion Detection.
 - Facial Affect / Emotion recognition using ViT (Vision Transformer) ONNX model:
   happy, sad, angry, fear, surprise, disgust, neutral.
 - Real-time configurable sensitivity thresholds with defaults calibrated to eliminate false triggers.
+- Per-marker ENABLE gates: a marker can be switched off entirely, which is not
+  the same as pushing its threshold out of reach. See NMM_MARKER_GATES below.
 """
 
 from collections import deque
@@ -66,6 +68,35 @@ DEFAULT_CONFIG = {
     "emotion_sensitivity": 1.0,      # Multiplier on emotion logits
 }
 
+# Per-marker master switches.
+#
+# The threshold sliders are a *sensitivity* control -- they decide how much of an
+# expression counts as a marker. That is the wrong tool for turning a marker off.
+# Pushing brow_raise_thresh to its maximum does not disable the question marker;
+# it only raises the bar until it fires rarely, and it silently also changes the
+# value an operator would return to when they want the marker back.
+#
+# These gates are the on/off switch. Negation and the two question markers ship
+# OFF because a head shake and a brow raise are things every speaker does while
+# thinking or mid-sentence, so leaving them on fills the gloss string with
+# [negation] and [?] that the signer never intended. Affirmation and emphasis
+# are deliberately cheap to re-enable and are on by default.
+DEFAULT_MARKER_GATES = {
+    "negation": False,
+    "question": False,
+    "wh_question": False,
+    "affirmation": True,
+    "emphasis": True,
+}
+
+# Runtime active gates, keyed by marker flag name in detect_nmm()'s output.
+MARKER_GATES = dict(DEFAULT_MARKER_GATES)
+
+# The five flags a gate can act on. "emotion" and "metrics" are outputs of
+# detection, not markers, and must never be gated -- the UI reads metrics to draw
+# its live readout even when the corresponding marker is switched off.
+GATEABLE_MARKERS = tuple(DEFAULT_MARKER_GATES.keys())
+
 # Runtime active config
 CONFIG = dict(DEFAULT_CONFIG)
 
@@ -84,8 +115,29 @@ def update_nmm_thresholds(new_thresholds: dict):
     return CONFIG
 
 
+def update_marker_gates(new_gates: dict):
+    """Enable or disable individual markers.
+
+    Only the five gateable marker names are accepted, and only real booleans.
+    A string like ``"false"`` is rejected rather than coerced: truthy coercion
+    would read it as ON, which is the opposite of what was asked for and would
+    look like the switch was broken.
+    """
+    for k, v in new_gates.items():
+        if k in MARKER_GATES and isinstance(v, bool):
+            MARKER_GATES[k] = v
+    return dict(MARKER_GATES)
+
+
 def get_nmm_config() -> dict:
-    return dict(CONFIG)
+    """Thresholds plus gates.
+
+    Returned together because the UI edits them in one panel and posts them to
+    one endpoint; splitting them across two endpoints would let the panel and the
+    detector disagree about which marker is on.
+    """
+    return {**CONFIG, "marker_gates": dict(MARKER_GATES),
+            "default_marker_gates": dict(DEFAULT_MARKER_GATES)}
 
 
 def _get_point(landmarks, idx, w, h):
@@ -225,6 +277,18 @@ def detect_nmm(frame_bgr: np.ndarray, custom_thresholds: dict | None = None) -> 
         except Exception:
             pass
 
+    # Apply the master gates LAST, after every flag has been computed.
+    #
+    # This ordering is the point: the gates must not be able to change the
+    # detection itself. Doing it earlier (skipping the brow measurement when
+    # question is off, say) would also blank brow_ratio in metrics, and the
+    # panel's live readout would go dead for a marker the operator had merely
+    # switched off. Gating the output leaves the measurement intact and only
+    # stops the flag reaching the LLM.
+    for _marker, _enabled in MARKER_GATES.items():
+        if not _enabled:
+            flags[_marker] = False
+
     flags["emotion"] = _last_emotion
     return flags
 
@@ -235,3 +299,9 @@ def reset_nmm_state():
     _nose_x_history.clear()
     _nose_y_history.clear()
     _last_emotion = {"dominant": "neutral", "confidence": 1.0, "scores": {"neutral": 1.0}}
+
+
+def emotion_available() -> bool:
+    """False when tests/vit_emotion.onnx is not installed; the UI can then say
+    affect is offline instead of showing a permanently neutral panel."""
+    return _vit_session is not None

@@ -8,7 +8,7 @@ import { VideoPlayer } from "@/components/media/VideoPlayer";
 import { Upload, Trash2, Film, Image as ImageIcon, Play } from "lucide-react";
 import { toast } from "sonner";
 
-const API_BASE = "http://localhost:8000";
+const API_BASE = "http://localhost:8200";
 
 export default function AdminSignsPage() {
   const qc = useQueryClient();

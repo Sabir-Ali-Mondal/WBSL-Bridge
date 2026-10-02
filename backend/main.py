@@ -1,16 +1,18 @@
 """
 backend/main.py
 Complete FastAPI backend for WBSL Bridge.
-Loads sign_mlp.onnx, serves predictions, NMM, TTS, NLG, reference media,
-and REAL community ingestion (uploaded video -> landmarks -> .npy + manifest).
+Loads the active run from models/onnx_models/ via the registry, serves predictions,
+NMM, TTS, NLG, reference media, and REAL community ingestion (uploaded video -> landmarks -> .npy + manifest).
 
 Run:
     cd "d:\\Download\\Projects\\WBSL Bridge"
-    & "tests\\.venv\\Scripts\\python.exe" -m uvicorn backend.main:app --reload --port 8000
+    & "tests\\.venv\\Scripts\\python.exe" -m uvicorn backend.main:app --reload --port 8200
 """
 
 import json
+import os
 import re
+import tempfile
 import time
 import uuid
 from pathlib import Path
@@ -24,14 +26,16 @@ from fastapi.responses import FileResponse, Response, StreamingResponse
 from pydantic import BaseModel
 
 # Local imports
-from backend.extract import process_bgr_frame
-from backend.nmm import detect_nmm, reset_nmm_state
+from backend.extract import process_bgr_frame, HANDS_DIM, HOLISTIC_DIM
+from backend.nmm import detect_nmm, reset_nmm_state, emotion_available
+from backend.streaming import get_session, last_vector
 from backend.llm_engine import (
     generate_bengali,
     generate_bengali_with_uncertainty,
     is_llm_available,
     get_ai_config,
     stream_bengali,
+    break_into_glosses,
 )
 
 # ─────────────────────────────────────────────
@@ -118,7 +122,16 @@ def _persist_sign_media():
 # Non-.onnx files (e.g. the .gguf LLM) are ignored. The newest run wins at
 # startup. The admin panel can override the choice; the override is stored in
 # models/active_model.json and survives restarts.
+#
+# The extractions below serve a dynamic vocabulary -- zero-vocabulary signs
+# currently get an all-zero placeholder face, because that is the only face a
+# user can see during a non-manual rather than a manual sign. Every class the
+# active model can emit must therefore be able to be expressed as a single
+# 258-dim holistic vector.
 SEQ_T = 32
+# Feature widths the serving layer can actually feed. Both are produced by
+# backend/extract.py; the graph's declared input width picks between them.
+SERVABLE_WIDTHS = (HANDS_DIM, HOLISTIC_DIM)
 ACTIVE_MODEL_PATH = MODELS_DIR / "active_model.json"
 
 
@@ -175,10 +188,11 @@ def _discover_models():
                     classes = json.loads(classes_file.read_text(encoding="utf-8"))
                 except Exception:
                     classes = []
-            # A static classifier is only usable if it takes the 126-landmark
-            # frame vector; temporal runs ingest a (T, 126) sequence. Both are
-            # probed, so a run with no classes or an unloadable graph is dropped
-            # rather than silently winning the "newest" race.
+            # A static classifier is only usable if it takes a frame vector this
+            # layer can produce (126 hands, or 258 hands+pose); temporal runs
+            # ingest a (T, width) sequence. Both are probed, so a run with no
+            # classes or an unloadable graph is dropped rather than silently
+            # winning the "newest" race.
             #
             # The probe reads BOTH the rank and the middle axis. Width alone is
             # ambiguous: a static [N,126] and a temporal [N,32,126] both end in
@@ -377,6 +391,42 @@ UNIFIED_CLASSES = REGISTRY.temporal_classes
 ACTIVE_MODEL = REGISTRY.active
 ACTIVE_CLASSES = REGISTRY.active_classes
 
+
+def _active_width() -> int:
+    """Feature width the active graph declares, defaulting to the two-hand vector.
+
+    Every prediction route needs this before it can call an extractor: 126 and
+    258 are different tensors, not the same tensor padded. Routing on the
+    graph's own shape keeps the 126-dim MLP runs working unchanged while letting
+    a 258-dim run (train_daily6) be fed what it was trained on.
+    """
+    width = (REGISTRY.active or {}).get("input_width")
+    return width if width in SERVABLE_WIDTHS else HANDS_DIM
+
+
+def resample_feature_width(seq: np.ndarray, width: int) -> np.ndarray:
+    """Re-widen a stored landmark clip to the width the active graph expects.
+
+    Community recordings and the ``dataset_train/*`` pools store the 126-dim
+    two-hand vector, so a 258-dim graph cannot be fed one as-is. Only the pose
+    block (columns 126:258) is missing; the hand block and its normalization are
+    already shared, so the pose columns are zero-padded rather than recomputed
+    from video that is no longer on hand. The model then sees a sign performed
+    with the body out of frame -- lossy, and deliberately so: the alternative is
+    refusing to serve every stored clip once a holistic model is active.
+    """
+    if seq.shape[-1] == width:
+        return seq
+    if width == HOLISTIC_DIM and seq.shape[-1] == HANDS_DIM:
+        pad = np.zeros((*seq.shape[:-1], HOLISTIC_DIM - HANDS_DIM), np.float32)
+        return np.concatenate([seq.astype(np.float32), pad], axis=-1)
+    if width == HANDS_DIM and seq.shape[-1] == HOLISTIC_DIM:
+        return seq[..., :HANDS_DIM].astype(np.float32)
+    raise ValueError(
+        f"Stored clip is {seq.shape[-1]}-wide and cannot be served to a "
+        f"{width}-wide graph."
+    )
+
 # ─────────────────────────────────────────────
 # FASTAPI APP
 # ─────────────────────────────────────────────
@@ -490,7 +540,7 @@ app.add_middleware(
 # ─────────────────────────────────────────────
 # NMM / AFFECT SENSITIVITY CONFIGURATION
 # ─────────────────────────────────────────────
-from backend.nmm import get_nmm_config, update_nmm_thresholds
+from backend.nmm import get_nmm_config, update_marker_gates, update_nmm_thresholds
 
 
 @app.get("/api/nmm/config")
@@ -500,19 +550,35 @@ def get_nmm_settings():
 
 @app.post("/api/nmm/config")
 def set_nmm_settings(payload: dict):
-    return update_nmm_thresholds(payload)
+    """Update sensitivity thresholds and/or the per-marker enable gates.
+
+    One endpoint for both because the panel edits them together and a single
+    POST is what keeps the two in step. ``marker_gates`` is nested rather than
+    flattened because a marker name like ``negation`` is both a gate and a flag
+    in the detection output, and keeping the gates in their own object means a
+    future non-boolean threshold can never collide with one.
+    """
+    gates = payload.pop("marker_gates", None)
+    if isinstance(gates, dict):
+        update_marker_gates(gates)
+    if payload:
+        update_nmm_thresholds(payload)
+    return get_nmm_config()
+
+
 def _check_model_available(path):
     """Guards against activating a graph the serving layer cannot feed.
 
     There are two servable contracts, and they are distinguished by RANK, not
     by width:
 
-      * static   ``[N, 126]``     fed by ``/api/predict/frame`` (one frame)
-      * temporal ``[N, T, 126]``  fed by ``/api/predict/clip``   (T frames)
+      * static   ``[N, 126]`` / ``[N, 258]``  fed by ``/api/predict/frame`` (one frame)
+      * temporal ``[N, T, 126]`` / ``[N, T, 258]``  fed by ``/api/predict/clip``
 
-    A width-only test is unable to tell these apart, because both end in 126.
-    Earlier revisions of this function compared ``shape[-1]`` to 126 and so
-    waved through temporal graphs that the frame endpoint then failed on.
+    The two widths are the two feature extractors in ``backend/extract.py``:
+    126 is the two-hand landmark vector, 258 adds the 33x4 pose block that
+    ``train_daily6.py`` learns. Rank is what separates a frame classifier from a
+    clip classifier -- width alone cannot, because both end in the same number.
 
     Returns an error string, or None when the model is safe to activate."""
     desc = next((m for m in REGISTRY.models if m["path"] == path), None)
@@ -520,19 +586,22 @@ def _check_model_available(path):
         return f"Model not in registry: {path}"
     # Both contracts are servable: the frame route handles rank 2, the clip
     # route handles rank 3. What is NOT servable is a graph whose last axis is
-    # not the 126-landmark vector, since every feature extractor here emits 126.
-    if desc.get("input_width") == 126:
+    # not one of the feature vectors this layer emits -- feed it anything else
+    # and the run() raises a shape error the user reads as "detected nothing".
+    if desc.get("input_width") in SERVABLE_WIDTHS:
         return None
     if desc.get("input_width") is None:
         return (
             f"'{desc['name']}' declares an open-ended final input axis, so its "
-            f"feature width cannot be verified as the 126-landmark vector. "
-            f"Re-export the graph with a fixed feature dimension."
+            f"feature width cannot be verified against the extractors this "
+            f"backend serves. Re-export the graph with a fixed feature "
+            f"dimension."
         )
     return (
-        f"'{desc['name']}' expects {desc['input_width']}-wide inputs, but every "
-        f"feature extractor in this project emits a 126-dim two-hand landmark "
-        f"vector."
+        f"'{desc['name']}' expects {desc['input_width']}-wide inputs, but the "
+        f"feature extractors in this project emit either a "
+        f"{HANDS_DIM}-dim two-hand landmark vector or a {HOLISTIC_DIM}-dim "
+        f"hands+pose holistic vector."
     )
 
 
@@ -569,9 +638,16 @@ def health(response: Response):
             "input_rank": active.get("input_rank"),
             "frames": active.get("frames", 1),
             "feature_width": active.get("input_width"),
+            # The extractor this width selects. Published for the same reason as
+            # the endpoint: a 258-dim graph needs hands AND pose in frame, and a
+            # client that knows that can tell the user to step back.
+            "feature_kind": ("two_hand" if active.get("input_width") == HANDS_DIM
+                             else "hands_pose" if active.get("input_width") == HOLISTIC_DIM
+                             else None),
             "endpoint": active.get("endpoint", "/api/predict/frame"),
         },
         "reference_coverage": _coverage_summary(),
+        "emotion_available": emotion_available(),
     }
 
 
@@ -680,7 +756,7 @@ def dataset_stats():
         "languages": languages,
         "categories": categories,
         "dataset_version": "v0.1",
-        "model_version": "MLP-static",
+        "model_version": REGISTRY.active["name"] if REGISTRY.active else "none",
     }
 
 
@@ -727,7 +803,7 @@ async def predict_frame(file: UploadFile = File(...)):
         if frame_bgr is None:
             raise HTTPException(status_code=400, detail="Could not decode image")
 
-        vec = process_bgr_frame(frame_bgr)
+        vec = process_bgr_frame(frame_bgr, _active_width())
         nmm_flags = detect_nmm(frame_bgr)
 
         if vec is None:
@@ -742,7 +818,11 @@ async def predict_frame(file: UploadFile = File(...)):
                 metrics=nmm_flags.get("metrics"),
             )
 
-        logits = session.run(None, {INPUT_NAME: vec.reshape(1, 126)})[0][0]
+        # The width is the graph's, not a constant: a 126-dim MLP wants the
+        # two-hand vector, the 258-dim daily LSTM wants hands + pose. Hard-coding
+        # 126 here is what made the LSTM runs fail with a shape error.
+        width = _active_width()
+        logits = session.run(None, {INPUT_NAME: vec.reshape(1, width)})[0][0]
         probs = np.exp(logits - logits.max())
         probs = probs / probs.sum()
 
@@ -788,13 +868,14 @@ async def predict_clip(files: list[UploadFile] = File(...)):
     # SEQ_T: a run may be exported with a different T, and silently resampling
     # to the wrong length produces confident nonsense instead of an error.
     want_t = (REGISTRY.active or {}).get("frames") or SEQ_T
+    width = _active_width()
     vecs, last = [], None
     for f in files:
         raw = await f.read()
         fr = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
         if fr is None:
             continue
-        v = process_bgr_frame(fr)
+        v = process_bgr_frame(fr, width)
         if v is not None:
             last = v
         vecs.append(v if v is not None else last)
@@ -844,6 +925,7 @@ async def predict_stream(files: list[UploadFile] = File(...)):
             ),
         )
     want_t = (REGISTRY.active or {}).get("frames") or SEQ_T
+    width = _active_width()
     vecs, last = [], None
     last_frame_bgr = None
     for f in files:
@@ -852,7 +934,7 @@ async def predict_stream(files: list[UploadFile] = File(...)):
         if fr is None:
             continue
         last_frame_bgr = fr
-        v = process_bgr_frame(fr)
+        v = process_bgr_frame(fr, width)
         if v is not None:
             last = v
         vecs.append(v if v is not None else last)
@@ -868,6 +950,17 @@ async def predict_stream(files: list[UploadFile] = File(...)):
     arr = np.array(vecs, np.float32)
     if len(arr) != want_t:
         arr = arr[np.linspace(0, len(arr) - 1, want_t).astype(int)]
+
+    # Same unconditional motion gate as /api/stream/frame (see the comment
+    # there): the legacy batch path the page falls back to needs the identical
+    # policy, and a NONE class in the label list is not evidence the model can
+    # actually recognise idleness.
+    if len(arr) > 1:
+        motion = float(np.mean(np.abs(np.diff(arr, axis=0))))
+        spread = float(np.mean(np.abs(arr - arr.mean(axis=0))))
+        if motion < IDLE_MOTION_GATE or spread < IDLE_SPREAD_GATE:
+            return {"ready": False, "detail": "idle"}
+
     logits = unified_session.run(None, {UNIFIED_INPUT: arr[None]})[0][0]
     probs = np.exp(logits - logits.max())
     probs /= probs.sum()
@@ -889,6 +982,133 @@ async def predict_stream(files: list[UploadFile] = File(...)):
             for i in order
         ],
     }
+
+
+# ─────────────────────────────────────────────
+# PREDICTION: single frame in → server-side ring buffer → temporal model
+# ─────────────────────────────────────────────
+# The windows the server cuts out of its own buffer. Two lengths, not one: a
+# short window reads a fast sign, a long one reads a slow one, and the same
+# signer produces both. Fusing them and keeping the most decisive answer is
+# what stops a single unlucky window length from deciding the output.
+STREAM_WINDOWS = (24, 32)
+# Seconds between model runs per session. At 30 fps capture this is ~7 frames,
+# i.e. an order of magnitude fewer inferences than frames -- the client can push
+# frames as fast as the camera delivers them and the server does the throttling.
+STREAM_INFER_EVERY = 0.25
+
+
+# Below this mean frame-to-frame landmark motion a window is treated as idle.
+# Coordinates are normalised by hand size, so an absolutely still signer's
+# window sits around 1e-4 while even a slow sign clears 1e-2; the threshold is
+# set an order of magnitude above jitter and two below any real sign so sensor
+# noise alone can never cross it.
+IDLE_MOTION_GATE = 0.004
+# Mean per-column deviation from the window's own mean. This is the second,
+# independent idle signal: tracking jitter OSCILLATES, so its frame-to-frame
+# motion can sit above the gate while the hand never actually goes anywhere --
+# the window's spread stays tiny. A held "HUG" pose reported forever by a
+# signer who has stopped moving is exactly this signature; motion alone could
+# not see it, spread can.
+IDLE_SPREAD_GATE = 0.008
+
+
+@app.post("/api/stream/frame")
+async def stream_frame(session_id: str = "default", file: UploadFile = File(...)):
+    """One JPEG in, buffered landmark out.
+
+    Inference runs server-side on a sliding window every ``STREAM_INFER_EVERY``
+    seconds -- the client no longer uploads 32 frames per tick.
+
+    ``ready: false`` is a normal answer, not an error: it means the buffer is
+    still filling or the throttle is holding. The client uses ``buffered`` to
+    show how much history exists without inventing a count of its own.
+    """
+    if unified_session is None:
+        raise HTTPException(409, "Active model is static; activate a temporal model first.")
+
+    raw = await file.read()
+    fr = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
+    if fr is None:
+        raise HTTPException(400, "Could not decode image")
+
+    width = _active_width()
+    sess = get_session(session_id)
+    vec = process_bgr_frame(fr, width)
+    # Bounded carry-forward: <= 8 consecutive misses (~0.8 s at 10 Hz client)
+    # keep the window dense through a flicker; beyond that the signer's hands
+    # are genuinely gone, and freezing the last vector would replay the ending
+    # pose of the previous sign as if it were still being performed. Zeros are
+    # what the hand-presence channels read as "no hands".
+    if vec is None:
+        sess.miss += 1
+        vec = (sess.buf[-1] if sess.buf and sess.miss <= 8
+               else np.zeros(width, np.float32))
+    else:
+        sess.miss = 0
+    sess.buf.append(np.asarray(vec, np.float32))
+
+    now = time.time()
+    if len(sess.buf) < STREAM_WINDOWS[0]:
+        return {"ready": False, "buffered": len(sess.buf), "detail": "filling"}
+    if now - sess.last_infer < STREAM_INFER_EVERY:
+        return {"ready": False, "buffered": len(sess.buf), "detail": "throttled"}
+    sess.last_infer = now
+
+    tail = np.array(list(sess.buf), np.float32)
+    want_t = (REGISTRY.active or {}).get("frames") or SEQ_T
+
+    # Motion gate -- per WINDOW, not per buffer. The buffer holds up to 18 s of
+    # history; gating on its mean kept the gate open for ~15 s after a sign
+    # ended, so idle windows decoded as the previous sign and repeated until
+    # the camera stopped. Each candidate window is now gated on its own
+    # geometry: a window the signer visibly stopped moving in is skipped, and
+    # if EVERY window is idle the endpoint answers "idle" instead of guessing.
+    best = None
+    idle_stats = None
+    for w in STREAM_WINDOWS:                       # multi-window fusion: max margin wins
+        win = tail[-w:]
+        if len(win) < 2:
+            continue
+        motion = float(np.mean(np.abs(np.diff(win, axis=0))))
+        spread = float(np.mean(np.abs(win - win.mean(axis=0))))
+        if idle_stats is None or motion > idle_stats[0]:
+            idle_stats = (motion, spread)
+        if motion < IDLE_MOTION_GATE or spread < IDLE_SPREAD_GATE:
+            continue                               # this window is idle or frozen
+
+        # The interpolation in resample_arr mixes the source rows with float
+        # weights, which promotes the result to float64. ONNX Runtime rejects
+        # that outright ("Unexpected input data type ... expected float"), so the
+        # dtype is pinned here rather than left to the arithmetic.
+        arr = resample_feature_width(resample_arr(win, want_t)[None], width).astype(np.float32)
+        logits = unified_session.run(None, {UNIFIED_INPUT: arr})[0][0]
+        probs = np.exp(logits - logits.max())
+        probs /= probs.sum()
+        order = np.argsort(probs)[::-1][:2]
+        # Margin, not confidence: a hesitant window can still report 99% on one
+        # class, but it cannot report a large gap to the runner-up as well.
+        margin = float(probs[order[0]] - probs[order[1]]) if len(order) > 1 else 1.0
+        if best is None or margin > best["margin"]:
+            best = {
+                "label": ACTIVE_CLASSES[int(order[0])],
+                "confidence": float(probs[order[0]]),
+                "margin": margin,
+                "window": int(w),
+                "top3": [{"label": ACTIVE_CLASSES[i], "confidence": float(probs[i])}
+                         for i in np.argsort(probs)[::-1][:3]],
+            }
+
+    if best is None:
+        motion, spread = idle_stats if idle_stats else (0.0, 0.0)
+        return {"ready": False, "buffered": len(sess.buf),
+                "detail": "idle",
+                "motion": round(motion, 5), "spread": round(spread, 5)}
+
+    nmm = detect_nmm(fr)
+    return {**best, "ready": True, "buffered": len(sess.buf),
+            "frames_used": int(want_t),
+            "nmm": nmm, "emotion": nmm.get("emotion"), "metrics": nmm.get("metrics")}
 
 
 @app.get("/api/coverage")
@@ -934,6 +1154,13 @@ def coverage():
 # ─────────────────────────────────────────────
 @app.get("/api/simulation/frames")
 def simulation_frames(label: str = "", sample_id: str = ""):
+    """Real extracted landmarks for one sign, shaped for the replay canvas.
+
+    The response says which contract it is in ``width``, because the two are not
+    interchangeable: a 126-dim recording has hands only, a 258-dim one has hands
+    AND pose. The client draws the pose layer only when it is present, rather
+    than synthesising a body for a two-hand clip.
+    """
     arr = None
     source = ""
     if sample_id:
@@ -943,10 +1170,19 @@ def simulation_frames(label: str = "", sample_id: str = ""):
             source = f"community:{sample_id}"
     elif label:
         safe = label.upper().replace(" ", "_")
-        for p in (ROOT / "dataset_train" / "unified_video" / f"{safe}.npy",
+        # The 258-dim daily pool is searched FIRST because those sequences are
+        # the ones that carry a pose block worth drawing. The 126-dim pools are
+        # the fallback, not the default.
+        for p in (ROOT / "dataset_train" / "daily_video" / f"{safe}.npy",
+                  ROOT / "dataset_train" / "unified_video" / f"{safe}.npy",
                   ROOT / "dataset_train" / "unified_static" / f"{safe}.npy"):
             if p.exists():
-                arr = np.load(p)[0]
+                loaded = np.load(p)
+                # daily_video/'unified_video' hold stacks of clips; the static
+                # pool holds hold-sequences. In every case a single clip is what
+                # the replay wants, so the first axis is index-of-sample for the
+                # 3-D pools and index-of-frame for a bare (F, D) recording.
+                arr = loaded[0] if (loaded.ndim == 3 or loaded.ndim == 1) else loaded
                 source = f"extracted:{p.parent.name}"
                 break
         if arr is None:
@@ -957,9 +1193,19 @@ def simulation_frames(label: str = "", sample_id: str = ""):
                 source = f"community:{rec['sample_id']}"
     if arr is None:
         raise HTTPException(status_code=404, detail="No extracted landmark sequence for this sign yet")
+
     arr = arr[:64]
+    if arr.ndim == 1:                                   # a single frame was stored
+        arr = arr[None]
+
+    if arr.shape[-1] == HOLISTIC_DIM:                   # 258 = hands 126 + pose 33x4
+        hands = arr[:, :126].reshape(len(arr), 42, 3)
+        pose = arr[:, 126:].reshape(len(arr), 33, 4)
+        return {"frames": hands.tolist(), "pose": pose.tolist(), "points": 42,
+                "count": int(len(arr)), "source": source, "width": HOLISTIC_DIM}
+
     return {"frames": arr.reshape(len(arr), 42, 3).tolist(), "points": 42,
-            "count": int(len(arr)), "source": source}
+            "count": int(len(arr)), "source": source, "width": HANDS_DIM}
 
 
 @app.get("/api/dataset/reference")
@@ -1108,6 +1354,44 @@ def text_to_sign(payload: TextToSignRequest):
         "gloss_sequence": gloss_sequence,
         "available_signs": len(ACTIVE_CLASSES),
         "media": media,
+    }
+
+
+@app.post("/api/text-to-sign/llm")
+def text_to_sign_llm(payload: TextToSignRequest):
+    """Plan a signable gloss sequence with the LLM instead of the phrase table.
+
+    The dictionary route above is deterministic and free but cannot generalise:
+    any word outside WORD_MAP and the model's classes returns as ``[word]``, which
+    has no media and cannot be signed. This route asks the model to express the
+    sentence using only what the system can actually play.
+
+    503 rather than an empty 200 when the model is unconfigured or unreachable:
+    the caller falls back to the dictionary, and "the LLM is unavailable" is a
+    different situation from "this sentence has no signs", which the caller must
+    be able to tell apart.
+    """
+    # Both halves matter: ACTIVE_CLASSES is what the recogniser can name, and
+    # SIGN_MEDIA is what the player can render. A gloss needs to be in the union
+    # to be useful -- recognition-only classes are still worth planning if media
+    # exists for them, and vice versa.
+    vocab = sorted(set(ACTIVE_CLASSES) | set(SIGN_MEDIA.keys()))
+    res = break_into_glosses(payload.text, vocab)
+
+    if not res["gloss_sequence"]:
+        raise HTTPException(status_code=503, detail=res.get("status", "llm_unavailable"))
+
+    return {
+        "input_text": payload.text,
+        "gloss_sequence": res["gloss_sequence"],
+        "available_signs": len(ACTIVE_CLASSES),
+        "media": [
+            {"gloss": g,
+             "type": (SIGN_MEDIA.get(g) or {}).get("type"),
+             "url": (SIGN_MEDIA.get(g) or {}).get("url")}
+            for g in res["gloss_sequence"]
+        ],
+        "engine": "llm",
     }
 
 
@@ -1371,28 +1655,30 @@ def list_tts_voices():
 
 
 # ─────────────────────────────────────────────
-# DEMO SEQUENCES
+# SPEECH TO TEXT (faster-whisper)
 # ─────────────────────────────────────────────
-@app.get("/api/demo/sequences")
-def demo_sequences():
-    return {
-        "sequences": [
-            {
-                "id": "demo-hello",
-                "name": "Hello Sequence",
-                "gloss_sequence": ["H", "E", "L", "L", "O"],
-                "bengali_output": "হ্যালো",
-                "frames": 150,
-            },
-            {
-                "id": "demo-thank",
-                "name": "Thank You",
-                "gloss_sequence": ["T", "H", "A", "N", "K"],
-                "bengali_output": "ধন্যবাদ",
-                "frames": 120,
-            },
-        ]
-    }
+# Model handle and language policy live in backend/stt_engine.py; this route is
+# only the HTTP shell. ``language`` is the user's explicit choice from the UI
+# ("bengali" / "english" / "auto") -- a deliberate pick is a fact the engine
+# must obey, not re-decide, so it is forwarded verbatim.
+from backend.stt_engine import transcribe_bytes  # noqa: E402
+
+
+@app.post("/api/stt")
+async def speech_to_text(
+    file: UploadFile = File(...),
+    language: str = Form(default=""),
+):
+    try:
+        data = await file.read()
+        if not data:
+            raise HTTPException(status_code=400, detail="Empty audio recording")
+        return transcribe_bytes(data, file.filename or "rec.webm", language)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        print(f"[STT Error] {exc}")
+        raise HTTPException(status_code=500, detail="Speech-to-text transcription failed") from exc
 
 
 # ─────────────────────────────────────────────
@@ -1427,6 +1713,7 @@ async def ingest_sample(
         tmp.write(await file.read())
         tmp.close()
 
+        width = _active_width()
         cap = cv2.VideoCapture(tmp.name)
         frames = []
         idx = 0
@@ -1435,7 +1722,7 @@ async def ingest_sample(
             if not ok:
                 break
             if idx % 3 == 0:
-                vec = process_bgr_frame(frame)
+                vec = process_bgr_frame(frame, width)
                 if vec is not None:
                     frames.append(vec)
             idx += 1
@@ -1471,6 +1758,7 @@ async def ingest_sample(
         "verified_by": None,
         "captured_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
         "frames": int(arr.shape[0]),
+        "width": int(arr.shape[-1]),
         "landmark_path": str(npy_path.relative_to(ROOT)),
         "nmm_tags": json.loads(nmm_tags or "{}"),
         "upload_status": "success",
@@ -1514,10 +1802,14 @@ def get_evidence(sample_id: str):
             mean_vel = float(np.linalg.norm(np.diff(arr[:, :63], axis=0), axis=1).mean())
         if unified_session is not None:
             seq = resample_arr(arr, SEQ_T)[None].astype(np.float32)
+            # Same dispatch as the endpoints: the clip is assembled in the width
+            # the active graph declares, not in whatever the upload happens to be.
+            seq = resample_feature_width(seq, _active_width())
             logits = unified_session.run(None, {UNIFIED_INPUT: seq})[0][0]
         else:
             mid = arr[frames // 2]
-            logits = session.run(None, {INPUT_NAME: mid.reshape(1, 126)})[0][0]
+            logits = session.run(
+                None, {INPUT_NAME: mid.reshape(1, _active_width())})[0][0]
         probs = np.exp(logits - logits.max())
         probs /= probs.sum()
         order = np.argsort(probs)[::-1][:3]
@@ -1575,8 +1867,12 @@ def admin_stats():
         "total_approved_samples": sum(s["approved_samples"] for s in sign_catalog),
         "total_pending_samples": sum(s["pending_samples"] for s in sign_catalog),
         "total_rejected_samples": sum(s["rejected_samples"] for s in sign_catalog),
-        "model_active": "sign_mlp.onnx",
-        "model_classes": len(CLASSES),
+        "model_active": REGISTRY.active["name"] if REGISTRY.active else None,
+        "model_classes": len(REGISTRY.active_classes),
+        "contract": (REGISTRY.active or {}).get("contract") or {
+            "kind": "temporal" if (REGISTRY.active or {}).get("temporal") else "static",
+            "feature_width": (REGISTRY.active or {}).get("input_width", 126),
+        },
         "llm_available": is_llm_available(),
         "llm_model": ai["model"],
         "inference_mode": ai["provider"],
@@ -1589,4 +1885,4 @@ def admin_stats():
 # ─────────────────────────────────────────────
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8200)

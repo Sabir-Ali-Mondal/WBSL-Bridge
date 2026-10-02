@@ -1,6 +1,7 @@
 "use client";
 import React, { useRef, useEffect, useState } from "react";
 import { Play, Pause, RotateCcw, Database } from "lucide-react";
+import { POSE_BODY_PAIRS, POSE_FACE_MARKERS, POSE_POINTS, type PosePoint } from "@/lib/pose";
 
 const HAND_CONN: [number, number][] = [
   [0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 8], [5, 9], [9, 10],
@@ -9,13 +10,19 @@ const HAND_CONN: [number, number][] = [
 ];
 
 interface LandmarkSimulationProps {
-  frames?: number[][][];   // F x 42 x 3 (real extracted landmarks)
+  frames?: number[][][];              // F x 42 x 3
+  // F x 33 x 4 (optional, 258-dim runs). Typed as a tuple rather than
+  // number[][] because the visibility column is index 3 of every landmark and
+  // the type is what keeps a plain (x, y, z) clip from being passed in and read
+  // as though p[3] were a visibility score.
+  pose?: PosePoint[][];
   fps?: number;
   title?: string;
 }
 
 export function LandmarkSimulation({
   frames,
+  pose,
   fps = 15,
   title,
 }: LandmarkSimulationProps) {
@@ -76,6 +83,13 @@ export function LandmarkSimulation({
 
     // Slot 0 = left hand (21 pts), slot 1 = right hand (21 pts)
     for (const off of [0, 21]) {
+      const slot = frame.slice(off, off + 21);
+      // A slot whose 21 points are all exactly zero is a MISSING hand, not a
+      // hand at the origin: the extractor writes zeros when MediaPipe found no
+      // signer hand in that slot. Drawing it would paint a real-looking
+      // skeleton at the wrist, which is the one place a viewer would believe it.
+      if (slot.every((p) => p[0] === 0 && p[1] === 0 && p[2] === 0)) continue;
+
       ctx.strokeStyle = off === 0 ? "#22c55e" : "#4ade80";
       ctx.fillStyle = ctx.strokeStyle;
       ctx.lineWidth = 1.5;
@@ -98,7 +112,40 @@ export function LandmarkSimulation({
         ctx.fill();
       }
     }
-  }, [currentFrame, frames]);
+
+    // Body layer, drawn after the hands so the torso reads as the backdrop.
+    // Only 258-dim recordings have it; a 126-dim clip leaves `pose` undefined
+    // and nothing is drawn -- a synthesised body would be a lie about the data.
+    const pf = pose?.[currentFrame];
+    if (pf) {
+      ctx.strokeStyle = "#6366F1";
+      ctx.fillStyle = "#818CF8";
+      ctx.lineWidth = 2;
+
+      for (const [a, b] of POSE_BODY_PAIRS) {
+        const p1 = pf[a];
+        const p2 = pf[b];
+        // Visibility gate: BlazePose reports a low-confidence landmark for a
+        // body part that is out of frame, and joining it to a confident one
+        // draws a bone to nowhere.
+        if (!p1 || !p2 || p1[3] < 0.5 || p2[3] < 0.5) continue;
+        ctx.beginPath();
+        ctx.moveTo(px(p1), py(p1));
+        ctx.lineTo(px(p2), py(p2));
+        ctx.stroke();
+      }
+
+      // Nose + mouth corners: the exact landmarks the NMM detector reads, so
+      // the replay shows where the question/negation signal was measured.
+      for (const i of POSE_FACE_MARKERS) {
+        const p = pf[i];
+        if (!p || p[3] < 0.5) continue;
+        ctx.beginPath();
+        ctx.arc(px(p), py(p), 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }, [currentFrame, frames, pose]);
 
   // Honest empty state: this sign simply has no extracted sequence yet.
   if (totalFrames === 0) {
@@ -131,6 +178,14 @@ export function LandmarkSimulation({
           <span>FPS: <strong className="text-accent-primary">{fps}</strong></span>
           <span>|</span>
           <span>Hands: <strong className="text-status-approved">2 (21 pts each)</strong></span>
+          {pose && (
+            <>
+              <span>|</span>
+              <span>
+                Pose: <strong className="text-[#818CF8]">{POSE_POINTS} pts</strong>
+              </span>
+            </>
+          )}
           {title && (
             <>
               <span>|</span>

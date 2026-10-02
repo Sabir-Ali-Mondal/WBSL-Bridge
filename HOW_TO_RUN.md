@@ -7,7 +7,7 @@
 
 Create `backend/.env`:
 
-```env
+```bash
 AI_BASE_URL=https://openrouter.ai/api/v1
 AI_API_KEY=<YOUR_OPENROUTER_API_KEY>
 AI_MODEL_NAME=google/gemma-4-26b-a4b-it:free
@@ -30,10 +30,12 @@ cd "D:\Download\Projects\WBSL Bridge"
 This automatically starts:
 
 ```text
-FastAPI Backend → http://localhost:8000
+FastAPI Backend → http://localhost:8200
 Next.js Frontend → http://localhost:3000
-OpenAI Compatible API on port 5001 at http://localhost:5001/v1/
+OpenAI Compatible API on port 5001 at http://localhost:5001/v1/ (if models/llm/ is present)
 ```
+
+> **Note on AI tab in start.ps1:** The local KoboldCpp AI runner requires the `models/llm/` directory with local weights. If `models/llm/` is absent, the script will skip starting the local runner and you can rely directly on the cloud LLM configuration defined in `backend/.env`.
 Enabled APIs: KoboldCppApi OpenAiApi OllamaApi AnthropicApi
 
 

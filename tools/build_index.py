@@ -81,6 +81,27 @@ if man.exists():
                      "verification": r.get("verification", "pending")})
 
 # ── 7. Trained models ──
+#
+# The two flat artefacts below are the legacy layout. Every run written since
+# train_daily6.py lives in models/onnx_models/<id>/ and was previously invisible
+# to this index -- so the index listed 2 models while the registry was serving a
+# third. Both layouts are walked, and each run is recorded with its report when
+# one was written.
+RUNS = ROOT / "models" / "onnx_models"
+for run in sorted((d for d in RUNS.iterdir() if d.is_dir() and d.name.isdigit()),
+                  key=lambda d: int(d.name)):
+    for onnx in sorted(run.glob("*.onnx")):
+        rec = {"sample_id": f"MODEL_RUN{run.name}_{onnx.stem}", "kind": "model",
+               "label": onnx.stem, "source": "trained", "run": f"onnx_models/{run.name}",
+               "path": rel(onnx), "split": "n/a", "verification": "n/a"}
+        for rep_name in ("duration.json", "daily_report.json", "static_report.json",
+                         "unified_report.json"):
+            rp = run / rep_name
+            if rp.exists():
+                rec["metrics"] = json.loads(rp.read_text(encoding="utf-8"))
+                break
+        recs.append(rec)
+
 for mp_ in [("sign_mlp.onnx", "MLP-static"), ("sign_unified_lstm.onnx", "LSTM-unified")]:
     if (ROOT / "models" / mp_[0]).exists():
         recs.append({"sample_id": f"MODEL_{mp_[1]}", "kind": "model", "label": mp_[1],

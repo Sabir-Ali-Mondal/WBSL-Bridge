@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import { Sliders, RotateCcw, X } from "lucide-react";
 import axios from "axios";
 
-const API_BASE = "http://localhost:8000";
+const API_BASE = "http://localhost:8200";
 
 /**
  * The NMM thresholds are all "how much of this expression counts as that marker".
@@ -29,6 +29,47 @@ export interface NmmThresholds {
 }
 
 /**
+ * Master on/off switches for the five non-manual markers.
+ *
+ * These are NOT thresholds. A slider decides how much of an expression counts as
+ * a marker; a gate decides whether the marker exists at all. Turning the question
+ * slider down still leaves it able to fire on a big enough brow raise, and it
+ * loses the value the operator had tuned. A gate is the honest off switch.
+ */
+export interface MarkerGates {
+  question: boolean;
+  wh_question: boolean;
+  negation: boolean;
+  affirmation: boolean;
+  emphasis: boolean;
+}
+
+/** The gate keys, in the order the panel lists them. */
+export const MARKER_GATE_KEYS: (keyof MarkerGates)[] = [
+  "question",
+  "wh_question",
+  "negation",
+  "affirmation",
+  "emphasis",
+];
+
+/**
+ * Negation and the two question markers ship OFF.
+ *
+ * A head shake and a brow raise are things every speaker does while thinking or
+ * mid-sentence, so leaving them armed fills the gloss string with [negation] and
+ * [?] the signer never intended. Affirmation and emphasis are cheap to re-enable
+ * and are on by default. These must match DEFAULT_MARKER_GATES in backend/nmm.py.
+ */
+export const DEFAULT_MARKER_GATES: MarkerGates = {
+  question: false,
+  wh_question: false,
+  negation: false,
+  affirmation: true,
+  emphasis: true,
+};
+
+/**
  * Client-side acceptance thresholds. Unlike NMM these never reach the server:
  * the decision to accept a window and append a gloss is made in the page, from
  * the confidence and margin the stream endpoint already returns. They are
@@ -43,6 +84,15 @@ export interface CommitThresholds {
 
 /** Every slider the panel exposes: the 6 server-side NMM values + 4 client-side. */
 export type AllThresholds = NmmThresholds & CommitThresholds;
+
+/** The full panel state: sensitivity sliders plus the marker on/off gates. */
+export interface PanelState {
+  thresholds: AllThresholds;
+  gates: MarkerGates;
+}
+
+/** localStorage key for the marker gates. */
+export const GATE_STORAGE_KEY = "wbsl.markerGates.v1";
 
 export const DEFAULT_THRESHOLDS: NmmThresholds = {
   brow_raise_thresh: 0.082,
@@ -200,13 +250,47 @@ const GROUP_META: Record<string, { title: string; blurb: string }> = {
 interface Props {
   values: AllThresholds;
   onChange: (next: AllThresholds) => void;
+  /** Marker on/off gates. */
+  gates: MarkerGates;
+  onGatesChange: (next: MarkerGates) => void;
   /** Open the modal on mount. Defaults to closed. */
   defaultOpen?: boolean;
   /** Renders the trigger button inline instead of in the control bar. */
   variant?: "inline" | "header";
 }
 
-export function NmmThresholdPanel({ values, onChange, defaultOpen = false, variant = "inline" }: Props) {
+/** One-line description of each gate, shown next to its switch. */
+const GATE_META: Record<keyof MarkerGates, { label: string; desc: string }> = {
+  question: {
+    label: "Question (yes/no)",
+    desc: "Eyebrow raise. Adds [?] to the clause.",
+  },
+  wh_question: {
+    label: "WH-question",
+    desc: "Brow furrow. Frames what / why / how.",
+  },
+  negation: {
+    label: "Negation",
+    desc: "Head shake. Adds [negation] to the sign.",
+  },
+  affirmation: {
+    label: "Affirmation",
+    desc: "Head nod. Confirms the clause.",
+  },
+  emphasis: {
+    label: "Emphasis",
+    desc: "Mouth open. Stresses the clause.",
+  },
+};
+
+export function NmmThresholdPanel({
+  values,
+  onChange,
+  gates,
+  onGatesChange,
+  defaultOpen = false,
+  variant = "inline",
+}: Props) {
   const [open, setOpen] = useState(defaultOpen);
   // Portals cannot run during SSR/prerender -- there is no document to portal
   // into -- so the overlay is only rendered after the first client mount.
@@ -261,13 +345,34 @@ export function NmmThresholdPanel({ values, onChange, defaultOpen = false, varia
     }
   };
 
+  const setGate = (key: keyof MarkerGates, enabled: boolean) => {
+    const next = { ...gates, [key]: enabled };
+    onGatesChange(next);
+    // The gates live on the server, so they are pushed the same way thresholds
+    // are. The local mirror is written too: without it a reload would show the
+    // defaults while the server kept the operator's choice.
+    axios
+      .post(`${API_BASE}/api/nmm/config`, { marker_gates: { [key]: enabled } })
+      .catch(() => {});
+    try {
+      localStorage.setItem(GATE_STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      /* ignore */
+    }
+  };
+
   const reset = () => {
     onChange(DEFAULT_ALL);
+    onGatesChange(DEFAULT_MARKER_GATES);
     axios
-      .post(`${API_BASE}/api/nmm/config`, DEFAULT_THRESHOLDS)
+      .post(`${API_BASE}/api/nmm/config`, {
+        ...DEFAULT_THRESHOLDS,
+        marker_gates: DEFAULT_MARKER_GATES,
+      })
       .catch(() => {});
     try {
       localStorage.setItem(COMMIT_STORAGE_KEY, JSON.stringify(DEFAULT_COMMIT_THRESHOLDS));
+      localStorage.setItem(GATE_STORAGE_KEY, JSON.stringify(DEFAULT_MARKER_GATES));
     } catch {
       /* ignore */
     }
@@ -280,19 +385,26 @@ export function NmmThresholdPanel({ values, onChange, defaultOpen = false, varia
    * Surfacing this on the trigger matters because the modal is invisible when
    * shut: without a count, an operator who tuned something last week has no way
    * to know the detector is still running on those values.
+   *
+   * A switched-off marker counts as a change, because it is the one setting that
+   * silently deletes output the operator may later expect to see.
    */
-  const changedCount = SLIDERS.filter(
-    (s) =>
-      (values as unknown as Record<string, number>)[s.key] !==
-      (DEFAULT_ALL as unknown as Record<string, number>)[s.key]
-  ).length;
+  const changedCount =
+    SLIDERS.filter(
+      (s) =>
+        (values as unknown as Record<string, number>)[s.key] !==
+        (DEFAULT_ALL as unknown as Record<string, number>)[s.key]
+    ).length +
+    MARKER_GATE_KEYS.filter((k) => gates[k] !== DEFAULT_MARKER_GATES[k]).length;
+
+  const disabledCount = MARKER_GATE_KEYS.filter((k) => !gates[k]).length;
 
   const trigger =
     variant === "header" ? (
       <button
         type="button"
         onClick={() => setOpen(true)}
-        title="Threshold Controller"
+        title="NMM Controller"
         className="relative p-1.5 rounded-lg bg-surface border border-border text-text-muted hover:text-accent-secondary hover:border-accent-secondary/50 transition-colors"
       >
         <Sliders size={13} />
@@ -311,11 +423,16 @@ export function NmmThresholdPanel({ values, onChange, defaultOpen = false, varia
       >
         <span className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.15em] text-text-secondary">
           <Sliders size={13} className="text-accent-secondary" />
-          Threshold Controller
+          NMM Controller
         </span>
 
         <span className="flex items-center gap-2 text-[10px] font-mono text-text-muted">
-          {changedCount > 0 ? (
+          {/* Markers that are switched off are the most important thing to see
+              from outside the modal, so they are named rather than folded into
+              the tuned count. */}
+          {disabledCount > 0 ? (
+            <span className="text-status-pending">{disabledCount} off</span>
+          ) : changedCount > 0 ? (
             <span className="text-accent-secondary">{changedCount} tuned</span>
           ) : (
             <span>defaults</span>
@@ -334,7 +451,7 @@ export function NmmThresholdPanel({ values, onChange, defaultOpen = false, varia
       onClick={() => setOpen(false)}
       role="dialog"
       aria-modal="true"
-      aria-label="Threshold Controller"
+      aria-label="NMM Controller"
     >
       <div
         onClick={(e) => e.stopPropagation()}
@@ -344,13 +461,13 @@ export function NmmThresholdPanel({ values, onChange, defaultOpen = false, varia
           <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3 border-b border-border shrink-0">
             <span className="flex items-center gap-2 text-xs font-mono uppercase tracking-[0.15em] text-text-secondary">
               <Sliders size={13} className="text-accent-secondary" />
-              Threshold Controller
+              NMM Controller
             </span>
 
             <button
               type="button"
               onClick={() => setOpen(false)}
-              aria-label="Close threshold controller"
+              aria-label="Close NMM controller"
               className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-elevated transition-colors"
             >
               <X size={15} />
@@ -360,11 +477,78 @@ export function NmmThresholdPanel({ values, onChange, defaultOpen = false, varia
           {/* BODY — scrolls independently so the header stays put */}
           <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-5 py-4 space-y-5">
             <p className="text-[11px] text-text-muted leading-relaxed">
-              Every threshold below is live — changes take effect immediately. Not sure what
+              Every control below is live — changes take effect immediately. Not sure what
               to change? Start with <strong className="text-text-secondary">Decisiveness margin</strong>{" "}
               and <strong className="text-text-secondary">Agreeing windows</strong>: they do the
               most to stop wrong signs without making detection sluggish.
             </p>
+
+            {/* MARKER SWITCHES. First, because a switched-off marker explains
+                far more about a wrong output than any slider value does: no
+                amount of threshold tuning will produce a [negation] while the
+                negation gate is closed. */}
+            <div className="space-y-3">
+              <div className="pb-1 border-b border-border/50">
+                <div className="text-[10px] font-mono uppercase tracking-wider text-accent-secondary">
+                  Markers
+                </div>
+                <p className="text-[10px] text-text-muted leading-relaxed mt-0.5">
+                  Which non-manual markers are allowed to reach the LLM at all. A marker
+                  switched off is never reported, no matter how strongly it is performed —
+                  this is different from the sliders below, which only set how much of an
+                  expression is needed. Negation and questions are off by default because a
+                  head shake or a brow raise happens constantly in ordinary signing.
+                </p>
+              </div>
+
+              {MARKER_GATE_KEYS.map((key) => {
+                const on = gates[key];
+                const meta = GATE_META[key];
+                const isDefault = on === DEFAULT_MARKER_GATES[key];
+
+                return (
+                  <div
+                    key={key}
+                    className="flex items-center justify-between gap-3"
+                  >
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-mono text-text-secondary">
+                        {meta.label}
+                        {!isDefault && (
+                          <span className="ml-1.5 text-[9px] text-accent-secondary">•</span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-text-muted leading-relaxed">
+                        {meta.desc}
+                      </p>
+                    </div>
+
+                    {/* A real switch, not a checkbox: the state has to read at a
+                        glance from across a room while signing. */}
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={on}
+                      aria-label={meta.label}
+                      onClick={() => setGate(key, !on)}
+                      className={`shrink-0 w-10 h-5 rounded-full border transition-colors relative ${
+                        on
+                          ? "bg-accent-primary/30 border-accent-primary/60"
+                          : "bg-surface-elevated border-border"
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-0.5 w-3.5 h-3.5 rounded-full transition-all ${
+                          on
+                            ? "left-[22px] bg-accent-primary"
+                            : "left-0.5 bg-text-muted"
+                        }`}
+                      />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
 
             {(["commit", "nmm", "affect"] as const).map((group) => (
               <div key={group} className="space-y-3">

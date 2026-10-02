@@ -29,12 +29,6 @@ export interface SystemHealth {
 export type PipelineStage = "camera" | "landmarks" | "recognition" | "nlg" | "tts";
 export type PipelineStatus = "active" | "idle" | "error" | "waiting";
 
-export interface Candidate {
-  meaning: string;
-  confidence: number;
-  evidence: string;
-}
-
 export interface NMMFlags {
   question: boolean;
   wh_question: boolean;
@@ -42,52 +36,6 @@ export interface NMMFlags {
   affirmation: boolean;
   emphasis: boolean;
   head_tilt?: boolean;
-}
-
-export interface PipelineEvent {
-  type:
-    | "status"
-    | "landmarks"
-    | "sign_detected"
-    | "unknown_sign"
-    | "candidates_ready"
-    | "nmm_update"
-    | "emotion_update"
-    | "sentence_end"
-    | "bengali_output"
-    | "tts_ready"
-    | "error";
-  stage?: PipelineStage;
-  status?: PipelineStatus;
-  gloss?: string;
-  confidence?: number;
-  timestamp?: [number, number];
-  window_id?: number;
-  candidates?: Candidate[];
-  markers?: NMMFlags;
-  emotion?: string;
-  text?: string;
-  has_uncertain?: boolean;
-  audio_url?: string;
-  engine?: "edge-tts" | "banglatts";
-  duration_ms?: number;
-  message?: string;
-  hands?: number;
-  face?: boolean;
-  pose?: boolean;
-  fps?: number;
-  gloss_sequence?: string[];
-}
-
-// --- WebSocket Payloads (Frontend -> Backend) ---
-export interface WsLandmarksPayload {
-  type: "landmarks";
-  frame_id: number;
-  timestamp: number;
-  hands_left: number[][] | null;   // 21 x 3
-  hands_right: number[][] | null;  // 21 x 3
-  face: number[][] | null;         // 468 x 3
-  pose: number[][] | null;         // 33 x 3
 }
 
 // --- Dataset & Contributions ---
@@ -144,39 +92,4 @@ export interface VerificationEvidence {
     nmm_detected: string;
     top_candidate: string;
   };
-}
-
-// --- Training & Models ---
-export interface ModelVersion {
-  id: string;
-  version: string;
-  dataset_version: string;
-  status: "active" | "archived" | "training" | "evaluating";
-  accuracy: number;
-  precision: number;
-  recall: number;
-  f1: number;
-  created_at: string;
-}
-
-export interface TrainingEvent {
-  type:
-    | "epoch_start"
-    | "epoch_end"
-    | "batch_progress"
-    | "training_complete"
-    | "training_error"
-    | "export_progress";
-  epoch?: number;
-  total_epochs?: number;
-  loss?: number;
-  accuracy?: number;
-  val_accuracy?: number;
-  batch?: number;
-  total_batches?: number;
-  model_id?: string;
-  final_accuracy?: number;
-  message?: string;
-  stage?: string;
-  percent?: number;
 }

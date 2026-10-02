@@ -9,7 +9,7 @@ import { Contribution } from "@/lib/types";
 import { toast } from "sonner";
 import axios from "axios";
 
-const API_BASE = "http://localhost:8000";
+const API_BASE = "http://localhost:8200";
 
 export default function AdminContributionsPage() {
   const { data: contributions, isLoading, refetch } = useQuery({
@@ -116,7 +116,7 @@ export default function AdminContributionsPage() {
                 <div className="text-xs font-mono uppercase text-text-muted">
                   Kinematic Skeleton Replay: {selectedContribution.label}
                 </div>
-                <LandmarkSimulation frames={sim?.frames} fps={15} title={sim?.source} />
+                <LandmarkSimulation frames={sim?.frames} pose={sim?.pose} fps={15} title={sim?.source} />
               </div>
 
               {/* Evidence Panel with Reasoning Layer */}

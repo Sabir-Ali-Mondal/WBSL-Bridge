@@ -26,6 +26,7 @@
 *   **4.1 FastAPI Backend:** Create /generate-sign endpoint; input text, output gloss JSON. [Pending]
 *   **4.2 React UI:** Simple input box + button; display returned gloss sequence on screen. [Pending]
 *   **4.3 Bengali TTS (Dual Engine):** Windows SAPI and sherpa-onnx confirmed unusable (no Bengali voice/model). edge-tts selected as PRIMARY (online, bn-BD-NabanitaNeural, ~2.5 sec generation, handles punctuation correctly). BanglaTTS selected as OFFLINE FALLBACK (silero model, ~2.4 sec generation after cache, ignores punctuation; mitigated by text cleaning). Automatic fallback chain coded in tts_engine.py. Timing constants measured: edge-tts ~604 ms/word, BanglaTTS ~453 ms/word. [Done]
+* **4.4 Speech-to-Text (Bengali + English):** Browser/cloud STT avoided due to offline and privacy requirements. `faster-whisper` selected as the local engine with the `small` model, CPU INT8 inference, automatic language detection, and VAD enabled; supports Bengali, English, and mixed speech. Initial `.venv`/`pip` launcher mismatch was resolved by using the correct `tests\.venv\Scripts\python.exe -m pip` environment directly. Integrated through FastAPI `/api/stt` for the existing Voice → Text input flow. [Done]
 
 ## Phase 5: Unknown Sign Handling (The Honesty Layer) [Planned]
 *   **5.1 OOD Gate:** Combine max softmax probability + embedding distance (Mahalanobis) + temporal consistency to decide KNOWN vs UNKNOWN. Recognition model decides, not the LLM. Threshold selected on validation data. [Planned]

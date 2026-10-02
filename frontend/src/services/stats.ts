@@ -18,6 +18,10 @@ export interface AdminStats {
   total_rejected_samples: number;
   model_active: string;
   model_classes: number;
+  contract?: {
+    kind?: string;
+    feature_width?: number;
+  };
   llm_available: boolean;
   llm_model: string;
   inference_mode: string;

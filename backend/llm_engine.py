@@ -1,19 +1,6 @@
-"""
-backend/llm_engine.py
-Provider-agnostic NLG engine (OpenAI-compatible chat/completions).
-
-Configuration is environment-driven (see .env.example). Switch providers by
-editing .env only -- no code changes required:
-
-    OPENAI config      -> AI_BASE_URL unset, AI_API_KEY=sk-..., AI_MODEL_NAME=gpt-4o-mini
-    DeepSeek / Groq    -> AI_BASE_URL=https://api.deepseek.com/v1, ...
-    Local (Ollama)     -> AI_BASE_URL=http://localhost:11434/v1, AI_API_KEY=ollama
-
-NOTE: no local-LLM provider is configured or auto-started by default.
-"""
-
 import json
 import os
+import re
 import socket
 from urllib.parse import urlparse
 from pathlib import Path
@@ -21,10 +8,10 @@ from typing import Iterator
 
 import httpx
 
-# Load .env (repo root or backend/) without hard-depending on python-dotenv.
+
 def _load_dotenv():
     try:
-        from dotenv import load_dotenv  # type: ignore
+        from dotenv import load_dotenv
     except ImportError:
         return
     here = Path(__file__).resolve()
@@ -37,16 +24,12 @@ def _load_dotenv():
 
 _load_dotenv()
 
-# ─────────────────────────────────────────────
-# PROVIDER CONFIG (environment-driven)
-# ─────────────────────────────────────────────
 DEFAULT_BASE_URL = "https://api.openai.com/v1"
 DEFAULT_MODEL_NAME = "gpt-4o-mini"
 
-# Providers that accept any non-empty key and need no real credential.
 _KEYLESS_HOSTS = ("localhost", "127.0.0.1", "0.0.0.0", "::1")
 
-# Streaming / reasoning are ON by default.
+
 def _env_bool(name: str, default: bool) -> bool:
     raw = (os.getenv(name) or "").strip().lower()
     if not raw:
@@ -59,14 +42,12 @@ def _env(name: str, default: str = "") -> str:
 
 
 def get_ai_config() -> dict:
-    """Resolve the active provider configuration from the environment."""
     configured_url = _env("AI_BASE_URL")
     base_url = configured_url or DEFAULT_BASE_URL
     is_local = any(h in base_url for h in _KEYLESS_HOSTS)
 
     api_key = _env("AI_API_KEY")
     if not api_key:
-        # Local OpenAI-compatible servers ignore the key; cloud providers do not.
         api_key = "no-key-required" if is_local else ""
 
     return {
@@ -76,7 +57,6 @@ def get_ai_config() -> dict:
         "is_local": is_local,
         "provider": "local" if is_local else "cloud",
         "configured": bool(api_key),
-        # Streaming ON, reasoning ON (unless AI_REASONING=off).
         "stream": _env_bool("AI_STREAM", True),
         "reasoning": _env_bool("AI_REASONING", True),
         "reasoning_effort": _env("AI_REASONING_EFFORT", "low"),
@@ -85,13 +65,7 @@ def get_ai_config() -> dict:
 
 
 def get_ai_client(timeout: float | None = None):
-    """
-    Return (client, model_name) for the provider in .env.
-
-    As requested, this does NOT use a local LLM for now: an unconfigured
-    environment resolves to the default cloud endpoint, never to localhost.
-    """
-    from openai import OpenAI  # imported lazily so status checks work without it
+    from openai import OpenAI
 
     cfg = get_ai_config()
     client = OpenAI(
@@ -103,16 +77,6 @@ def get_ai_client(timeout: float | None = None):
 
 
 def build_user_message(gloss_text: str, meta: dict | None = None) -> str:
-    """
-    Compose the user turn: the gloss itself, plus any NMM / affect context.
-
-    The recognition layer already knows things the gloss string cannot express --
-    head shake (negation), brow raise (polar question), brow furrow (WH question),
-    mouth opening (emphasis) and the dominant facial emotion (ViT). Dropping them
-    on the floor leaves the LLM guessing, so they are forwarded as an explicit
-    metadata block. The model is told what each signal means; it is NOT told how
-    to phrase the sentence, which stays the prompt's job.
-    """
     meta = meta or {}
     lines: list[str] = []
 
@@ -172,15 +136,6 @@ def build_user_message(gloss_text: str, meta: dict | None = None) -> str:
 def build_request(
     cfg: dict, gloss_text: str, meta: dict | None = None, **overrides
 ) -> dict:
-    """
-    Build the chat/completions payload from .env settings.
-
-    Reasoning is expressed per-provider so the same .env works everywhere:
-      - OpenAI / Groq / DeepSeek : `reasoning_effort`
-      - OpenRouter / Qwen / HF   : `reasoning: {"enabled": ...}`
-      - Local servers (Ollama...) : no reasoning field at all
-    Unknown fields are ignored by most local servers; AI_REASONING=off removes them.
-    """
     payload = {
         "model": cfg["model"],
         "messages": [
@@ -229,7 +184,7 @@ def _offline_result(status: str, error: str, tokens: int = 0) -> dict:
         get_ai_config(), status=status, tokens_used=tokens, error=error
     )
 
-# Constrained NLG Prompt from Phase 3.2
+
 SYSTEM_PROMPT = """You are the Bengali NLG module of a WBSL communication system.
 
 Convert WBSL gloss into natural West Bengal Bengali.
@@ -318,24 +273,17 @@ event preservation, subject/object, negation scope, question scope,
 WHETHER scope, IF/THEN scope, speaker, tense, temporal relations,
 and absence of invented or omitted information.
 
-Output ONLY the final natural West Bengal Bengali text."""
+Here is some more guide lines for you to follow (if characters only):
+- If user inputs aplphabets gloss you should interpret them as words/sentence (example [I]+[L]+[O]+[V]+[E]+[S]+[A]+[M] = I LOVE SAM )
+- If user inputs numbers similer looking with aplphabets you should interpret them as words/sentence (example [1]+[L]+[0]+[V]+[E]+[S]+[A]+[M] = I LOVE SAM )
+- Some time can be word which actually made for alphabets you have to guess that like [A]+[I]=Artificial Intelligence etc.
+
+
+Output ONLY the final natural West Bengal Bengali text.
+"""
 
 
 def _host_is_reachable(base_url: str, budget: float = 0.12) -> bool:
-    """Cheap TCP pre-flight before spending a full HTTP round trip.
-
-    A refused connection is NOT cheap on Windows when the host is a name like
-    ``localhost``: it resolves to both ``::1`` and ``127.0.0.1``, and each
-    address is attempted in turn, so a single failed request costs the connect
-    timeout *twice*. Measured here that was ~0.3 s per address and ~2.4 s for the
-    two-path probe -- paid on the mount of every page, purely to discover that
-    the LLM server is not running.
-
-    Opening a raw socket first turns "nothing is listening" into a sub-
-    millisecond verdict, so the expensive path is only taken when there is
-    genuinely something to talk to. The budget is deliberately tight: this is a
-    liveness check, not a health check.
-    """
     parsed = urlparse(base_url)
     host = parsed.hostname
     if not host:
@@ -359,29 +307,9 @@ def _host_is_reachable(base_url: str, budget: float = 0.12) -> bool:
 
 
 def is_llm_available() -> bool:
-    """True when the configured provider responds to a models/health probe.
-
-    This is called by ``/api/system/health``, which every page polls on mount to
-    learn the model contract. It therefore has to be *fast* when the provider is
-    absent, and the naive version was not: when the configured host is a local
-    server that is not running, each unreachable address burned the full 5 s
-    timeout. Two things were wrong and both are fixed here.
-
-    First, a reachable host answering ``401``/``403`` is the *normal* response
-    from an OpenAI-compatible endpoint that wants a real key. A connect-and-see
-    probe reports that as "not available" and then wrongly reports every other
-    provider as missing too. Only 5xx and connection failures mean unavailable.
-
-    Second, ``timeout=`` alone does not bound resolution: on Windows ``localhost``
-    resolves to both ``::1`` and ``127.0.0.1``, and httpx tries them in turn, so a
-    refused IPv6 attempt plus a refused IPv4 attempt can exceed it. Pinning an
-    explicit ``ConnectTimeout`` separates "cannot connect" -- which is cheap and
-    definitive -- from "connected but slow", and collapses the whole probe to
-    tens of milliseconds when nothing is listening.
-    """
     cfg = get_ai_config()
     if not cfg["api_key"]:
-        return False  # nothing configured -> do not silently fall back to a local LLM
+        return False
 
     if not _host_is_reachable(cfg["base_url"]):
         return False
@@ -394,8 +322,6 @@ def is_llm_available() -> bool:
                 f"{cfg['base_url']}{path}", headers=headers, timeout=timeout
             )
             if resp.status_code < 500:
-                # 2xx = healthy, 401/403 = server is up but wants a key. Either
-                # way the provider is reachable.
                 return True
         except Exception:
             continue
@@ -403,7 +329,6 @@ def is_llm_available() -> bool:
 
 
 def _extract_delta(chunk: dict) -> tuple[str, str]:
-    """Return (content, reasoning) text from one streamed chunk."""
     choices = chunk.get("choices") or [{}]
     delta = choices[0].get("delta") or {}
     content = delta.get("content") or ""
@@ -420,16 +345,6 @@ def stream_bengali(
     meta: dict | None = None,
     **overrides,
 ) -> Iterator[dict]:
-    """
-    Stream the Bengali translation token by token.
-
-    Yields dicts:
-        {"type": "delta", "text": str, "reasoning": str}
-        {"type": "done",  "bengali_text": str, ...}
-        {"type": "error", "error": str, ...}
-
-    Used by the /api/nlg/stream SSE endpoint.
-    """
     cfg = get_ai_config()
     if not cfg["configured"]:
         yield _offline_result(
@@ -500,13 +415,6 @@ def generate_bengali(
     top_p: float | None = None,
     max_tokens: int | None = None,
 ) -> dict:
-    """
-    Send gloss to the provider configured in .env.
-    Returns Bengali text or a structured error.
-
-    Streaming is honoured (AI_STREAM=true in .env); pass stream=False to force
-    a single blocking request.
-    """
     cfg = get_ai_config()
     if not cfg["configured"]:
         return _offline_result(
@@ -519,7 +427,6 @@ def generate_bengali(
         stream = cfg["stream"]
 
     if stream:
-        # Consume the stream, keeping only the final assembled result.
         final = None
         for event in stream_bengali(
             gloss_text,
@@ -572,10 +479,6 @@ def generate_bengali(
 def generate_bengali_with_uncertainty(
     gloss_sequence: list[dict],
 ) -> dict:
-    """
-    Build gloss string from detected signs with UNKNOWN markers.
-    Injects সম্ভবত for uncertain signs.
-    """
     parts = []
     has_uncertain = False
 
@@ -603,3 +506,147 @@ def generate_bengali_with_uncertainty(
     result["has_uncertainty"] = has_uncertain
     result["gloss_used"] = gloss_text
     return result
+
+
+GLOSS_BREAK_SYSTEM = """You are a WBSL gloss planner.
+
+RULES:
+1. Output ONLY a JSON array of tokens from AVAILABLE.
+2. NEVER invent a token.
+3. STT INPUT INTERPRETATION: Treat the input as raw speech-to-text output. The speaker will primarily speak Bengali or English. Bengali speech may sometimes be transcribed into Hindi, Devanagari, Roman, Telugu, or another script. Interpret the text using phonetic meaning and context before breaking it into WBSL glosses. Do not assume the script itself represents the spoken language.
+4. NEVER use WHAT_IS_YOUR_NAME unless the input is literally asking "what is your name?"
+5. For names or unknown short words (6 letters or fewer), fingerspell them letter by letter.
+6. If a word has no matching gloss, omit it. Do NOT guess.
+7. Preserve statement vs question. Do NOT turn a statement into a question.
+
+STT INTERPRETATION EXAMPLE:
+
+Input: "आमी आज स्कूल जाबो"
+Interpret as Bengali phonetics: "আমি আজ স্কুল যাব"
+Then break the intended meaning into the appropriate WBSL glosses using AVAILABLE.
+
+EXAMPLES:
+
+Input: "Hello, my name is Ravi."
+Available has: HELLO, I, R, A, V, I, WHAT_IS_YOUR_NAME
+WRONG: ["HELLO", "WHAT_IS_YOUR_NAME"]
+CORRECT: ["HELLO", "I", "R", "A", "V", "I"]
+Reason: "my name is" is a statement. WHAT_IS_YOUR_NAME is a question. Use I + fingerspell.
+
+Input: "What is your name?"
+Available has: WHAT_IS_YOUR_NAME, HELLO
+CORRECT: ["WHAT_IS_YOUR_NAME"]
+
+Input: "Drink tea"
+Available has: DRINK, TEA, POUR
+CORRECT: ["DRINK", "TEA"]
+WRONG: ["POUR", "TEA"]
+
+Input: "I am very busy today."
+Available has: BUSY, I
+CORRECT: ["I", "BUSY"]
+
+Input: "Come soon."
+Available has: COME
+CORRECT: ["COME"]
+
+Output ONLY the JSON array. No explanation."""
+
+
+def _is_question(text: str) -> bool:
+    stripped = text.strip().lower()
+    question_words = (
+        "what", "who", "where", "when", "why", "how",
+        "do ", "does ", "did ", "is ", "are ", "was ", "were ",
+        "can ", "could ", "will ", "would ", "should ",
+        "am i", "have ", "has ",
+    )
+    if "?" in text:
+        return True
+    return any(stripped.startswith(w) for w in question_words)
+
+
+def _post_validate(seq: list[str], original_text: str, allowed: set[str]) -> list[str]:
+    seq = [g for g in seq if g in allowed or (len(g) == 1 and g.isalnum())]
+
+    if not _is_question(original_text) and "WHAT_IS_YOUR_NAME" in seq:
+        seq = [g for g in seq if g != "WHAT_IS_YOUR_NAME"]
+        if "I" in allowed and "I" not in seq:
+            seq.insert(0, "I")
+
+    if not seq:
+        words = re.findall(r"[a-zA-Z]+", original_text)
+        for word in words:
+            w_upper = word.upper()
+            if w_upper in allowed:
+                seq.append(w_upper)
+            elif len(word) <= 6:
+                letters = [ch.upper() for ch in word if ch.upper() in allowed]
+                seq.extend(letters)
+
+    return seq
+
+
+def break_into_glosses(text: str, vocab: list[str]) -> dict:
+    cfg = get_ai_config()
+    if not cfg["configured"]:
+        return {"status": "llm_not_configured", "gloss_sequence": None}
+
+    vocab_str = ", ".join(sorted(vocab))
+
+    user_msg = (
+        f"AVAILABLE: {vocab_str}\n\n"
+        f"SENTENCE: {text}\n\n"
+        f"Reminder: fingerspell unknown names letter by letter. "
+        f"Do NOT use WHAT_IS_YOUR_NAME for statements."
+    )
+
+    payload = {
+        "model": cfg["model"],
+        "messages": [
+            {"role": "system", "content": GLOSS_BREAK_SYSTEM},
+            {"role": "user", "content": user_msg},
+        ],
+        "temperature": 0.1,
+        "top_p": 0.85,
+        "max_tokens": 128,
+        "stream": False,
+    }
+
+    try:
+        resp = httpx.post(
+            f"{cfg['base_url']}/chat/completions",
+            headers=_headers(cfg),
+            json=payload,
+            timeout=cfg["timeout"],
+        )
+        resp.raise_for_status()
+        content = resp.json()["choices"][0]["message"]["content"].strip()
+
+        s, e = content.find("["), content.rfind("]")
+        if s == -1 or e == -1:
+            return {"status": "parse_error", "gloss_sequence": None}
+
+        raw_array = content[s:e + 1].strip()
+        allowed = set(vocab)
+        raw_items = []
+
+        try:
+            parsed = json.loads(raw_array)
+            if isinstance(parsed, list):
+                raw_items = [str(g) for g in parsed]
+        except Exception:
+            raw_items = re.findall(r"[A-Za-z0-9_]+", raw_array)
+
+        seq = [
+            g.upper()
+            for g in raw_items
+            if g.upper() in allowed or (len(g) == 1 and g.isalnum())
+        ]
+
+        seq = _post_validate(seq, text, allowed)
+
+        return {"status": "success", "gloss_sequence": seq}
+
+    except Exception as exc:
+        return {"status": "error", "gloss_sequence": None, "error": str(exc)}

@@ -85,6 +85,34 @@ export function VideoPlayer({
 
   useEffect(() => setIsLooping(loop), [loop]);
 
+  /*
+   * The `autoPlay` attribute only matters to the browser at load time. The
+   * Text → Sign sequential viewer flips this prop *after* the element has
+   * loaded (Play Full Sequence / per-sign advance), so playback is driven
+   * here instead: a transition into autoplay starts the clip — from the top
+   * when the prop was off before, which is what "Restart Sequence" needs —
+   * and a transition out of it stops the clip, so the frozen last frame the
+   * sequence ends on stays visible instead of looping away.
+   */
+  const wasAutoPlay = useRef(autoPlay);
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v || status !== "ready") return;
+    if (autoPlay) {
+      if (!wasAutoPlay.current) v.currentTime = 0;
+      v.play().catch(() => {});
+    } else if (wasAutoPlay.current) {
+      v.pause();
+    }
+    wasAutoPlay.current = autoPlay;
+  }, [autoPlay, status, src]);
+
+  // The frame engine has no element to drive: when a sequence asks for autoplay
+  // it starts, and idle/manual control is left to togglePlay.
+  useEffect(() => {
+    if (status === "fallback" && autoPlay) setIsPlaying(true);
+  }, [autoPlay, status]);
+
   // A new source is a new load. Reset every verdict, or a stale error from the
   // previous sign keeps covering a video that plays perfectly well.
   useEffect(() => {
@@ -112,7 +140,7 @@ export function VideoPlayer({
       const filename = src.split("/").pop()?.split("#")[0]?.split("?")[0];
       if (!filename) throw new Error("no filename");
       const res = await axios.get(
-        `http://localhost:8000/api/media/${filename}/frames`,
+        `http://localhost:8200/api/media/${filename}/frames`,
         { timeout: 25000 }
       );
       const list: string[] = res.data?.frames ?? [];
@@ -212,7 +240,7 @@ export function VideoPlayer({
   const describeError = (code: number | undefined): string => {
     switch (code) {
       case 2:
-        return "The connection dropped mid-stream. A large clip needs the server to answer byte-range requests — check the backend is up on port 8000.";
+        return "The connection dropped mid-stream. A large clip needs the server to answer byte-range requests — check the backend is up on port 8200.";
       case 3:
         return "The browser cannot decode this file's codec.";
       case 4:

@@ -11,15 +11,16 @@ export function useSystemStatus() {
         const res = await apiClient.get<SystemHealth>("/system/health");
         return res.data;
       } catch {
-        // Fallback for standalone/offline dev
+        // A backend that cannot be reached is OFFLINE. Reporting green here
+        // made the navbar diagnostics lie exactly when they mattered most.
         return {
-          api: true,
-          model: true,
-          tts: true,
-          llm: true,
+          api: false,
+          model: false,
+          tts: false,
+          llm: false,
           inference_mode: "local",
-          dataset_version: "v0.8",
-          model_version: "LSTM-v1.4",
+          dataset_version: "unknown",
+          model_version: "unreachable",
         };
       }
     },

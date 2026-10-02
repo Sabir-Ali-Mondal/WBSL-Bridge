@@ -52,9 +52,7 @@ models/llm/
 *.gguf
 
 # ONNX graphs, external tensor data, and compiled model artifacts
-# (e.g. tests/vit_emotion.onnx.data is 327 MB)
-*.onnx
-*.onnx.data
+
 *.pt
 *.pth
 *.ckpt
@@ -84,6 +82,7 @@ torch/
 tests/Indian Sign Language_Dataset/
 tests/dataset_landmarks/
 tests/dataset_continuous/
+tests/HELLO
 dataset/samples/
 
 dataset/Indian Sign Language_Dataset/ISL_STATIC1

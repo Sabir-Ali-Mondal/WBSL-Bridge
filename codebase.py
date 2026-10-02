@@ -58,7 +58,8 @@ SKIP_DIRS = {
 
     "tests",
     "llm",
-    "docs"
+    "docs",
+    "media_fmp4_backup"
 }
 
 
@@ -104,8 +105,10 @@ COLLAPSE_TREE_DIRS = {
 # ============================================================
 
 SKIP_FILES = {
+    "backend\data\sign_media.json",
+    "frontend\src\app\about\page.tsx",
     "codebase.py",
-    "implementation.md",
+    "IMPLEMENTATION_GUIDE.md",
     "README.md",
     "codebase.md",
     "project-tree.txt",

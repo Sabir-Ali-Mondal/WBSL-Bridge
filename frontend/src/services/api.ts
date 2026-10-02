@@ -2,7 +2,7 @@ import axios from "axios";
 import { ApiError } from "@/lib/types";
 
 const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api",
+  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8200/api",
   headers: { "Content-Type": "application/json" },
 });
 

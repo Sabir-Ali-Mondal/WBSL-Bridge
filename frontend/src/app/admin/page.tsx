@@ -41,7 +41,9 @@ export default function AdminDashboardPage() {
         <div className="p-5 rounded-lg bg-surface border border-border space-y-2">
           <div className="text-xs font-mono uppercase text-text-muted">Active Model</div>
           <div className="text-lg font-bold text-text-primary truncate">{stats?.model_active ?? "—"}</div>
-          <div className="text-[11px] font-mono text-text-secondary">MLP 126→256→128→{stats?.model_classes ?? "—"}</div>
+          <div className="text-[11px] font-mono text-text-secondary">
+            {stats?.contract?.feature_width ?? 126}-dim {stats?.contract?.kind ?? "model"} · {stats?.model_classes ?? "—"} classes
+          </div>
         </div>
         <div className="p-5 rounded-lg bg-surface border border-border space-y-2">
           <div className="text-xs font-mono uppercase text-text-muted">LLM Engine</div>

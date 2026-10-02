@@ -5,7 +5,7 @@ import axios from "axios";
 import { Cpu, RefreshCw, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
-const API_BASE = "http://localhost:8000";
+const API_BASE = "http://localhost:8200";
 
 type ModelEntry = {
   run: string;
@@ -29,8 +29,24 @@ type RegistryResponse = {
   error: string | null;
 };
 
-/** A static model is only servable when it takes the 126-landmark frame vector. */
-const canActivate = (m: ModelEntry) => m.temporal || m.input_width === 126;
+/**
+ * The two feature vectors the backend can actually produce (backend/extract.py):
+ * 126 is the two-hand landmark block, 258 adds the 33x4 pose block that the
+ * daily-conversation LSTM is trained on. Anything else cannot be fed, so the
+ * backend refuses it -- this mirror only greys the button out first.
+ */
+const SERVABLE_WIDTHS = [126, 258];
+
+/** A model is servable when the backend has an extractor for its input width. */
+const canActivate = (m: ModelEntry) =>
+  m.input_width !== null && SERVABLE_WIDTHS.includes(m.input_width);
+
+/** Human name for the extractor an input width selects. */
+const featureLabel = (m: ModelEntry) => {
+  if (m.temporal) return "LSTM temporal";
+  if (m.input_width === 258) return "MLP static \u00b7 hands+pose 258";
+  return `MLP static \u00b7 input ${m.input_width ?? "?"}`;
+};
 
 export default function AdminModelsPage() {
   const qc = useQueryClient();
@@ -131,7 +147,7 @@ export default function AdminModelsPage() {
                     {m.name}.onnx
                   </div>
                   <div className="text-xs text-text-muted font-mono">
-                    {m.temporal ? "LSTM temporal" : `MLP static · input ${m.input_width ?? "?"}`}
+                    {featureLabel(m)}
                     {" · "}
                     {m.classes} classes · {m.size_mb} MB · {m.run}
                   </div>
@@ -145,7 +161,7 @@ export default function AdminModelsPage() {
                 {!servable && (
                   <span
                     className="px-2 py-0.5 rounded text-[10px] font-mono bg-status-pending/20 text-status-pending"
-                    title="This graph does not accept the 126-landmark frame vector"
+                    title="The backend has no extractor for this input width (it emits 126-dim two-hand or 258-dim hands+pose vectors)"
                   >
                     INCOMPATIBLE
                   </span>

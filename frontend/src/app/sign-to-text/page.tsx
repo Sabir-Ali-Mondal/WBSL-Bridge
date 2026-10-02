@@ -5,8 +5,10 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import {
   NmmThresholdPanel,
   DEFAULT_ALL,
+  DEFAULT_MARKER_GATES,
   COMMIT_STORAGE_KEY,
   type AllThresholds,
+  type MarkerGates,
 } from "@/components/sign/NmmThresholdPanel";
 import { EmotionPanel } from "@/components/sign/EmotionPanel";
 import {
@@ -19,20 +21,12 @@ import {
   Plus,
   Activity,
   Sparkles,
-  HelpCircle,
-  XCircle,
-  CheckCircle2,
-  Megaphone,
-  Timer,
   Lock,
 } from "lucide-react";
 import { toast } from "sonner";
 import axios from "axios";
 
-const API_BASE = "http://localhost:8000";
-
-/** How long an auto-detected non-manual marker stays armed (ms). */
-const NMM_ARM_MS = 2500;
+const API_BASE = "http://localhost:8200";
 
 interface Prediction {
   detected: boolean;
@@ -75,26 +69,14 @@ interface DetectedSign {
   emphasis: boolean;
 }
 
-/** Manual marker overrides the user can arm from the UI. */
-type MarkerKey =
-  | "question"
-  | "wh_question"
-  | "negation"
-  | "affirmation"
-  | "emphasis";
-
 /**
  * [affirmation] and [emphasis] have no symbol in the LLM prompt's notation
  * guide, so they are never appended to the gloss string. They still travel in
  * the `nmm` metadata payload, where the model is told what they mean.
+ *
+ * Which markers can reach this point at all is decided server-side by the NMM
+ * Controller's gates (backend/nmm.py MARKER_GATES), not here.
  */
-const MARKER_SYMBOL: Record<MarkerKey, string | null> = {
-  question: "?",
-  wh_question: "wh",
-  negation: "negation",
-  affirmation: null,
-  emphasis: null,
-};
 
 interface StreamResult {
   ready: boolean;
@@ -102,7 +84,10 @@ interface StreamResult {
   confidence?: number;
   margin?: number;
   detail?: string;
+  buffered?: number;
   top3?: { label: string; confidence: number }[];
+  /** The window's non-manual markers, captured on the frame being recognised. */
+  nmm?: Prediction["nmm"] & { emotion?: EmotionResult | null; metrics?: NmmMetrics | null };
 }
 
 interface CatalogSign {
@@ -116,6 +101,37 @@ export default function SignToTextPage() {
   const streamRef = useRef<MediaStream | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isProcessingRef = useRef(false);
+
+  // One id per page visit. The server keys its landmark ring buffer on this, so
+  // the recognition window survives React re-renders and only the client can
+  // decide when it should be abandoned (which is what "Clear" does).
+  //
+  // Seeded in an effect rather than in the initialiser: reading the clock or the
+  // crypto device during render is not idempotent, and a ref initialiser runs on
+  // every render attempt (including the ones React discards), so it must not do
+  // anything observable. Nothing is sent to the server before the camera starts,
+  // so the id is always in place before it is first used.
+  const sessionIdRef = useRef<string>(
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : "pending-session"
+  );
+
+  const newSessionId = () =>
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+  useEffect(() => {
+    sessionIdRef.current = newSessionId();
+  }, []);
+
+  // Set once the streaming endpoint answers 404/405. From then on the tick uses
+  // the batch path, which posts a whole window to /api/predict/stream -- the
+  // only route a backend older than this page understands. Without this the page
+  // would spend every tick failing against an endpoint that is not there.
+  const [streamUnavailable, setStreamUnavailable] = useState(false);
+  const streamFallbackRef = useRef(false);
 
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -134,45 +150,68 @@ export default function SignToTextPage() {
   const [catalog, setCatalog] = useState<CatalogSign[]>([]);
   const [pickSign, setPickSign] = useState("");
   const [emotion, setEmotion] = useState<EmotionResult | null>(null);
-  const [thresholds, setThresholds] =
-    useState<AllThresholds>(DEFAULT_ALL);
+  const [emotionAvailable, setEmotionAvailable] = useState(true);
+
+  // The thresholds the panel last saved, read once on mount. Declared as an
+  // initialiser rather than a useEffect that calls setThresholds: restoring
+  // saved state in an effect body is a second render for data that was already
+  // available synchronously, and the lint rule against setState-in-effect is
+  // pointing at a real cost here, not a stylistic one.
+  const savedThresholds = React.useMemo<Partial<AllThresholds> | null>(() => {
+    if (typeof window === "undefined") return null;
+
+    try {
+      const raw = localStorage.getItem(COMMIT_STORAGE_KEY);
+
+      return raw ? (JSON.parse(raw) as Partial<AllThresholds>) : null;
+    } catch {
+      return null;
+    }
+  }, []);
 
   const thresholdsRef = useRef<AllThresholds>(DEFAULT_ALL);
 
-  // Manual / auto-detected non-manual markers armed for the NEXT sign.
-  const [armed, setArmed] = useState<Record<MarkerKey, boolean>>({
-    question: false,
-    wh_question: false,
-    negation: false,
-    affirmation: false,
-    emphasis: false,
+  const [thresholds, setThresholds] = useState<AllThresholds>({
+    ...DEFAULT_ALL,
+    ...(savedThresholds ?? {}),
   });
-  // Markers detected in the latest window that would be LOST if not applied now.
-  const [pendingNmm, setPendingNmm] =
-    useState<Prediction["nmm"] | null>(null);
+  // Marker on/off gates, mirrored from the NMM Controller panel. Held here
+  // because the panel can be closed and the page still needs the current state
+  // to know what the server was last told.
+  const [markerGates, setMarkerGates] =
+    useState<MarkerGates>(DEFAULT_MARKER_GATES);
+
   const [repeatBlocked, setRepeatBlocked] = useState(false);
-
-  const armTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-  const armedRef = useRef(armed);
-
-  useEffect(() => {
-    armedRef.current = armed;
-  }, [armed]);
+  // How deep the SERVER's buffer is. The client does not track this itself: it
+  // uploads one frame per tick and the server reports what it holds.
+  const [buffered, setBuffered] = useState(0);
 
   useEffect(() => {
     thresholdsRef.current = thresholds;
   }, [thresholds]);
 
+  // The gates live on the server, so the page must not invent its own default.
+  // Reading them back on mount is what stops the panel showing OFF while the
+  // detector is still emitting [negation] from a previous session.
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(COMMIT_STORAGE_KEY);
-      if (!raw) return;
+    let cancelled = false;
 
-      const saved = JSON.parse(raw);
-      setThresholds((prev) => ({ ...prev, ...saved }));
-    } catch {
-      // Defaults remain active.
-    }
+    axios
+      .get(`${API_BASE}/api/nmm/config`)
+      .then((res) => {
+        if (cancelled) return;
+
+        const serverGates = res.data?.marker_gates;
+
+        if (serverGates && typeof serverGates === "object") {
+          setMarkerGates((prev) => ({ ...prev, ...serverGates }));
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const [nmmFlags, setNmmFlags] =
@@ -204,6 +243,11 @@ export default function SignToTextPage() {
     kind: "static" | "temporal";
     frames: number;
     endpoint: string;
+    // Which extractor the active graph needs: "two_hand" (126-dim) or
+    // "hands_pose" (258-dim). Only used to tell the user why a 258-dim run
+    // wants their full body in frame; recognition itself is unchanged.
+    feature_width?: number | null;
+    feature_kind?: "two_hand" | "hands_pose" | null;
   }>({
     kind: "static",
     frames: 1,
@@ -225,6 +269,7 @@ export default function SignToTextPage() {
 
         setBackendOnline(true);
         setUnifiedActive(!!res.data.unified);
+        setEmotionAvailable(!!res.data.emotion_available);
 
         if (typeof res.data.active_classes === "number") {
           setActiveClasses(res.data.active_classes);
@@ -289,9 +334,19 @@ export default function SignToTextPage() {
       candidateRef.current = null;
 
       if (!intervalRef.current) {
+        // 100 ms = 10 uploads/s. The server throttles its own inference to every
+        // 250 ms and only keeps the newest frame in the buffer, so a faster tick
+        // costs bandwidth without buying resolution; anything slower than ~150 ms
+        // starts dropping frames out of the 30 fps capture the window assumes.
         intervalRef.current = setInterval(
-          isTemporal ? doAutoDetectTick : doCaptureAndPredict,
-          isTemporal ? 350 : 1000
+          // The tick choice is read on EVERY tick, not at setInterval creation:
+          // the 404 fallback flag can only flip after the first failed request,
+          // and a ternary evaluated here would freeze the wrong tick forever.
+          () => {
+            if (!isTemporal) return doCaptureAndPredict();
+            return streamFallbackRef.current ? doAutoDetectTick() : doStreamTick();
+          },
+          isTemporal ? 100 : 1000
         );
       }
     } catch {
@@ -616,160 +671,53 @@ export default function SignToTextPage() {
     }
   };
 
-  const clearArmed = () => {
-    Object.values(armTimersRef.current).forEach((t) => clearTimeout(t));
-    armTimersRef.current = {};
-
-    const off: Record<MarkerKey, boolean> = {
-      question: false,
-      wh_question: false,
-      negation: false,
-      affirmation: false,
-      emphasis: false,
-    };
-
-    setArmed(off);
-    armedRef.current = off;
-    setPendingNmm(null);
-  };
-
-  const toggleMarker = (key: MarkerKey) => {
-    const next = { ...armedRef.current, [key]: !armedRef.current[key] };
-
-    // WH and polar questions are mutually exclusive: a single brow position
-    // cannot encode both, and allowing both produces "...?" plus a WH frame.
-    if (key === "question" && next.question) next.wh_question = false;
-    if (key === "wh_question" && next.wh_question) next.question = false;
-
-    if (armTimersRef.current[key]) {
-      clearTimeout(armTimersRef.current[key]);
-      delete armTimersRef.current[key];
-    }
-
-    if (next[key]) {
-      // Auto-expire: a marker armed but never consumed would silently attach
-      // itself to an unrelated sign minutes later.
-      armTimersRef.current[key] = setTimeout(() => {
-        setArmed((prev) => ({ ...prev, [key]: false }));
-      }, NMM_ARM_MS);
-    }
-
-    setArmed(next);
-    armedRef.current = next;
-  };
-
   const appendGloss = (
     gloss: string,
     nmm?: DetectedSign
   ) => {
-    // Merge the manually / recently armed markers with whatever the model saw,
-    // so a marker the user turned on is never dropped by auto-detection.
-    const a = armedRef.current;
-
+    // The markers are whatever the detector reported for the window this sign
+    // came from. Nothing is merged in from the UI: the manual marker buttons
+    // were removed, and inventing a marker the detector never saw is exactly
+    // what made the old panel untrustworthy.
     const applied: DetectedSign = {
       gloss,
-      question: !!nmm?.question || a.question,
-      wh_question: !!nmm?.wh_question || a.wh_question,
-      negation: !!nmm?.negation || a.negation,
-      affirmation: !!nmm?.affirmation || a.affirmation,
-      emphasis: !!nmm?.emphasis || a.emphasis,
+      question: !!nmm?.question,
+      wh_question: !!nmm?.wh_question,
+      negation: !!nmm?.negation,
+      affirmation: !!nmm?.affirmation,
+      emphasis: !!nmm?.emphasis,
     };
 
     setDetectedHistory((prev) => [...prev, applied]);
-
-    // A question only marks the END of the clause, so it is consumed (and
-    // re-armed automatically if the detector still sees the brow raise).
-    const keep = Object.fromEntries(
-      (Object.keys(MARKER_SYMBOL) as MarkerKey[]).map((k) => [
-        k,
-        k === "question" || k === "wh_question"
-          ? pendingNmm?.[k] === true
-          : a[k],
-      ])
-    ) as Record<MarkerKey, boolean>;
-
-    setArmed(keep);
-    armedRef.current = keep;
-    setPendingNmm(null);
   };
 
   /**
    * Everything the recognition stage knows but the gloss string cannot show.
    * This is what makes the questions block an OPTION rather than a blind rule:
-   * the LLM only marks a question when a marker was really detected or armed.
+   * the LLM only marks a question when the detector actually reported one -- and
+   * only for markers whose gate is open in the NMM Controller.
    */
   const nmm = {
-    question: armed.question || !!pendingNmm?.question,
-    wh_question: armed.wh_question || !!pendingNmm?.wh_question,
-    negation: armed.negation || !!pendingNmm?.negation,
-    affirmation: armed.affirmation || !!pendingNmm?.affirmation,
-    emphasis: armed.emphasis || !!pendingNmm?.emphasis,
+    question: !!prediction?.nmm?.question,
+    wh_question: !!prediction?.nmm?.wh_question,
+    negation: !!prediction?.nmm?.negation,
+    affirmation: !!prediction?.nmm?.affirmation,
+    emphasis: !!prediction?.nmm?.emphasis,
   };
-
-  const markerRows: {
-    key: MarkerKey;
-    label: string;
-    hint: string;
-    icon: React.ReactNode;
-  }[] = [
-    {
-      key: "wh_question",
-      label: "WH-Q",
-      hint: "What / why / how question (brow furrow)",
-      icon: <HelpCircle size={12} />,
-    },
-    {
-      key: "question",
-      label: "YES/NO Q",
-      hint: "Polar question (eyebrow raise)",
-      icon: <HelpCircle size={12} />,
-    },
-    {
-      key: "negation",
-      label: "NEGATION",
-      hint: "Negate the next sign (head shake)",
-      icon: <XCircle size={12} />,
-    },
-    {
-      key: "affirmation",
-      label: "AFFIRM",
-      hint: "Confirm the next sign (head nod)",
-      icon: <CheckCircle2 size={12} />,
-    },
-    {
-      key: "emphasis",
-      label: "EMPHASIS",
-      hint: "Stress the next sign (mouth open)",
-      icon: <Megaphone size={12} />,
-    },
-  ];
 
   const handleBackspace = () => {
     if (detectedHistory.length === 0) {
       return;
     }
 
-    const dropped = detectedHistory[detectedHistory.length - 1];
-
     setDetectedHistory((prev) =>
       prev.slice(0, -1)
     );
 
-    // Push the dropped sign's markers back into the armed set -- otherwise a
-    // question / negation that was attached to it is gone from the text but
-    // still sitting in the LLM's metadata, and the next generation is wrong.
-    const restored: Record<MarkerKey, boolean> = {
-      question: !!(pendingNmm?.question || dropped.question),
-      wh_question: !!(pendingNmm?.wh_question || dropped.wh_question),
-      negation: !!(pendingNmm?.negation || dropped.negation),
-      affirmation: !!(pendingNmm?.affirmation || dropped.affirmation),
-      emphasis: !!(pendingNmm?.emphasis || dropped.emphasis),
-    };
-
-    setArmed(restored);
-    armedRef.current = restored;
-    setPendingNmm(null);
-
+    // The dropped sign's markers leave with it. Nothing is restored, because
+    // markers are no longer something the UI holds on the user's behalf -- they
+    // come from the detector on the frame that is being recognised, and a
+    // marker that has passed is a marker that has passed.
     setBengaliOutput("");
   };
 
@@ -788,8 +736,6 @@ export default function SignToTextPage() {
     setLive(null);
     setRepeatBlocked(false);
 
-    clearArmed();
-
     candidateRef.current = null;
 
     lastAppendRef.current = {
@@ -798,8 +744,26 @@ export default function SignToTextPage() {
     };
 
     frameBufferRef.current = [];
+
+    // The recognition window lives on the server now, so clearing the sequence
+    // has to clear it there too. A fresh session id is the cheapest correct
+    // reset: the old buffer is abandoned rather than mutated, and the next tick
+    // starts from an empty window instead of reading the sign the user just
+    // deleted.
+    sessionIdRef.current = newSessionId();
+
+    setBuffered(0);
   };
 
+  /**
+   * Legacy batch tick: fills a 32-frame client buffer and posts it to
+   * /api/predict/stream.
+   *
+   * Kept because it is the only path that works if the page is served against a
+   * backend without /api/stream/frame, and because it is a useful reference for
+   * what the server-side windowing replaced. All recognition policy now lives in
+   * commitFromStream, so the two ticks cannot disagree about when a sign counts.
+   */
   const doAutoDetectTick = async () => {
     if (
       isProcessingRef.current ||
@@ -884,182 +848,181 @@ export default function SignToTextPage() {
           }
         );
 
-      if (
-        !res.data.ready ||
-        !res.data.label
-      ) {
-        setLive(null);
-        candidateRef.current = null;
-        setPrediction(null);
-        return;
-      }
-
-      const {
-        label,
-        confidence = 0,
-        margin = 0,
-        top3 = [],
-      } = res.data;
-
-      const nmmPayload = (
-        res.data as unknown as {
-          nmm?: Record<string, unknown>;
-        }
-      ).nmm;
-
-      const emo =
-        (nmmPayload?.emotion ??
-          null) as EmotionResult | null;
-
-      if (emo) {
-        setEmotion(emo);
-      }
-
-      setPrediction({
-        detected: true,
-        label,
-        confidence,
-        top5: top3.map((t) => ({
-          label: t.label,
-          confidence: t.confidence,
-        })),
-        hands_detected: 1,
-        nmm:
-          (nmmPayload as Prediction["nmm"]) ??
-          {
-            question: false,
-            wh_question: false,
-            negation: false,
-            affirmation: false,
-            emphasis: false,
-          },
-        emotion: emo,
-        metrics:
-          (nmmPayload?.metrics ??
-            null) as NmmMetrics | null,
-      });
-
-      const T =
-        thresholdsRef.current;
-
-      // The window's NMM / affect belongs to the SIGN being recognised, not to
-      // the previous one. Capture it BEFORE the confidence gates below: a
-      // rejected window is exactly when a head shake would otherwise be lost
-      // (the detector only looks at the latest frame).
-      const nn =
-        (nmmPayload as Prediction["nmm"]) ?? {
-          question: false,
-          wh_question: false,
-          negation: false,
-          affirmation: false,
-          emphasis: false,
-        };
-
-      const hasNmm = !!(
-        nn.question ||
-        nn.wh_question ||
-        nn.negation ||
-        nn.affirmation ||
-        nn.emphasis
-      );
-
-      if (hasNmm && !nn.affirmation) {
-        setPendingNmm((prev) => ({
-          question: !!(prev?.question || nn.question),
-          wh_question: !!(prev?.wh_question || nn.wh_question),
-          negation: !!(prev?.negation || nn.negation),
-          affirmation: !!(prev?.affirmation || nn.affirmation),
-          emphasis: !!(prev?.emphasis || nn.emphasis),
-        }));
-      }
-
-      const decisive =
-        confidence >= T.min_confidence &&
-        margin >= T.min_margin;
-
-      if (!decisive) {
-        setLive({
-          label,
-          confidence,
-          margin,
-        });
-
-        candidateRef.current = null;
-
-        return;
-      }
-
-      setLive({
-        label,
-        confidence,
-        margin,
-      });
-
-      const cand =
-        candidateRef.current;
-
-      const count =
-        cand &&
-        cand.label === label
-          ? cand.count + 1
-          : 1;
-
-      candidateRef.current = {
-        label,
-        count,
-      };
-
-      if (
-        count <
-        Math.max(
-          1,
-          Math.round(
-            T.stable_windows
-          )
-        )
-      ) {
-        return;
-      }
-
-      const now = Date.now();
-      const last =
-        lastAppendRef.current;
-
-      if (
-        last.label === label &&
-        now - last.at <
-          T.repeat_cooldown_ms
-      ) {
-        // Swallowing this silently makes the UI look dead while the model is
-        // actually recognising the sign again. Surface it instead.
-        setRepeatBlocked(true);
-        setTimeout(() => setRepeatBlocked(false), 1200);
-        return;
-      }
-
-      lastAppendRef.current = {
-        label,
-        at: now,
-      };
-
-      candidateRef.current = null;
-
-      if (autoDetect) {
-        appendGloss(label, {
-          gloss: label,
-          question: !!nn.question,
-          wh_question: !!nn.wh_question,
-          negation: !!nn.negation,
-          affirmation: !!nn.affirmation,
-          emphasis: !!nn.emphasis,
-        });
-      }
+      commitFromStream(res.data);
     } catch (err) {
       // Keep camera and buffer alive.
       console.warn(
         "recognition tick failed:",
         err
       );
+    } finally {
+      isProcessingRef.current = false;
+      setIsProcessing(false);
+    }
+  };
+
+  /**
+   * Everything that happens once the server has recognised a window.
+   *
+   * Shared by the single-frame streaming tick and the legacy batch tick, so the
+   * commit policy exists in exactly one place: confidence and margin must clear
+   * the panel's thresholds, the same label must repeat ``stable_windows`` times,
+   * and a repeat inside the cooldown is reported rather than swallowed.
+   *
+   * The window's NMM / affect belongs to the SIGN being recognised, not to the
+   * previous one, so it is read here -- from the payload that carried the
+   * prediction -- and not from whatever the last frame happened to report.
+   */
+  const commitFromStream = (data: StreamResult) => {
+    const label = data.label;
+
+    if (!data.ready || !label) {
+      setLive(null);
+      candidateRef.current = null;
+      return;
+    }
+
+    const confidence = data.confidence ?? 0;
+    const margin = data.margin ?? 0;
+    const top3 = data.top3 ?? [];
+
+    const nn = data.nmm ?? {
+      question: false,
+      wh_question: false,
+      negation: false,
+      affirmation: false,
+      emphasis: false,
+    };
+
+    const emo = (data.nmm?.emotion ?? null) as EmotionResult | null;
+
+    if (emo) setEmotion(emo);
+
+    setPrediction({
+      detected: true,
+      label,
+      confidence,
+      top5: top3.map((t) => ({ label: t.label, confidence: t.confidence })),
+      hands_detected: 1,
+      nmm: nn,
+      emotion: emo,
+      metrics: (data.nmm?.metrics ?? null) as NmmMetrics | null,
+    });
+
+    const T = thresholdsRef.current;
+    const decisive = confidence >= T.min_confidence && margin >= T.min_margin;
+    // The background class is an answer, not a sign: showing it in the live
+    // readout is useful, committing it to the gloss sequence is not. Without
+    // this guard an idle signer accumulates [NONE] chips every cooldown.
+    const isBackground = label === "NONE" || label === "BACKGROUND";
+    setLive(isBackground ? null : { label, confidence, margin });
+
+    if (isBackground || !decisive) {
+      candidateRef.current = null;
+      return;
+    }
+
+    const cand = candidateRef.current;
+    const count = cand && cand.label === label ? cand.count + 1 : 1;
+
+    candidateRef.current = { label, count };
+
+    if (count < Math.max(1, Math.round(T.stable_windows))) return;
+
+    const now = Date.now();
+    const last = lastAppendRef.current;
+
+    if (last.label === label && now - last.at < T.repeat_cooldown_ms) {
+      // Swallowing this silently makes the UI look dead while the model is
+      // actually recognising the sign again. Surface it instead.
+      setRepeatBlocked(true);
+      setTimeout(() => setRepeatBlocked(false), 1200);
+      return;
+    }
+
+    lastAppendRef.current = { label, at: now };
+    candidateRef.current = null;
+
+    // "Clear" is the one thing that resets the server's window: the model would
+    // otherwise keep reading the previous signer state after the user wiped the
+    // sequence and started over.
+    if (autoDetect) appendGloss(label, { gloss: label, ...nn });
+  };
+
+  /**
+   * One JPEG in, one buffered landmark out.
+   *
+   * This replaces the old tick that pushed a JPEG into a client-side ring buffer
+   * and uploaded all 32 of them every time. The browser never holds the window
+   * now: it sends the newest frame and the server appends it to that session's
+   * history and runs the model on its own schedule. Upload cost per tick drops
+   * by the window length, and latency stops depending on how fast the client can
+   * serialise 32 blobs.
+   */
+  const doStreamTick = async () => {
+    if (isProcessingRef.current || !isTemporal) return;
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+
+    if (!video || !canvas || !video.videoWidth) return;
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    const ctx = canvas.getContext("2d");
+
+    if (!ctx) return;
+
+    ctx.drawImage(video, 0, 0);
+
+    const blob = await new Promise<Blob | null>((r) =>
+      canvas.toBlob(r, "image/jpeg", 0.7)
+    );
+
+    if (!blob) return;
+
+    isProcessingRef.current = true;
+    setIsProcessing(true);
+
+    try {
+      const fd = new FormData();
+
+      fd.append("file", blob, "f.jpg");
+
+      const res = await axios.post<StreamResult>(
+        `${API_BASE}/api/stream/frame?session_id=${sessionIdRef.current}`,
+        fd,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+          // A frame the server did not answer in 5 s is a frame the signer has
+          // already moved past. Dropping it keeps the tick rate honest instead of
+          // queueing requests behind a stalled one.
+          timeout: 5000,
+        }
+      );
+
+      setBuffered(res.data.buffered ?? 0);
+
+      if (!res.data.ready || !res.data.label) {
+        setLive(null);
+        return;
+      }
+
+      commitFromStream(res.data);
+    } catch (err) {
+      // A backend without /api/stream/frame 404s on every tick, which is not a
+      // transient network blip -- falling back is the only way the page can work
+      // against it. Any other failure keeps the single-frame path, because a
+      // dropped frame is exactly what server-side buffering is designed to
+      // absorb.
+      const status = (err as { response?: { status?: number } })?.response?.status;
+
+      if (status === 404 || status === 405) {
+        streamFallbackRef.current = true;
+        setStreamUnavailable(true);
+        return;
+      }
     } finally {
       isProcessingRef.current = false;
       setIsProcessing(false);
@@ -1167,7 +1130,7 @@ export default function SignToTextPage() {
           Backend is not running. Start:
           {" "}
           <code className="bg-surface px-1 rounded">
-            uvicorn backend.main:app --reload --port 8000
+            uvicorn backend.main:app --reload --port 8200
           </code>
         </div>
       )}
@@ -1274,7 +1237,9 @@ export default function SignToTextPage() {
 
               {cameraActive
                 ? isTemporal
-                  ? `${contract.frames}-FRAME WINDOW`
+                  ? streamUnavailable
+                    ? "BATCH FALLBACK · POLLING"
+                    : `${buffered}/${contract.frames * 6} BUFFER · LIVE`
                   : "POLLING 1S"
                 : "CAMERA OFF"}
             </span>
@@ -1291,7 +1256,7 @@ export default function SignToTextPage() {
 
           {/* AFFECT */}
           <div className="min-h-0 flex-1 rounded-xl border border-border/80 bg-surface/60 overflow-hidden">
-            <EmotionPanel emotion={emotion} />
+            <EmotionPanel emotion={emotion} offline={!emotionAvailable} />
           </div>
         </div>
 
@@ -1306,13 +1271,15 @@ export default function SignToTextPage() {
               Recognition
             </div>
 
-            {/* Opens the threshold modal. It lives here rather than as an inline
-                block because ten sliders plus their explanations occupied a
-                third of the column permanently, pushing the actual recognition
-                output off-screen. */}
+            {/* Opens the NMM Controller modal. It lives here rather than as an
+                inline block because ten sliders plus five marker switches and
+                their explanations occupied a third of the column permanently,
+                pushing the actual recognition output off-screen. */}
             <NmmThresholdPanel
               values={thresholds}
               onChange={setThresholds}
+              gates={markerGates}
+              onGatesChange={setMarkerGates}
               variant="header"
             />
           </div>
@@ -1412,94 +1379,6 @@ export default function SignToTextPage() {
             )}
           </div>
 
-          {/* NMM — DETECTOR STATE + MANUAL MARKER OPTIONS */}
-          <div className="rounded-xl border border-border/80 bg-surface/60 p-3 shrink-0">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[9px] font-mono uppercase text-text-muted">
-                NMM · Sent to LLM
-              </span>
-
-              <span className="text-[8px] font-mono text-text-muted">
-                DETECTED
-              </span>
-            </div>
-
-            {/* Read-only detector readout: what the face is doing right now. */}
-            <div className="grid grid-cols-5 gap-1 mb-2">
-              {([
-                ["Q", nmmFlags?.question],
-                ["WH", nmmFlags?.wh_question],
-                ["NEG", nmmFlags?.negation],
-                ["AFM", nmmFlags?.affirmation],
-                ["EMP", nmmFlags?.emphasis],
-              ] as [string, boolean | undefined][]).map(
-                ([label, value]) => (
-                  <div
-                    key={label}
-                    className={`h-5 flex items-center justify-center rounded border text-[7px] font-mono ${
-                      value
-                        ? "bg-accent-primary/15 border-accent-primary/50 text-accent-primary"
-                        : "border-border text-text-muted"
-                    }`}
-                  >
-                    {label}
-                  </div>
-                )
-              )}
-            </div>
-
-            {/* The actual controls. These are what make negation / question
-                feedable to the LLM instead of being guessed at. */}
-            <div className="grid grid-cols-2 gap-1.5">
-              {markerRows.map((row) => {
-                const on = armed[row.key];
-
-                return (
-                  <button
-                    key={row.key}
-                    onClick={() =>
-                      toggleMarker(row.key)
-                    }
-                    title={row.hint}
-                    className={`h-7 flex items-center justify-center gap-1 rounded border text-[8px] font-mono transition-colors ${
-                      on
-                        ? "bg-accent-secondary/20 border-accent-secondary text-accent-secondary font-bold"
-                        : "border-border text-text-secondary hover:border-accent-secondary/50"
-                    }`}
-                  >
-                    {row.icon}
-                    {row.label}
-                  </button>
-                );
-              })}
-
-              <div className="h-7 flex items-center justify-center rounded border border-dashed border-border text-[7px] font-mono text-text-muted">
-                {Object.values(armed).some(
-                  Boolean
-                )
-                  ? "ARMED → next sign"
-                  : "tap to arm"}
-              </div>
-            </div>
-
-            {pendingNmm && (
-              <div className="mt-2 flex items-center gap-1.5 text-[8px] font-mono text-status-pending">
-                <Timer size={9} />
-                Detector saw:{" "}
-                {(
-                  [
-                    "question",
-                    "wh_question",
-                    "negation",
-                    "emphasis",
-                  ] as MarkerKey[]
-                )
-                  .filter((k) => pendingNmm[k])
-                  .join(", ")}
-              </div>
-            )}
-          </div>
-
           {/* AUTO DETECT */}
           {isTemporal && (
             <label className="h-10 flex items-center justify-between px-3 rounded-lg bg-surface/60 border border-border cursor-pointer shrink-0">
@@ -1526,6 +1405,12 @@ export default function SignToTextPage() {
               {isTemporal
                 ? `${contract.frames}-frame temporal recognition`
                 : "Static frame recognition"}
+              {/* The feature width is not a detail the user can ignore: a
+                  258-dim run needs the signer's body in frame, because half its
+                  input is the pose block. Naming it here is what makes a run of
+                  "detected nothing" legible as "step back". */}
+              {contract.feature_kind === "hands_pose" &&
+                " · hands+pose (258)"}
             </div>
 
             <div className="text-[8px] font-mono text-text-muted">

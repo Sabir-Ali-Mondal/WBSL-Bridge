@@ -67,7 +67,7 @@ export default function AboutPage() {
       icon: Hand,
       label: "RECOGNITION",
       color: "text-accent-primary",
-      desc: "126-dim two-hand vector, right-wrist normalized, MLP/LSTM → ONNX, sub-5ms inference",
+      desc: "258-dim holistic vector (hands+pose) or 126-dim two-hand vector, right-wrist normalized, MLP/LSTM → ONNX, sub-5ms inference",
     },
     {
       id: "nmm",
@@ -101,7 +101,7 @@ export default function AboutPage() {
 
   const techStack = [
     { category: "Vision", items: "MediaPipe Holistic 0.10.14 · OpenCV · ViT-ONNX (trpakov/vit-face-expression)" },
-    { category: "ML", items: "PyTorch · ONNX Runtime · MLP (static) · LSTM (temporal) · 126-dim landmarks" },
+    { category: "ML", items: "PyTorch · ONNX Runtime · MLP (static) · LSTM (temporal) · 258-dim holistic (hands+pose) active contract (126-dim fallback)" },
     { category: "LLM", items: "gemma-4-E4B-it-Q4_K_M (deployment) · gemma-4-12b-it-Q4_0 (reference) · KoboldCpp" },
     { category: "TTS", items: "edge-tts (bn-BD-NabanitaNeural) · BanglaTTS (silero) · mutagen" },
     { category: "Frontend", items: "Next.js 14 · TypeScript · Tailwind · shadcn/ui · Framer Motion · Recharts" },
