@@ -1,5 +1,5 @@
 {
-  "path": "D:\\Download\\Projects\\WBSL Bridge\\models\\onnx_models\\8\\sign_daily_lstm.onnx",
+  "path": "D:\\Download\\Projects\\WBSL Bridge\\models\\onnx_models\\7\\sign_daily_lstm.onnx",
   "name": "sign_daily_lstm",
-  "run": "onnx_models/8"
+  "run": "onnx_models/7"
 }

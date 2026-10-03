@@ -7,6 +7,7 @@ Supports male / female voice selection via voice_id.
 
 import asyncio
 import re
+import unicodedata
 from pathlib import Path
 
 TTS_DIR = Path(__file__).resolve().parent / "tts_output"
@@ -23,6 +24,14 @@ BANGLATTS_VOICE = {
     "1": "female",
     "2": "male",
 }
+
+
+def _clean_banglatts_text(text: str) -> str:
+    clean = "".join(
+        char if char.isspace() or unicodedata.category(char)[0] in {"L", "M", "N"} else " "
+        for char in text
+    )
+    return re.sub(r"\s+", " ", clean).strip()
 
 
 def speak(text: str, output_name: str = "bengali_speech", voice_id: str = "1") -> dict:
@@ -69,8 +78,7 @@ def speak(text: str, output_name: str = "bengali_speech", voice_id: str = "1") -
     try:
         from banglatts import BanglaTTS
 
-        clean = re.sub(r'[,.|!?;:"\'()—-।]', ' ', text)
-        clean = re.sub(r'\s+', ' ', clean).strip()
+        clean = _clean_banglatts_text(text)
 
         tts = BanglaTTS()
         path = tts(
