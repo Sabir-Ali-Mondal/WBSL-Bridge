@@ -12,7 +12,7 @@ import axios from "axios";
 const API_BASE = "http://localhost:8200";
 
 export default function AdminContributionsPage() {
-  const { data: contributions, isLoading, refetch } = useQuery({
+  const { data: contributions, isLoading, isError, refetch } = useQuery({
     queryKey: ["admin-contributions"],
     queryFn: () => contributionService.getContributions(),
   });
@@ -80,7 +80,13 @@ export default function AdminContributionsPage() {
                   Array.from({ length: 4 }).map((_, i) => (
                     <TableRowSkeleton key={i} columns={4} />
                   ))
-                ) : contributions?.map((item) => (
+                ) : isError ? (
+                  <tr>
+                    <td colSpan={4} className="py-8 text-center text-status-error">
+                      Could not load contributions. Check the backend connection and try again.
+                    </td>
+                  </tr>
+                ) : contributions?.length ? contributions.map((item) => (
                   <tr
                     key={item.sample_id}
                     onClick={() => setSelectedContribution(item)}
@@ -101,7 +107,13 @@ export default function AdminContributionsPage() {
                       <span className="text-accent-primary hover:underline text-[11px]">Inspect</span>
                     </td>
                   </tr>
-                ))}
+                )) : (
+                  <tr>
+                    <td colSpan={4} className="py-8 text-center text-text-muted">
+                      No community contributions have been submitted yet.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

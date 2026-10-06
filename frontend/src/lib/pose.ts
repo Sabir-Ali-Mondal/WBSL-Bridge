@@ -30,5 +30,11 @@ export const POSE_BODY_PAIRS: [number, number][] = [
 /** Nose + mouth corners: the landmarks the NMM detector reads. */
 export const POSE_FACE_MARKERS: number[] = [0, 9, 10];
 
+/** Landmark connections that make the available BlazePose face points legible. */
+export const POSE_FACE_PAIRS: [number, number][] = [
+  [7, 3], [3, 2], [2, 1], [1, 0], [0, 4], [4, 5], [5, 6], [6, 8],
+  [0, 9], [0, 10], [9, 10],
+];
+
 /** A single pose landmark as delivered by /api/simulation/frames. */
 export type PosePoint = [number, number, number, number];

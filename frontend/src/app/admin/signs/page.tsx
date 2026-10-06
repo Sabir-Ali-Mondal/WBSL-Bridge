@@ -12,7 +12,7 @@ const API_BASE = "http://localhost:8200";
 
 export default function AdminSignsPage() {
   const qc = useQueryClient();
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ["admin-signs"],
     queryFn: () => datasetService.getSigns({ limit: 100 }),
   });
@@ -82,6 +82,12 @@ export default function AdminSignsPage() {
           <tbody className="divide-y divide-border">
             {isLoading ? (
               Array.from({ length: 8 }).map((_, i) => <TableRowSkeleton key={i} columns={5} />)
+            ) : isError ? (
+              <tr>
+                <td colSpan={5} className="py-8 text-center text-status-error">
+                  Could not load the sign catalog. Check the backend connection and try again.
+                </td>
+              </tr>
             ) : (
               data?.items.map((sign) => {
                 const media = (sign as any).reference_media as { type: string; url: string } | null;

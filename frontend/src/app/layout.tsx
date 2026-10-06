@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Noto_Sans_Bengali, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
-import { Navbar } from "@/components/layout/Navbar";
+import { AppSidebar } from "@/components/layout/AppSidebar";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -39,10 +39,12 @@ export default function RootLayout({
       lang="en"
       className={`${inter.variable} ${notoSansBengali.variable} ${jetbrainsMono.variable} dark`}
     >
-      <body className="min-h-screen flex flex-col bg-background text-text-primary antialiased">
+      <body className="min-h-screen bg-background text-text-primary antialiased">
         <Providers>
-          <Navbar />
-          <div className="flex-1 flex flex-col">{children}</div>
+          <div className="flex min-h-screen">
+            <AppSidebar />
+            <div className="flex min-w-0 flex-1 flex-col">{children}</div>
+          </div>
         </Providers>
       </body>
     </html>

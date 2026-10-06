@@ -21,12 +21,12 @@ export default function AdminDatasetPage() {
   const [language, setLanguage] = useState("");
   const [page, setPage] = useState(1);
 
-  const { data: stats } = useQuery<DatasetStats>({
+  const { data: stats, isError: statsError } = useQuery<DatasetStats>({
     queryKey: ["dataset-stats"],
     queryFn: () => statsService.getDatasetStats(),
   });
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ["signs", page, search, category, language],
     queryFn: () =>
       datasetService.getSigns({
@@ -45,13 +45,23 @@ export default function AdminDatasetPage() {
         <h1 className="text-2xl font-bold tracking-tight text-text-primary mt-1">
           Sign Lexicon & Dataset Browser
         </h1>
+        <p className="mt-2 text-[11px] font-mono text-text-muted">
+          Source files: <code>dataset_train/daily_video/&lt;SIGN&gt;.npy</code>,{" "}
+          <code>dataset_train/unified_video/&lt;SIGN&gt;.npy</code>,{" "}
+          <code>dataset_train/unified_static/&lt;SIGN&gt;.npy</code>
+        </p>
       </div>
+
+      {statsError && (
+        <div className="rounded border border-status-error/30 bg-status-error/10 p-3 text-sm text-status-error">
+          Could not load dataset statistics. Check the backend connection and try again.
+        </div>
+      )}
 
       {/* Top Bar Stats — fetched from backend */}
       <div className="p-4 rounded-lg bg-surface border border-border flex flex-wrap items-center justify-between gap-4 font-mono text-xs">
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-text-secondary">
           <span>Total Signs: <strong className="text-text-primary">{stats?.total_signs ?? "—"}</strong></span>
-          <span>Approved Samples: <strong className="text-status-approved">{stats?.total_approved_samples ?? "—"}</strong></span>
           <span>Languages: <strong className="text-text-primary">{stats?.languages?.join(", ") ?? "—"}</strong></span>
           <span>Version: <strong className="text-accent-primary">{stats?.dataset_version ?? "—"}</strong></span>
         </div>
@@ -134,19 +144,23 @@ export default function AdminDatasetPage() {
                 <th className="py-3 px-4">Bengali Meaning</th>
                 <th className="py-3 px-4">Category</th>
                 <th className="py-3 px-4">Language</th>
-                <th className="py-3 px-4 text-center">Approved Samples</th>
-                <th className="py-3 px-4 text-center">Status</th>
                 <th className="py-3 px-4 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {isLoading ? (
                 Array.from({ length: 6 }).map((_, i) => (
-                  <TableRowSkeleton key={i} columns={7} />
+                  <TableRowSkeleton key={i} columns={5} />
                 ))
+              ) : isError ? (
+                <tr>
+                  <td colSpan={5} className="py-8 text-center text-status-error">
+                    Could not load signs. Check the backend connection and try again.
+                  </td>
+                </tr>
               ) : data?.items.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-12 text-center text-text-muted">
+                  <td colSpan={5} className="py-12 text-center text-text-muted">
                     No signs matched your search filters.
                   </td>
                 </tr>
@@ -157,12 +171,6 @@ export default function AdminDatasetPage() {
                     <td className="py-3 px-4 font-bengali text-sm text-text-primary">{sign.bengali_meaning}</td>
                     <td className="py-3 px-4 text-text-secondary">{sign.category}</td>
                     <td className="py-3 px-4 text-text-secondary">{sign.language}</td>
-                    <td className="py-3 px-4 text-center text-accent-primary font-bold">{sign.approved_samples}</td>
-                    <td className="py-3 px-4 text-center">
-                      <span className="px-2 py-0.5 rounded bg-status-approved/10 text-status-approved text-[10px]">
-                        ACTIVE
-                      </span>
-                    </td>
                     <td className="py-3 px-4 text-right">
                       <Link
                         href={`/admin/dataset/${sign.id}`}
@@ -182,6 +190,10 @@ export default function AdminDatasetPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {isLoading ? (
             Array.from({ length: 8 }).map((_, i) => <SignCardSkeleton key={i} />)
+          ) : isError ? (
+            <div className="col-span-full py-12 text-center text-sm text-status-error">
+              Could not load signs. Check the backend connection and try again.
+            </div>
           ) : data?.items.length === 0 ? (
             <div className="col-span-full py-12 text-center text-xs font-mono text-text-muted">
               No signs matched your search query.
@@ -202,8 +214,7 @@ export default function AdminDatasetPage() {
                   <div className="font-bengali text-base text-text-secondary mt-1">{sign.bengali_meaning}</div>
                 </div>
 
-                <div className="pt-2 border-t border-border flex items-center justify-between text-xs font-mono">
-                  <span className="text-text-muted">Samples: <strong className="text-accent-primary">{sign.approved_samples}</strong></span>
+                <div className="pt-2 border-t border-border flex items-center justify-end text-xs font-mono">
                   <Link
                     href={`/admin/dataset/${sign.id}`}
                     className="text-accent-primary hover:underline flex items-center space-x-1"

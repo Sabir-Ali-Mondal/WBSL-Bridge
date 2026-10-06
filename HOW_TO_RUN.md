@@ -35,6 +35,8 @@ Next.js Frontend → http://localhost:3000
 OpenAI Compatible API on port 5001 at http://localhost:5001/v1/ (if models/llm/ is present)
 ```
 
+If the backend is already running on port 8200, the launcher reuses it instead of starting a duplicate. If another process owns that port, the launcher reports the process and stops.
+
 > **Note on AI tab in start.ps1:** The local KoboldCpp AI runner requires the `models/llm/` directory with local weights. If `models/llm/` is absent, the script will skip starting the local runner and you can rely directly on the cloud LLM configuration defined in `backend/.env`.
 Enabled APIs: KoboldCppApi OpenAiApi OllamaApi AnthropicApi
 

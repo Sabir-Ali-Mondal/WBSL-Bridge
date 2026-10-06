@@ -1,9 +1,46 @@
 "use client";
 import React from "react";
+import { Activity } from "lucide-react";
 import { useSystemStatus } from "@/hooks/useSystemStatus";
 
-export function SystemDiagnostics() {
+export function SystemDiagnostics({ compact = false }: { compact?: boolean }) {
   const { health } = useSystemStatus();
+
+  if (compact) {
+    const services = [
+      { label: "API", healthy: health.api },
+      { label: "MODEL", healthy: health.model },
+      { label: "TTS", healthy: health.tts },
+      { label: "LLM", healthy: health.llm },
+    ];
+
+    return (
+      <div className="space-y-2 rounded-md border border-border bg-surface p-3 tech-mono text-[10px] text-text-secondary">
+        <div className="flex items-center gap-2 text-[11px] font-semibold text-text-primary">
+          <Activity size={13} aria-hidden="true" />
+          System status
+        </div>
+        <div className="grid grid-cols-2 gap-x-2 gap-y-1.5">
+          {services.map((service) => (
+            <span key={service.label} className="flex items-center gap-1.5">
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${
+                  service.healthy ? "bg-status-approved" : "bg-status-error"
+                }`}
+              />
+              {service.label}
+            </span>
+          ))}
+        </div>
+        <div className="truncate text-[10px]">
+          MODE:{" "}
+          <span className="uppercase text-text-primary">
+            {health.inference_mode}
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex items-center space-x-3 px-3 py-1.5 bg-surface border border-border rounded-md tech-mono text-xs text-text-secondary select-none">

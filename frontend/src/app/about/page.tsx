@@ -38,7 +38,7 @@ export default function AboutPage() {
       name: "Koushaki Singha",
       roll: "34900124074",
       role: "Sign Language Data & Quality Lead",
-      focus: "WBSL sign recording coordination, dataset annotation, NMM tagging, landmark data quality review",
+      focus: "WBSL/ISL/BdSL sign recording coordination, dataset annotation, NMM tagging, landmark data quality review",
     },
     {
       name: "Monirul Halder",
@@ -66,8 +66,8 @@ export default function AboutPage() {
       id: "recognition",
       icon: Hand,
       label: "RECOGNITION",
-      color: "text-accent-primary",
-      desc: "258-dim holistic vector (hands+pose) or 126-dim two-hand vector, right-wrist normalized, MLP/LSTM → ONNX, sub-5ms inference",
+      color: "text-status-pending",
+      desc: "Static MLP (99.9% acc) is LIVE. Continuous LSTM video training for dynamic signs is currently HALF-DONE and in active progress.",
     },
     {
       id: "nmm",
@@ -87,21 +87,21 @@ export default function AboutPage() {
       id: "nlg",
       icon: Brain,
       label: "BENGALI NLG",
-      color: "text-status-pending",
+      color: "text-accent-primary",
       desc: "gemma-4-E4B, 50-criteria constrained prompt, preserves question/negation/WHETHER/IF-THEN scope",
     },
     {
       id: "tts",
       icon: Volume2,
       label: "TTS",
-      color: "text-status-pending",
+      color: "text-accent-primary",
       desc: "edge-tts (online, ~604 ms/word) → BanglaTTS (offline, ~453 ms/word) automatic fallback",
     },
   ];
 
   const techStack = [
     { category: "Vision", items: "MediaPipe Holistic 0.10.14 · OpenCV · ViT-ONNX (trpakov/vit-face-expression)" },
-    { category: "ML", items: "PyTorch · ONNX Runtime · MLP (static) · LSTM (temporal) · 258-dim holistic (hands+pose) active contract (126-dim fallback)" },
+    { category: "ML", items: "PyTorch · ONNX Runtime · MLP (static) · LSTM (temporal, in progress) · 258-dim holistic (hands+pose) active contract" },
     { category: "LLM", items: "gemma-4-E4B-it-Q4_K_M (deployment) · gemma-4-12b-it-Q4_0 (reference) · KoboldCpp" },
     { category: "TTS", items: "edge-tts (bn-BD-NabanitaNeural) · BanglaTTS (silero) · mutagen" },
     { category: "Frontend", items: "Next.js 14 · TypeScript · Tailwind · shadcn/ui · Framer Motion · Recharts" },
@@ -109,17 +109,33 @@ export default function AboutPage() {
   ];
 
   const gaps = [
-    { id: "G4", label: "WBSL Regional Focus", status: "OPEN — VERIFIED", detail: "Zero AI/ML/DL projects exist for WBSL. Only resource: 170 Wikisigns entries" },
-    { id: "G15", label: "WBSL ≠ ISL ≠ BdSL", status: "OPEN — VERIFIED", detail: "Johnson & Johnson (2016) proved linguistic distinctness. All tech targets Bangladesh" },
-    { id: "G6", label: "WBSL → Bengali Translation", status: "OPEN", detail: "No system produces grammatically correct Bengali from signs" },
+    { id: "G4", label: "WB Regional Sign Focus", status: "OPEN — VERIFIED", detail: "Zero AI/ML projects exist for WBSL, ISL, or BdSL as used in West Bengal. Only resource: 170 Wikisigns entries" },
+    { id: "G15", label: "WBSL ≠ ISL ≠ BdSL", status: "OPEN — VERIFIED", detail: "Johnson & Johnson (2016) proved linguistic distinctness. All tech targets Bangladesh or Delhi" },
+    { id: "G6", label: "Sign → Bengali Translation", status: "OPEN", detail: "No system produces grammatically correct Bengali from signs for the WB region" },
     { id: "G7", label: "Constrained LLM Integration", status: "OPEN", detail: "No sign language system uses LLM with anti-hallucination constraints" },
     { id: "G10", label: "Bidirectional Communication", status: "OPEN", detail: "Google SL2T is forward-only. Reverse path not deployed anywhere" },
-    { id: "G13", label: "Low-Resource Transfer", status: "OPEN", detail: "Google uses 100,000+ hours. WBSL has near-zero. What works without scale?" },
+    { id: "G13", label: "Low-Resource Transfer", status: "OPEN", detail: "Google uses 100,000+ hours. WB region has near-zero. What works without scale?" },
+  ];
+
+  const currentStatus = [
+    { label: "MediaPipe Stream", desc: "540 landmarks extracted at stable 30 FPS.", status: "DONE" },
+    { label: "Emotion & NMM", desc: "ViT-ONNX (glasses-robust) and 5 geometric NMM markers live.", status: "DONE" },
+    { label: "Static Recognition", desc: "126-dim MLP achieving 99.9% validation accuracy.", status: "DONE" },
+    { label: "Bengali NLG & TTS", desc: "6 models benchmarked; gemma-4-E4B selected and stress-tested.", status: "DONE" },
+    { label: "Continuous Action Recognition", desc: "Pipeline designed; LSTM video training is half-done.", status: "HALF-DONE" },
+  ];
+
+  const roadmap = [
+    { num: 1, label: "Continuous Action Recognition", desc: "Finalizing LSTM training on continuous video sequences for dynamic signs (currently half-done).", active: false },
+    { num: 2, label: "WB Region Data Creation", desc: "A dedicated data collector tool is being prepared to build the first continuous dataset for WBSL/ISL/BdSL.", active: true },
+    { num: 3, label: "Field Survey", desc: "50+ field verification questions prepared and structured for real-world community data collection.", active: true },
+    { num: 4, label: "Unknown Sign Handling", desc: "Fully implementing the “Honesty Layer” to detect unknown signs and prevent AI hallucination.", active: false },
+    { num: 5, label: "Real-Time Workable UI", desc: "Conversation documenting, Sign-to-Voice and Voice-to-Sign on a single, high-speed interface.", active: false },
   ];
 
   return (
     <PageContainer className="max-w-5xl py-16 space-y-20">
-      {/* ─── HERO ─── */}
+      {/* ─── HERO ── */}
       <header className="space-y-6">
         <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-accent-primary">
           <BookOpen size={14} />
@@ -129,11 +145,11 @@ export default function AboutPage() {
           WBSL Bridge
         </h1>
         <p className="text-lg sm:text-xl text-text-secondary leading-relaxed max-w-3xl">
-          Intent-aware bidirectional sign language communication for the Deaf community of West Bengal
-          with unknown sign handling and community-driven growth.
+          Intent-aware bidirectional sign language communication for the Deaf community of West Bengal. 
+          Designed to support WBSL, ISL, BdSL, and mixed signing with unknown sign handling and community-driven growth.
         </p>
         <div className="flex flex-wrap gap-3 pt-2">
-          {["WBSL → Bengali", "Bengali → WBSL", "Unknown Sign Honesty", "Privacy-First", "CPU-Only", "Offline-Capable"].map((tag) => (
+          {["WBSL/ISL/BdSL Support", "Bengali ↔ Sign", "Unknown Sign Honesty", "Privacy-First", "CPU-Only", "Offline-Capable"].map((tag) => (
             <span key={tag} className="px-3 py-1 text-xs font-mono rounded-md bg-surface-elevated border border-border text-text-secondary">
               {tag}
             </span>
@@ -141,25 +157,25 @@ export default function AboutPage() {
         </div>
       </header>
 
-      {/* ─── THE PROBLEM ─── */}
+      {/* ── THE PROBLEM ─── */}
       <section className="space-y-6">
         <div className="flex items-center gap-3">
           <AlertTriangle size={20} className="text-status-error" />
           <h2 className="text-2xl font-bold text-text-primary">The Verified Technological Void</h2>
         </div>
         <p className="text-sm text-text-secondary leading-relaxed max-w-3xl">
-          West Bengal Sign Language (WBSL) has been linguistically proven distinct from both Delhi ISL
-          and Bangladesh BdSL (Johnson &amp; Johnson, 2016, <em>Sign Language Studies</em>, 16(4)).
+          The Deaf community in West Bengal uses various sign varieties including West Bengal Sign Language (WBSL), 
+          Indian Sign Language (ISL), and Bangladeshi Sign Language (BdSL), often mixing them. 
           Despite this, an exhaustive search confirmed:
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {[
-            "ZERO AI/ML/DL projects for WBSL",
-            "ZERO WBSL video datasets",
-            "ZERO WBSL recognition systems",
-            "ZERO WBSL → Bengali translators",
+            "ZERO systems handling continuous signs for WB region",
+            "ZERO tools supporting mixed WBSL/ISL/BdSL signing",
+            "ZERO WBSL/ISL/BdSL → Bengali translators",
             "ZERO projects from WB universities",
             "Only resource: 170 Wikisigns entries",
+            "Existing tech targets Bangladesh or Delhi only",
           ].map((item) => (
             <div key={item} className="flex items-start gap-2 p-3 rounded-md bg-surface border border-border">
               <XCircle size={14} className="text-status-error mt-0.5 shrink-0" />
@@ -170,9 +186,65 @@ export default function AboutPage() {
         <div className="p-4 rounded-md bg-surface border-l-2 border-l-accent-primary">
           <p className="text-xs font-mono text-text-secondary">
             Every existing &ldquo;Bengali Sign Language&rdquo; technology project originates from Bangladesh
-            and targets Bangladesh BdSL — a linguistically separate sign language — not the WBSL used by
-            the Deaf community in West Bengal, India.
+            and targets Bangladesh BdSL — a linguistically separate sign language — not the WBSL, ISL, or BdSL 
+            varieties actually used by the Deaf community in West Bengal, India.
           </p>
+        </div>
+      </section>
+
+      {/* ── CURRENT STATUS & ROADMAP ─── */}
+      <section className="space-y-8">
+        {/* Current Status */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 size={20} className="text-accent-primary" />
+            <h2 className="text-2xl font-bold text-text-primary">Current Implementation Status</h2>
+          </div>
+          <div className="space-y-3">
+            {currentStatus.map((item) => (
+              <div key={item.label} className={`flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 p-4 rounded-md border ${item.status === "HALF-DONE" ? "bg-status-unknown/5 border-status-unknown" : "bg-surface border-border"}`}>
+                <div className="flex items-center gap-3 sm:w-1/3">
+                  {item.status === "DONE" ? (
+                    <CheckCircle2 size={18} className="text-status-approved shrink-0" />
+                  ) : (
+                    <Clock3 size={18} className="text-status-unknown shrink-0" />
+                  )}
+                  <span className={`text-sm font-semibold ${item.status === "HALF-DONE" ? "text-status-unknown" : "text-text-primary"}`}>
+                    {item.label}
+                  </span>
+                </div>
+                <span className="text-xs text-text-secondary sm:w-2/3">{item.desc}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Roadmap */}
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <ArrowRight size={20} className="text-accent-secondary" />
+            <h2 className="text-2xl font-bold text-text-primary">Roadmap & Active Progress</h2>
+          </div>
+          <div className="space-y-3">
+            {roadmap.map((item) => (
+              <div key={item.num} className={`flex items-start gap-4 p-4 rounded-md border ${item.active ? "bg-status-unknown/5 border-status-unknown" : "bg-surface border-border"}`}>
+                <div className={`flex items-center justify-center w-8 h-8 rounded-full shrink-0 text-sm font-bold ${item.active ? "bg-status-unknown text-white" : "bg-accent-primary text-white"}`}>
+                  {item.num}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-semibold text-text-primary">{item.label}</span>
+                    {item.active && (
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-status-unknown text-white font-bold">
+                        ACTIVE PROGRESS
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-text-secondary mt-1">{item.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -237,7 +309,7 @@ export default function AboutPage() {
         {/* Key Innovations */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4">
           {[
-            { title: "Landmark-Based Signer Independence", desc: "126-dim normalized vector removes skin color, background, lighting bias. 99.9% val accuracy." },
+            { title: "Landmark-Based Signer Independence", desc: "126-dim normalized vector removes skin color, background, lighting bias. 99.9% val accuracy for static signs." },
             { title: "Open-Set Honesty Layer", desc: "OOD gate detects unknown signs BEFORE LLM reasoning. Output carries সম্ভবত (probably), never forced classification." },
             { title: "Fast/Slow Path Separation", desc: "Real-time recognition in fast path (<50ms). Heavy LLM reasoning runs asynchronously off critical path." },
             { title: "Privacy-First Verification", desc: "Landmarks only, never raw video. Human reviewers decide. DPDP Act 2023 compliant." },
@@ -280,13 +352,13 @@ export default function AboutPage() {
         <p className="text-sm text-text-secondary leading-relaxed max-w-3xl">
           Transfer-first approach. Ready-made datasets (BdSLW401, iSign, ISLTranslate) provide
           ~15,000 pre-labelled sequences covering 460+ signs. Community collection via web platform
-          targets 10–15 recordings per WBSL-specific sign from 3–5 signers.
+          targets 10–15 recordings per sign from 3–5 signers across WBSL, ISL, and BdSL varieties.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {[
             { label: "Model A", desc: "WBSL only (baseline)" },
             { label: "Model B", desc: "ISL pre-train → WBSL fine-tune" },
-            { label: "Model C", desc: "ISL + WBSL mixed training" },
+            { label: "Model C", desc: "ISL + WBSL + BdSL mixed training" },
           ].map((m) => (
             <div key={m.label} className="p-3 rounded-md bg-surface border border-border text-center">
               <div className="text-xs font-mono font-bold text-accent-primary">{m.label}</div>
@@ -303,7 +375,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* ─── UNKNOWN SIGN HANDLING ─── */}
+      {/* ─── UNKNOWN SIGN HANDLING ── */}
       <section className="space-y-4">
         <div className="flex items-center gap-3">
           <HelpCircle size={20} className="text-status-unknown" />
@@ -397,7 +469,7 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* ─── PROJECT TEAM ─── */}
+      {/* ── PROJECT TEAM ─── */}
       <section className="space-y-4">
         <div className="flex items-center gap-3">
           <Users size={20} className="text-accent-primary" />
@@ -453,8 +525,8 @@ export default function AboutPage() {
           WBSL Bridge does not attempt to replicate the scale of Google DeepMind&rsquo;s SL2T (100,000+ hours,
           ASL → English, Pixel 11). It investigates whether the architectural principles demonstrated at
           high-resource scale can be adapted to a severely low-resource, linguistically distinct, regionally
-          specific sign language with Bengali-language output, budget-device deployment, and bidirectional
-          communication — none of which currently exists.
+          specific sign language ecosystem (WBSL, ISL, BdSL) with Bengali-language output, budget-device deployment, 
+          and bidirectional communication — none of which currently exists.
         </p>
       </footer>
     </PageContainer>

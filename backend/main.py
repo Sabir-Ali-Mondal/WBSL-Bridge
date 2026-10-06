@@ -27,6 +27,7 @@ from pydantic import BaseModel
 
 # Local imports
 from backend.extract import process_bgr_frame, HANDS_DIM, HOLISTIC_DIM
+from backend.face_mesh import extract_video_face_mesh
 from backend.nmm import detect_nmm, reset_nmm_state, emotion_available
 from backend.streaming import get_session, last_vector
 from backend.llm_engine import (
@@ -461,7 +462,41 @@ _bengali_map = {
 # ─────────────────────────────────────────────
 # IN-MEMORY STATE
 # ─────────────────────────────────────────────
+def _sample_counts_by_label():
+    counts = {}
+    for record in _load_manifest():
+        label = record.get("label")
+        if not label:
+            continue
+        status = record.get("verification")
+        count_key = {
+            "accepted": "approved_samples",
+            "pending": "pending_samples",
+            "needs_review": "pending_samples",
+            "rejected": "rejected_samples",
+        }.get(status)
+        if count_key:
+            totals = counts.setdefault(label, {
+                "approved_samples": 0,
+                "pending_samples": 0,
+                "rejected_samples": 0,
+            })
+            totals[count_key] += 1
+    return counts
+
+
+def _refresh_catalog_sample_counts():
+    counts = _sample_counts_by_label()
+    for sign in sign_catalog:
+        sign.update(counts.get(sign["label"], {
+            "approved_samples": 0,
+            "pending_samples": 0,
+            "rejected_samples": 0,
+        }))
+
+
 def _build_catalog():
+    sample_counts = _sample_counts_by_label()
     catalog = [
         {
             "id": str(i),
@@ -469,9 +504,11 @@ def _build_catalog():
             "bengali_meaning": _bengali_map.get(c, WORD_BENGALI.get(c, "")),
             "category": "ISL Alphabet" if c in _bengali_map else "ISL Word",
             "type": "word",
-            "approved_samples": 300,
-            "pending_samples": 0,
-            "rejected_samples": 0,
+            **sample_counts.get(c, {
+                "approved_samples": 0,
+                "pending_samples": 0,
+                "rejected_samples": 0,
+            }),
             "reference_video_url": None,
             "language": "ISL",
         }
@@ -1163,13 +1200,16 @@ def simulation_frames(label: str = "", sample_id: str = ""):
     """
     arr = None
     source = ""
+    source_label = label
     if sample_id:
         rec = next((r for r in _load_manifest() if r["sample_id"] == sample_id), None)
         if rec and (ROOT / rec["landmark_path"]).exists():
             arr = np.load(ROOT / rec["landmark_path"])
             source = f"community:{sample_id}"
+            source_label = rec["label"]
     elif label:
         safe = label.upper().replace(" ", "_")
+        source_label = safe
         # The 258-dim daily pool is searched FIRST because those sequences are
         # the ones that carry a pose block worth drawing. The 126-dim pools are
         # the fallback, not the default.
@@ -1201,11 +1241,34 @@ def simulation_frames(label: str = "", sample_id: str = ""):
     if arr.shape[-1] == HOLISTIC_DIM:                   # 258 = hands 126 + pose 33x4
         hands = arr[:, :126].reshape(len(arr), 42, 3)
         pose = arr[:, 126:].reshape(len(arr), 33, 4)
-        return {"frames": hands.tolist(), "pose": pose.tolist(), "points": 42,
-                "count": int(len(arr)), "source": source, "width": HOLISTIC_DIM}
+        result = {"frames": hands.tolist(), "pose": pose.tolist(), "points": 42,
+                  "count": int(len(arr)), "source": source, "width": HOLISTIC_DIM}
+    else:
+        result = {"frames": arr.reshape(len(arr), 42, 3).tolist(), "points": 42,
+                  "count": int(len(arr)), "source": source, "width": HANDS_DIM}
 
-    return {"frames": arr.reshape(len(arr), 42, 3).tolist(), "points": 42,
-            "count": int(len(arr)), "source": source, "width": HANDS_DIM}
+    media = SIGN_MEDIA.get(source_label) or SIGN_MEDIA.get(
+        source_label.upper().replace(" ", "_")
+    )
+    if media and media.get("type") == "video" and media.get("filename"):
+        video_path = (MEDIA_DIR / media["filename"]).resolve()
+        if video_path.parent != MEDIA_DIR.resolve():
+            result["face_mesh_error"] = "Invalid source video path for Face Mesh."
+        else:
+            try:
+                face_mesh, face_connections = extract_video_face_mesh(
+                    video_path,
+                    len(arr),
+                )
+                result["face_mesh"] = face_mesh
+                result["face_mesh_connections"] = face_connections
+                result["face_mesh_source"] = video_path.name
+            except (FileNotFoundError, OSError, ValueError) as exc:
+                result["face_mesh_error"] = str(exc)
+    else:
+        result["face_mesh_error"] = "No original reference video is available for Face Mesh."
+
+    return result
 
 
 @app.get("/api/dataset/reference")
@@ -1765,6 +1828,7 @@ async def ingest_sample(
     }
     with open(MANIFEST_PATH, "a", encoding="utf-8") as f:
         f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    _refresh_catalog_sample_counts()
 
     return {"sample_id": sample_id, "status": "pending_review", "frames": int(arr.shape[0])}
 
@@ -1856,6 +1920,7 @@ def verify_contribution(sample_id: str, payload: dict):
             changed = True
     if changed:
         _write_manifest(items)
+        _refresh_catalog_sample_counts()
     return {"success": changed}
 
 

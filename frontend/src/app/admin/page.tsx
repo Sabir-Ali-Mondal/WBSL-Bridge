@@ -6,7 +6,7 @@ import { CheckSquare, Database, BookOpen, ArrowUpRight } from "lucide-react";
 import { statsService, AdminStats } from "@/services/stats";
 
 export default function AdminDashboardPage() {
-  const { data: stats } = useQuery<AdminStats>({
+  const { data: stats, isError: statsError } = useQuery<AdminStats>({
     queryKey: ["admin-stats"],
     queryFn: () => statsService.getAdminStats(),
     refetchInterval: 15000,
@@ -25,6 +25,12 @@ export default function AdminDashboardPage() {
           LLM: {stats?.llm_available ? "ONLINE" : "OFFLINE"} · {stats?.inference_mode?.toUpperCase() ?? "—"}
         </div>
       </div>
+
+      {statsError && (
+        <div className="rounded border border-status-error/30 bg-status-error/10 p-3 text-sm text-status-error">
+          Could not load admin statistics. Check that the backend is running at the configured API URL.
+        </div>
+      )}
 
       {/* Metric Cards — fetched from backend */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

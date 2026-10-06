@@ -14,7 +14,7 @@ export default function AdminSignDetailPage() {
   const params = useParams();
   const signId = params.signId as string;
 
-  const { data: sign, isLoading } = useQuery({
+  const { data: sign, isLoading, isError } = useQuery({
     queryKey: ["sign-detail", signId],
     queryFn: () => datasetService.getSignById(signId),
   });
@@ -30,10 +30,18 @@ export default function AdminSignDetailPage() {
     retry: false,
   });
 
-  if (isLoading || !sign) {
+  if (isLoading) {
     return (
       <div className="py-12 text-center text-xs font-mono text-text-muted">
         Loading sign details...
+      </div>
+    );
+  }
+
+  if (isError || !sign) {
+    return (
+      <div className="py-12 text-center text-sm text-status-error">
+        Could not load this sign. Check the backend connection or return to the dataset explorer.
       </div>
     );
   }
@@ -70,11 +78,7 @@ export default function AdminSignDetailPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 font-mono text-xs">
-        <div className="p-4 rounded bg-surface border border-border">
-          <div className="text-text-muted uppercase">Approved Samples</div>
-          <div className="text-xl font-bold text-status-approved mt-1">{sign.approved_samples}</div>
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-mono text-xs">
         <div className="p-4 rounded bg-surface border border-border">
           <div className="text-text-muted uppercase">Category</div>
           <div className="text-xl font-bold text-text-primary mt-1">{sign.category}</div>
@@ -89,7 +93,15 @@ export default function AdminSignDetailPage() {
         <div className="text-xs font-mono uppercase text-text-muted">
           Canonical Landmark Coordinate Reference
         </div>
-        <LandmarkSimulation frames={sim?.frames} pose={sim?.pose} fps={15} title={sim?.source} />
+        <LandmarkSimulation
+          frames={sim?.frames}
+          pose={sim?.pose}
+          faceMesh={sim?.face_mesh}
+          faceMeshConnections={sim?.face_mesh_connections}
+          faceMeshError={sim?.face_mesh_error}
+          fps={15}
+          title={sim?.source}
+        />
       </div>
     </div>
   );
