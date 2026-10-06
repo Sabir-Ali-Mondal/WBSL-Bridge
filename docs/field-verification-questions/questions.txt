@@ -1,0 +1,93 @@
+WBSL Field Verification Questions
+
+1. Language
+
+1. Which sign language is mainly used in West Bengal: ISL, regional/WBSL signs, BdSL, Home Sign, or mixed?
+2. Does the sign language vary by district/community?
+3. Which signs are different from standard ISL?
+
+2. Sign Structure
+
+4. Which body parts are most important: fingers, hand, palm/back palm, wrist/arm, shoulder, head, face, mouth, body?
+5. Which parts are essential and which are optional/additional?
+6. Can signs be static, or do they require movement?
+7. Which signs must be continuous/moving?
+
+3. Timing & Movement
+
+8. Can the same sign be performed faster/slower with the same meaning?
+9. Can sign duration vary between people/situations?
+10. Can movement, direction, speed or repetition change meaning?
+11. Are there pauses/breaks between signs or sentences?
+12. How is the end of a sentence indicated?
+
+4. Grammar
+
+13. How are questions expressed?
+14. Are questions shown by sign, face, head movement, or combination?
+15. How is negation expressed: sign, head movement, face, or context?
+16. Can the same hand sign change meaning because of face/head/mouth movement?
+
+5. Face & Mouth
+
+17. How important are facial expressions?
+18. How important are head movements/position?
+19. How important are mouth/lip movements?
+20. Are mouth movements necessary for any signs?
+21. Are face/head/mouth movements used for grammar, emotion, emphasis, or meaning?
+
+6. Emotion
+
+22. Does emotion change meaning, or mainly show feeling/tone?
+23. Which emotions are important to recognise?
+24. Can ignoring facial/emotional expression cause misunderstanding?
+
+7. Human Translation
+
+25. Does an interpreter translate sign-by-sign or meaning/context?
+26. How are differences in sign order vs Bengali/English order handled?
+27. How are face, head, mouth and body movements included?
+28. How are unknown/regional signs handled?
+
+8. Bidirectional Communication
+
+29. At a doctor/hospital, how does Deaf ↔ hearing communication normally happen?
+30. In court/police/legal situations, how is Deaf ↔ hearing communication handled?
+31. Is a human interpreter normally required?
+32. How does the interpreter handle Sign → Bengali/English?
+33. How does the interpreter handle Bengali/English → Sign?
+34. Is translation word-by-word or meaning-based?
+35. How is a hearing person's question converted into sign?
+36. How is a Deaf person's answer converted into Bengali/English?
+37. Are special requirements needed for medical/legal/emergency communication?
+38. What mistakes would be dangerous for an automatic translator?
+
+9. Alphabet & Fingerspelling
+
+39. Is fingerspelling used?
+40. Which alphabet is used: Bengali, English, or another?
+41. What is done for names/unknown words/no existing sign?
+
+10. Books & Software
+
+42. Is there a WBSL/West Bengal sign-language book or dictionary?
+43. Which books/videos/websites are actually used?
+44. Are there existing apps/software/digital dictionaries?
+45. Are West Bengal regional signs documented anywhere?
+
+11. Regional Variation
+
+46. Do signs vary by district, school, age or community?
+47. Can different people perform the same sign differently but mean the same thing?
+48. How should multiple signs with the same meaning be handled?
+49. How should an unknown/local sign be handled?
+
+12. Computer Translator
+
+50. What body information must a computer capture?
+51. Which is most important: hand/fingers, movement, palm orientation, arm/shoulder, face, head, mouth, body, timing, context?
+52. Which information can be ignored?
+53. Which signs require video instead of a single image?
+54. What are common mistakes made by human learners/computer systems?
+55. If the system does not understand a sign, should it ask/mark unknown instead of guessing?
+56. What important thing about real sign communication have we missed asking?
