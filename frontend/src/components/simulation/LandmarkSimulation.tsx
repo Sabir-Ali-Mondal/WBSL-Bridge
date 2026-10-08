@@ -11,8 +11,11 @@ import React, {
 } from "react";
 import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { ContactShadows, OrbitControls } from "@react-three/drei";
-import { Play, Pause, RotateCcw, Database, ZoomIn, ZoomOut } from "lucide-react";
+import { OrbitControls } from "@react-three/drei";
+import { Play, Pause, RotateCcw, Database } from "lucide-react";
+import { DhutiRig } from "./DhutiRig";
+import { RoundAlpanaStage } from "./AlpanaStage";
+import { DHUTI_DROP, THRESH, TORSO_WORLD } from "./simulationConstants";
 import {
   POSE_BODY_PAIRS,
   POSE_FACE_MARKERS,
@@ -257,42 +260,53 @@ function alignFaceMeshToPose(
 
 type PairList = ReadonlyArray<readonly [number, number]>;
 
-const THRESH = POSE_DRAW_THRESHOLD;
-const TORSO_WORLD = 1.8; // shoulder-centre -> hip-centre length in world units
-const Z_POSE = 0.15; // MediaPipe z is relative and noisy: kept small so the body stays upright
+const Z_POSE = 0.15;
 const Z_HAND = 0.5;
 const Z_FACE = 0.5;
-const Z_LIMIT = 0.4; // world-unit clamp on body depth offset
-const SNAP_MAX_TORSOS = 1.0; // max xy gap (in torsos) between hand wrist and pose wrist to snap
+const Z_LIMIT = 0.4;
+const SNAP_MAX_TORSOS = 1.0;
 const FOV = 38;
-const HEAD_LEN = 11; // [valid, cx, cy, cz, w, h, d, nx, ny, nz, roll]
+const HEAD_LEN = 11;
 
+/* Keep the dhuti knee-length and independent of leg landmarks so pose noise
+ * cannot stretch or shorten the garment. */
 const COLOR = {
-  torso: "#7C83F5",
-  arm: "#8B93FA",
+  torso: "#243B73",
+  arm: "#3E5A9A",
   leg: "#6870C9",
-  other: "#7A80D6",
-  joint: "#B4B9FF",
-  volume: "#8E96F2",
+  other: "#3E5A9A",
+  joint: "#6B85BD",
+  volume: "#243B73",
   handLeft: "#5EEAD4",
   handRight: "#C4B5FD",
   face: "#38BDF8",
   faceKey: "#BAE6FD",
+  dhuti: "#F1F0E8",
+  dhutiBand: "#D4D5D0",
+  gold: "#C79A32",
 } as const;
 
-const isHandStub = (i: number) => i >= 17 && i <= 22; // pose-model hand stubs; real hands replace them
+const isHandStub = (i: number) => i >= 17 && i <= 22;
+const isLowerBodyBone = ([a, b]: readonly [number, number]) =>
+  a >= 23 || b >= 23;
 const RIG_POSE_PAIRS: PairList = POSE_SKELETON_PAIRS.filter(
-  ([a, b]) => !isHandStub(a) && !isHandStub(b),
+  ([a, b]) =>
+    !isHandStub(a) &&
+    !isHandStub(b) &&
+    !isLowerBodyBone([a, b]),
 );
 const RIG_GUIDE_PAIRS: PairList = GUIDE_BODY_PAIRS.filter(
-  ([a, b]) => !isHandStub(a) && !isHandStub(b),
+  ([a, b]) =>
+    !isHandStub(a) &&
+    !isHandStub(b) &&
+    !isLowerBodyBone([a, b]),
 );
 const POSE_FACE_JOINTS: number[] = Array.from(
   new Set<number>([...POSE_FACE_MARKERS, ...POSE_FACE_PAIRS.flat()]),
 );
 
 const BODY_JOINT_RADIUS: Record<number, number> = {
-  11: 0.075, 12: 0.075, 13: 0.06, 14: 0.06, 15: 0.046, 16: 0.046,
+  11: 0.105, 12: 0.105, 13: 0.06, 14: 0.06, 15: 0.046, 16: 0.046,
   23: 0.08, 24: 0.08, 25: 0.066, 26: 0.066, 27: 0.05, 28: 0.05,
 };
 const DEFAULT_BODY_JOINT_RADIUS = 0.034;
@@ -308,7 +322,6 @@ const HAND_BONE_RADIUS: number[] = HAND_CONN.map(
 const PALM_FAN = [0, 1, 5, 9, 13, 17];
 const PALM_INDICES = [0, 1, 2, 0, 2, 3, 0, 3, 4, 0, 4, 5];
 
-/** Sparse, clean face topology (no 468-point spiderweb). */
 const FACE_LOOPS: { idx: number[]; closed: boolean }[] = [
   { idx: FACE_OVAL_INDICES, closed: true },
   { idx: [33, 160, 158, 133, 153, 144], closed: true },
@@ -331,7 +344,7 @@ const slotOf = (landmark: number): number => {
   }
   return slot;
 };
-const FACE_SEGMENTS: number[] = []; // flat [slotA, slotB, ...]
+const FACE_SEGMENTS: number[] = [];
 for (const { idx, closed } of FACE_LOOPS) {
   for (let k = 0; k < idx.length - 1; k++) FACE_SEGMENTS.push(slotOf(idx[k]), slotOf(idx[k + 1]));
   if (closed) FACE_SEGMENTS.push(slotOf(idx[idx.length - 1]), slotOf(idx[0]));
@@ -350,6 +363,12 @@ interface Bounds {
 const emptyBounds = (): Bounds => ({
   minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity, minZ: Infinity, maxZ: -Infinity,
 });
+function medianValue(values: number[]): number {
+  if (!values.length) return 0;
+  values.sort((a, b) => a - b);
+  return values[Math.floor(values.length / 2)];
+}
+
 function growBounds(b: Bounds, x: number, y: number, z: number): void {
   if (x < b.minX) b.minX = x;
   if (x > b.maxX) b.maxX = x;
@@ -359,30 +378,24 @@ function growBounds(b: Bounds, x: number, y: number, z: number): void {
   if (z > b.maxZ) b.maxZ = z;
 }
 
-/** One pre-solved frame in WORLD space (x right, y up, z toward the viewer). */
 interface SolvedFrame {
   hasPose: boolean;
-  pose: Float32Array; // POSE_POINTS * [x, y, z, visibility]  (visibility 0 = hidden)
-  hands: Float32Array; // 2 * 21 * [x, y, z, valid]
+  pose: Float32Array;
+  hands: Float32Array;
   handPresent: [boolean, boolean];
   dense: boolean;
-  face: Float32Array; // FACE_SLOTS.length * [x, y, z, valid]
-  head: Float32Array; // see HEAD_LEN
+  face: Float32Array;
+  head: Float32Array;
 }
-interface SolvedSequence {
+export interface SolvedSequence {
   frames: SolvedFrame[];
   bounds: Bounds;
 }
 
 /* ==========================================================================
- * 3. 3D: COORDINATE CONVERSION + SEQUENCE SOLVER (reuses existing alignment)
+ * 3. 3D: COORDINATE CONVERSION + SEQUENCE SOLVER
  * ========================================================================== */
 
-/**
- * MediaPipe/2D-viewer convention: x right, y DOWN, z negative = toward camera.
- * World convention: x right, y UP, z positive = toward the viewer (camera sits on +z).
- * x is intentionally NOT mirrored, so left/right matches the existing 2D viewer exactly.
- */
 function writeWorld(
   out: Float32Array, o: number, x: number, y: number, z: number, scale: number,
 ): void {
@@ -443,21 +456,16 @@ function poseHeadFallback(pose: Float32Array, head: Float32Array): void {
   head.set([1, cx, cy, cz, w, h, d, cx, cy - h * 0.5, 0, roll]);
 }
 
-/* ---- Manual neck tuning (world units; the torso is 1.8 tall) -------------
- * NECK_LENGTH : visible neck height, from the shoulder line up to the chin.
- *               Smaller = shorter neck (head sits lower), larger = longer.
- * NECK_RADIUS : thickness of the neck bone at the shoulders.
- * ------------------------------------------------------------------------ */
 const NECK_LENGTH = 0.2;
 const NECK_RADIUS = 0.1;
+const NECK_SEGMENTS = 5;
 
-/** Seats the head at exactly NECK_LENGTH above the shoulders, with a vertical neck (hands never move). */
 function seatHead(pose: Float32Array, face: Float32Array, head: Float32Array): void {
   if (head[0] === 0 || pose[11 * 4 + 3] < THRESH || pose[12 * 4 + 3] < THRESH) return;
   const shoulderX = (pose[11 * 4] + pose[12 * 4]) / 2;
   const shoulderY = (pose[11 * 4 + 1] + pose[12 * 4 + 1]) / 2;
   const dx = head[7] - shoulderX;
-  const dy = head[8] - shoulderY - NECK_LENGTH; // exact neck height, up or down
+  const dy = head[8] - shoulderY - NECK_LENGTH;
   head[1] -= dx; head[7] -= dx;
   head[2] -= dy; head[8] -= dy;
   for (let k = 0; k < FACE_SLOTS.length; k++) {
@@ -484,7 +492,6 @@ function solveFrame(
   const hasPose = Boolean(poseFrame);
   const pf = poseFrame ?? BODY_GUIDE;
 
-  /* ---- body (existing stabilization, plus conservative depth) ---- */
   let zc = 0;
   if (hasPose) {
     const zs = [11, 12]
@@ -500,8 +507,6 @@ function solveFrame(
     const p = pf[i];
     if (!p || !validPoint(p) || !(p[3] >= THRESH)) continue;
     const xy = alignment ? stabilizePoint(p, alignment) : { x: p[0], y: p[1] };
-    // Head, torso and legs stay on one upright plane (their MediaPipe depth only
-    // makes the body lean/bend); arms and hands keep depth relative to the shoulders.
     const isArm = i >= 13 && i <= 22;
     const rawZ = hasPose && isArm && Number.isFinite(p[2]) ? (p[2] - zc) * zScale : 0;
     const z = Math.max(-zLimit, Math.min(zLimit, rawZ));
@@ -510,7 +515,6 @@ function solveFrame(
     pose[i * 4 + 3] = p[3];
   }
 
-  /* ---- hands (all 21 landmarks each, same space as the pose) ---- */
   const hands = new Float32Array(2 * 21 * 4);
   const handPresent: [boolean, boolean] = [false, false];
   const handOffset = hasPose ? { x: 0, y: 0 } : handAnchor(frame);
@@ -518,7 +522,7 @@ function solveFrame(
   ([0, 21] as const).forEach((off, slot) => {
     if (isMissingHand(frame, off)) return;
     handPresent[slot] = true;
-    const wristIdx = slot === 0 ? 15 : 16; // left hand -> pose 15, right hand -> pose 16
+    const wristIdx = slot === 0 ? 15 : 16;
     const ref = [wristIdx, wristIdx - 2].find((i) => pose[i * 4 + 3] >= THRESH);
     const baseZ = ref !== undefined ? poseMpZ[ref] : 0;
     for (let j = 0; j < 21; j++) {
@@ -533,8 +537,6 @@ function solveFrame(
       writeWorld(hands, o, sx, sy, baseZ + rz * handScale * Z_HAND, S);
       hands[o + 3] = 1;
     }
-    // Attach: the pose wrist follows the real hand wrist, so the forearm always
-    // reaches the hand and the captured sign itself is never moved or distorted.
     const w = slot * 21 * 4;
     if (hands[w + 3] === 1) {
       const pi = wristIdx * 4;
@@ -548,10 +550,9 @@ function solveFrame(
     }
   });
 
-  /* ---- face + head ---- */
   const face = new Float32Array(FACE_SLOTS.length * 4);
   const head = new Float32Array(HEAD_LEN);
-  let dense = false;
+  let dense = ctx.hasDenseConnections;
   if (ctx.hasDenseConnections && alignedFace?.length && rawFace) {
     dense = true;
     let ratio = 1;
@@ -588,21 +589,40 @@ function solveFrame(
         if (dx < 0) { dx = -dx; dy = -dy; }
         roll = Math.atan2(dy, dx);
       }
-      head.set([1, cx, cy, cz, w, h, d, cx, minY, 0, roll]); // neck ends at the chin, not inside the face
+      head.set([1, cx, cy, cz, w, h, d, cx, minY, 0, roll]);
     }
   }
-  if (head[0] === 0) poseHeadFallback(pose, head);
+  if (head[0] === 0 && !ctx.hasDenseConnections) poseHeadFallback(pose, head);
   seatHead(pose, face, head);
 
-  /* ---- bounds for auto-framing (hands count) ---- */
+  /* Reject stray landmarks while retaining the upper-body and hand range. */
   const b = ctx.bounds;
+  let ccx = 0, ccy = 0, ccz = 0, ccn = 0;
+  for (const i of [11, 12, 23, 24]) {
+    if (pose[i * 4 + 3] < THRESH) continue;
+    ccx += pose[i * 4]; ccy += pose[i * 4 + 1]; ccz += pose[i * 4 + 2]; ccn++;
+  }
+  if (ccn) { ccx /= ccn; ccy /= ccn; ccz /= ccn; }
+  const inReach = (x: number, y: number, z: number, maxTorso: number) =>
+    Math.hypot(x - ccx, y - ccy) <= maxTorso * TORSO_WORLD &&
+    Math.abs(z - ccz) <= maxTorso * TORSO_WORLD;
   for (let i = 0; i < POSE_POINTS; i++) {
-    if (pose[i * 4 + 3] >= THRESH && !isHandStub(i)) growBounds(b, pose[i * 4], pose[i * 4 + 1], pose[i * 4 + 2]);
+    if (
+      i < 23 && pose[i * 4 + 3] >= THRESH && !isHandStub(i) &&
+      inReach(pose[i * 4], pose[i * 4 + 1], pose[i * 4 + 2], 3.4)
+    ) {
+      growBounds(b, pose[i * 4], pose[i * 4 + 1], pose[i * 4 + 2]);
+    }
   }
   for (let i = 0; i < 42; i++) {
-    if (hands[i * 4 + 3] === 1) growBounds(b, hands[i * 4], hands[i * 4 + 1], hands[i * 4 + 2]);
+    if (
+      hands[i * 4 + 3] === 1 &&
+      inReach(hands[i * 4], hands[i * 4 + 1], hands[i * 4 + 2], 2.6)
+    ) {
+      growBounds(b, hands[i * 4], hands[i * 4 + 1], hands[i * 4 + 2]);
+    }
   }
-  if (head[0] > 0) {
+  if (head[0] > 0 && inReach(head[1], head[2], head[3], 2.4)) {
     growBounds(b, head[1] - head[4] / 2, head[2] - head[5] / 2, head[3]);
     growBounds(b, head[1] + head[4] / 2, head[2] + head[5] / 2, head[3] + head[6] / 2);
   }
@@ -626,21 +646,53 @@ function solveSequence(
   const solved = frames.map((frame, f) =>
     solveFrame(ctx, frame, pose?.[f], alignments?.[f], alignedFaces?.[f], faceMesh?.[f]),
   );
+
+  const hemHeights = solved.flatMap(({ pose: framePose }) => {
+    if (
+      framePose[23 * 4 + 3] < THRESH ||
+      framePose[24 * 4 + 3] < THRESH
+    ) {
+      return [];
+    }
+    return [(framePose[23 * 4 + 1] + framePose[24 * 4 + 1]) / 2 - DHUTI_DROP];
+  });
+  if (hemHeights.length) {
+    ctx.bounds.minY = Math.min(
+      ctx.bounds.minY,
+      hemHeights.reduce((lowest, height) => Math.min(lowest, height), Infinity) - 0.44,
+    );
+    const hips = solved.flatMap(({ pose: framePose }) =>
+      framePose[23 * 4 + 3] >= THRESH && framePose[24 * 4 + 3] >= THRESH
+        ? [{
+            x: (framePose[23 * 4] + framePose[24 * 4]) / 2,
+            z: (framePose[23 * 4 + 2] + framePose[24 * 4 + 2]) / 2,
+          }]
+        : [],
+    );
+    const stageRadius = Math.max((ctx.bounds.maxX - ctx.bounds.minX) * 0.74, 1.55);
+    const stageCenterX = medianValue(hips.map(({ x }) => x));
+    const stageCenterZ = medianValue(hips.map(({ z }) => z));
+    ctx.bounds.minX = Math.min(ctx.bounds.minX, stageCenterX - stageRadius);
+    ctx.bounds.maxX = Math.max(ctx.bounds.maxX, stageCenterX + stageRadius);
+    ctx.bounds.minZ = Math.min(ctx.bounds.minZ, stageCenterZ - stageRadius);
+    ctx.bounds.maxZ = Math.max(ctx.bounds.maxZ, stageCenterZ + stageRadius);
+  }
+
   return { frames: solved, bounds: ctx.bounds };
 }
 
 /* ==========================================================================
- * 4. 3D: FRAME SAMPLING (interpolation + visual smoothing, no allocations)
+ * 4. 3D: FRAME SAMPLING
  * ========================================================================== */
 
 interface SampleState {
-  pose: Float32Array; // POSE_POINTS * 4
+  pose: Float32Array;
   poseInit: Uint8Array;
-  hands: [Float32Array, Float32Array]; // 21 * 3 each
+  hands: [Float32Array, Float32Array];
   handValid: [Uint8Array, Uint8Array];
   handInit: Uint8Array;
   handAlpha: Float32Array;
-  face: Float32Array; // FACE_SLOTS.length * 3
+  face: Float32Array;
   faceValid: Uint8Array;
   faceInit: Uint8Array;
   head: Float32Array;
@@ -649,7 +701,7 @@ interface SampleState {
   dense: boolean;
   hasPose: boolean;
 }
-type SampleRef = { current: SampleState };
+export type SampleRef = { current: SampleState };
 
 function createSampleState(): SampleState {
   const faceCount = FACE_SLOTS.length;
@@ -673,7 +725,6 @@ function createSampleState(): SampleState {
 
 const _t = new Float32Array(4);
 
-/** Blends landmark i of two solved frames into _t. Returns false if neither frame has it. */
 function blendSource(A: Float32Array, B: Float32Array, i: number, a: number, minW: number): boolean {
   const o = i * 4;
   const okA = A[o + 3] >= minW;
@@ -695,7 +746,7 @@ function easeInto(dst: Float32Array, o: number, init: boolean, kxy: number, kz: 
   }
   dst[o] += (_t[0] - dst[o]) * kxy;
   dst[o + 1] += (_t[1] - dst[o + 1]) * kxy;
-  dst[o + 2] += (_t[2] - dst[o + 2]) * kz; // depth is smoothed harder: it is the noisy axis
+  dst[o + 2] += (_t[2] - dst[o + 2]) * kz;
 }
 
 function sampleFrame(
@@ -730,7 +781,7 @@ function sampleFrame(
     st.handAlpha[h] = snap
       ? target
       : st.handAlpha[h] + (target - st.handAlpha[h]) * (1 - Math.exp(-delta * (present ? 16 : 5)));
-    if (!present) continue; // missing hand: hold last valid landmarks while fading out
+    if (!present) continue;
     const pts = st.hands[h];
     const valid = st.handValid[h];
     const init = st.handInit[h] === 1;
@@ -745,7 +796,8 @@ function sampleFrame(
     st.handInit[h] = 1;
   }
 
-  st.dense = (a < 0.5 ? f0 : f1).dense;
+  const selectedFrame = a < 0.5 ? f0 : f1;
+  st.dense = selectedFrame.dense;
   if (st.dense) {
     for (let k = 0; k < FACE_SLOTS.length; k++) {
       if (!blendSource(f0.face, f1.face, k, a, 0.5)) {
@@ -761,11 +813,17 @@ function sampleFrame(
 
   const v0 = f0.head[0] > 0;
   const v1 = f1.head[0] > 0;
-  st.headValid = v0 || v1;
+  st.headValid = st.dense ? selectedFrame.head[0] > 0 : v0 || v1;
   if (st.headValid) {
     const kh = snap ? 1 : 1 - Math.exp(-delta * 25);
     for (let k = 1; k < HEAD_LEN; k++) {
-      const t = v0 && v1 ? f0.head[k] + (f1.head[k] - f0.head[k]) * a : v0 ? f0.head[k] : f1.head[k];
+      const t = st.dense
+        ? selectedFrame.head[k]
+        : v0 && v1
+          ? f0.head[k] + (f1.head[k] - f0.head[k]) * a
+          : v0
+            ? f0.head[k]
+            : f1.head[k];
       st.head[k] = st.headInit ? st.head[k] + (t - st.head[k]) * kh : t;
     }
     st.headInit = true;
@@ -775,7 +833,7 @@ function sampleFrame(
 }
 
 /* ==========================================================================
- * 5. 3D: SHARED THREE HELPERS (reused objects, zero per-frame allocation)
+ * 5. 3D: SHARED THREE HELPERS
  * ========================================================================== */
 
 const _m = new THREE.Matrix4();
@@ -792,12 +850,10 @@ const _sb = new Float32Array(3);
 let boneGeometry: THREE.CylinderGeometry | null = null;
 let jointGeometry: THREE.SphereGeometry | null = null;
 let headGeometry: THREE.SphereGeometry | null = null;
-// Unit-height, slightly tapered cylinder (thick end = start of the bone).
 const getBoneGeometry = () => (boneGeometry ??= new THREE.CylinderGeometry(0.78, 1, 1, 14, 1, false));
 const getJointGeometry = () => (jointGeometry ??= new THREE.SphereGeometry(1, 18, 14));
 const getHeadGeometry = () => (headGeometry ??= new THREE.SphereGeometry(1, 36, 26));
 
-/** Orients a unit cylinder from A to B: midpoint, direction, length -> quaternion/scale. */
 function placeBone(
   mesh: THREE.InstancedMesh, index: number,
   A: ArrayLike<number>, ao: number, B: ArrayLike<number>, bo: number, radius: number,
@@ -847,7 +903,18 @@ const visTint = (v: number) => 0.4 + 0.6 * Math.min(1, Math.max(0.2, v));
 function BodyRig({ sampleRef, pairs }: { sampleRef: SampleRef; pairs: PairList }) {
   const bonesRef = useRef<THREE.InstancedMesh>(null);
   const jointsRef = useRef<THREE.InstancedMesh>(null);
-  const joints = useMemo(() => Array.from(new Set(pairs.flat())), [pairs]);
+  const joints = useMemo(
+    () => Array.from(new Set(pairs.flat())).filter(
+      (index) =>
+        index !== 23 &&
+        index !== 24 &&
+        index !== 25 &&
+        index !== 26 &&
+        index !== 27 &&
+        index !== 28,
+    ),
+    [pairs],
+  );
   const radii = useMemo(
     () => pairs.map(([a, b]) => ((bodyJointRadius(a) + bodyJointRadius(b)) / 2) * 0.58),
     [pairs],
@@ -864,11 +931,11 @@ function BodyRig({ sampleRef, pairs }: { sampleRef: SampleRef; pairs: PairList }
     [pairs],
   );
   const boneMat = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: "#ffffff", metalness: 0.3, roughness: 0.42 }),
+    () => new THREE.MeshStandardMaterial({ color: "#ffffff", metalness: 0.38, roughness: 0.34 }),
     [],
   );
   const jointMat = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: "#ffffff", metalness: 0.35, roughness: 0.36 }),
+    () => new THREE.MeshStandardMaterial({ color: "#ffffff", metalness: 0.3, roughness: 0.3 }),
     [],
   );
   useEffect(() => () => { boneMat.dispose(); jointMat.dispose(); }, [boneMat, jointMat]);
@@ -915,71 +982,179 @@ function BodyRig({ sampleRef, pairs }: { sampleRef: SampleRef; pairs: PairList }
 
   return (
     <group>
-      <instancedMesh ref={bonesRef} args={[getBoneGeometry(), boneMat, pairs.length]} frustumCulled={false} />
-      <instancedMesh ref={jointsRef} args={[getJointGeometry(), jointMat, joints.length]} frustumCulled={false} />
+      <instancedMesh
+        ref={bonesRef}
+        args={[getBoneGeometry(), boneMat, pairs.length]}
+        frustumCulled={false}
+        castShadow
+        receiveShadow
+      />
+      <instancedMesh
+        ref={jointsRef}
+        args={[getJointGeometry(), jointMat, joints.length]}
+        frustumCulled={false}
+        castShadow
+        receiveShadow
+      />
     </group>
   );
 }
 
-const TORSO_INDICES = [
-  0, 1, 2, 0, 2, 3, 4, 6, 5, 4, 7, 6, 0, 3, 7, 0, 7, 4,
-  1, 5, 6, 1, 6, 2, 0, 4, 5, 0, 5, 1, 3, 2, 6, 3, 6, 7,
-];
+const TORSO_RING_PROFILE = [0.72, 0.9, 0.99, 1.04, 1.03, 0.96, 0.8];
+const TORSO_RINGS = TORSO_RING_PROFILE.length;
+const TORSO_SEGMENTS = 16;
+const TORSO_CAPS = 2;
+const TORSO_CAP_TOP = TORSO_RINGS * TORSO_SEGMENTS;
+const TORSO_CAP_BOTTOM = TORSO_CAP_TOP + 1;
+const TORSO_INDICES = (() => {
+  const indices: number[] = [];
+  for (let ring = 0; ring < TORSO_RINGS - 1; ring++) {
+    const upper = ring * TORSO_SEGMENTS;
+    const lower = (ring + 1) * TORSO_SEGMENTS;
+    for (let segment = 0; segment < TORSO_SEGMENTS; segment++) {
+      const next = (segment + 1) % TORSO_SEGMENTS;
+      indices.push(
+        upper + segment, lower + segment, lower + next,
+        upper + segment, lower + next, upper + next,
+      );
+    }
+  }
+  for (let segment = 0; segment < TORSO_SEGMENTS; segment++) {
+    const next = (segment + 1) % TORSO_SEGMENTS;
+    indices.push(TORSO_CAP_TOP, next, segment);
+    const bottom = (TORSO_RINGS - 1) * TORSO_SEGMENTS;
+    indices.push(TORSO_CAP_BOTTOM, bottom + segment, bottom + next);
+  }
+  return indices;
+})();
 
-/** Subtle translucent torso box between shoulders and hips; never occludes the hands. */
-function TorsoRig({ sampleRef }: { sampleRef: SampleRef }) {
+function TorsoRig({
+  sampleRef,
+  playbackRef,
+}: {
+  sampleRef: SampleRef;
+  playbackRef: React.MutableRefObject<PlaybackState>;
+}) {
   const meshRef = useRef<THREE.Mesh>(null);
+  const idleTime = useRef(0);
   const geometry = useMemo(() => {
     const g = new THREE.BufferGeometry();
-    g.setAttribute("position", new THREE.BufferAttribute(new Float32Array(8 * 3), 3).setUsage(THREE.DynamicDrawUsage));
+    g.setAttribute(
+      "position",
+      new THREE.BufferAttribute(
+        new Float32Array((TORSO_RINGS * TORSO_SEGMENTS + TORSO_CAPS) * 3),
+        3,
+      )
+        .setUsage(THREE.DynamicDrawUsage),
+    );
     g.setIndex(TORSO_INDICES);
     return g;
   }, []);
   const material = useMemo(
     () =>
       new THREE.MeshStandardMaterial({
-        color: COLOR.volume, transparent: true, opacity: 0.15, roughness: 0.7, metalness: 0.1,
-        side: THREE.DoubleSide, depthWrite: false,
+        color: COLOR.volume,
+        emissive: "#080f29",
+        emissiveIntensity: 0.1,
+        roughness: 0.38,
+        metalness: 0.34,
+        side: THREE.DoubleSide, flatShading: false,
       }),
     [],
   );
   useEffect(() => () => { geometry.dispose(); material.dispose(); }, [geometry, material]);
 
-  useFrame(() => {
+  useFrame((_, delta) => {
     const mesh = meshRef.current;
     if (!mesh) return;
+    if (!playbackRef.current.playing) idleTime.current += Math.min(delta, 0.1);
     const P = sampleRef.current.pose;
     const ok = P[11 * 4 + 3] >= THRESH && P[12 * 4 + 3] >= THRESH && P[23 * 4 + 3] >= THRESH && P[24 * 4 + 3] >= THRESH;
     mesh.visible = ok;
     if (!ok) return;
-    const width = Math.hypot(P[11 * 4] - P[12 * 4], P[11 * 4 + 1] - P[12 * 4 + 1], P[11 * 4 + 2] - P[12 * 4 + 2]);
-    const depth = Math.max(0.1, width * 0.17);
+    const shoulderCenterX = (P[11 * 4] + P[12 * 4]) / 2;
+    const shoulderCenterY = (P[11 * 4 + 1] + P[12 * 4 + 1]) / 2;
+    const shoulderCenterZ = (P[11 * 4 + 2] + P[12 * 4 + 2]) / 2;
+    const hipCenterX = (P[23 * 4] + P[24 * 4]) / 2;
+    const hipCenterY = (P[23 * 4 + 1] + P[24 * 4 + 1]) / 2 - 0.12;
+    const hipCenterZ = (P[23 * 4 + 2] + P[24 * 4 + 2]) / 2;
+    const shoulderHalfWidth = Math.max(
+      Math.hypot(
+        P[11 * 4] - P[12 * 4],
+        P[11 * 4 + 1] - P[12 * 4 + 1],
+        P[11 * 4 + 2] - P[12 * 4 + 2],
+      ) * 0.52,
+      0.12,
+    );
+    const hipHalfWidth = Math.max(Math.abs(P[23 * 4] - P[24 * 4]) * 0.52, 0.1);
     const pos = geometry.getAttribute("position") as THREE.BufferAttribute;
-    const order = [11, 12, 24, 23]; // LS, RS, RH, LH -> front vertices 0-3, back vertices 4-7
-    for (let k = 0; k < 4; k++) {
-      const o = order[k] * 4;
-      pos.setXYZ(k, P[o], P[o + 1], P[o + 2] + depth);
-      pos.setXYZ(k + 4, P[o], P[o + 1], P[o + 2] - depth);
+    for (let ring = 0; ring < TORSO_RINGS; ring++) {
+      const t = ring / (TORSO_RINGS - 1);
+      const profile = TORSO_RING_PROFILE[ring];
+      const centerX = THREE.MathUtils.lerp(shoulderCenterX, hipCenterX, t);
+      const centerY = THREE.MathUtils.lerp(shoulderCenterY, hipCenterY, t);
+      const centerZ = THREE.MathUtils.lerp(shoulderCenterZ, hipCenterZ, t);
+      const idleBreath = playbackRef.current.playing
+        ? 1
+        : 1 + Math.sin(idleTime.current * 1.35) * 0.003;
+      const halfWidth =
+        THREE.MathUtils.lerp(shoulderHalfWidth, hipHalfWidth, t) * profile * idleBreath;
+      const depth = Math.max(halfWidth * 0.62, 0.08);
+      for (let segment = 0; segment < TORSO_SEGMENTS; segment++) {
+        const angle = (segment / TORSO_SEGMENTS) * Math.PI * 2;
+        const index = ring * TORSO_SEGMENTS + segment;
+        pos.setXYZ(
+          index,
+          centerX + Math.cos(angle) * halfWidth,
+          centerY,
+          centerZ + Math.sin(angle) * depth,
+        );
+      }
     }
+    pos.setXYZ(TORSO_CAP_TOP, shoulderCenterX, shoulderCenterY, shoulderCenterZ);
+    pos.setXYZ(TORSO_CAP_BOTTOM, hipCenterX, hipCenterY, hipCenterZ);
     pos.needsUpdate = true;
     geometry.computeVertexNormals();
   });
 
-  return <mesh ref={meshRef} geometry={geometry} material={material} frustumCulled={false} renderOrder={-1} />;
+  return (
+    <mesh
+      ref={meshRef}
+      geometry={geometry}
+      material={material}
+      frustumCulled={false}
+      renderOrder={-1}
+      castShadow
+      receiveShadow
+    />
+  );
 }
 
 function HeadRig({ sampleRef }: { sampleRef: SampleRef }) {
   const headRef = useRef<THREE.Mesh>(null);
   const neckRef = useRef<THREE.InstancedMesh>(null);
+  const neckStart = useRef(new Float32Array(3));
+  const neckEnd = useRef(new Float32Array(3));
   const headMat = useMemo(
     () =>
       new THREE.MeshStandardMaterial({
-        color: COLOR.volume, transparent: true, opacity: 0.13, roughness: 0.55, metalness: 0.05, depthWrite: false,
+        color: "#172a47",
+        transparent: true,
+        opacity: 0.13,
+        roughness: 0.55,
+        metalness: 0.05,
+        depthWrite: false,
       }),
     [],
   );
   const neckMat = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: COLOR.other, metalness: 0.3, roughness: 0.45 }),
+    () => new THREE.MeshStandardMaterial({
+      color: "#5678bd",
+      metalness: 0.34,
+      roughness: 0.3,
+      emissive: "#10213f",
+      emissiveIntensity: 0.08,
+    }),
     [],
   );
   useEffect(() => () => { headMat.dispose(); neckMat.dispose(); }, [headMat, neckMat]);
@@ -992,8 +1167,7 @@ function HeadRig({ sampleRef }: { sampleRef: SampleRef }) {
     const st = sampleRef.current;
     head.visible = st.headValid;
     if (!st.headValid) {
-      neck.setMatrixAt(0, _zero);
-      neck.instanceMatrix.needsUpdate = true;
+      hideAll(neck);
       return;
     }
     const H = st.head;
@@ -1007,17 +1181,52 @@ function HeadRig({ sampleRef }: { sampleRef: SampleRef }) {
       _sa[1] = (P[11 * 4 + 1] + P[12 * 4 + 1]) / 2;
       _sa[2] = (P[11 * 4 + 2] + P[12 * 4 + 2]) / 2;
       _sb[0] = H[7]; _sb[1] = H[8]; _sb[2] = H[9];
-      placeBone(neck, 0, _sa, 0, _sb, 0, NECK_RADIUS);
+      const dx = _sb[0] - _sa[0];
+      const dy = _sb[1] - _sa[1];
+      const dz = _sb[2] - _sa[2];
+      for (let index = 0; index < NECK_SEGMENTS; index++) {
+        const start = (index + 0.08) / NECK_SEGMENTS;
+        const end = (index + 0.92) / NECK_SEGMENTS;
+        neckStart.current[0] = _sa[0] + dx * start;
+        neckStart.current[1] = _sa[1] + dy * start;
+        neckStart.current[2] = _sa[2] + dz * start;
+        neckEnd.current[0] = _sa[0] + dx * end;
+        neckEnd.current[1] = _sa[1] + dy * end;
+        neckEnd.current[2] = _sa[2] + dz * end;
+        placeBone(
+          neck,
+          index,
+          neckStart.current,
+          0,
+          neckEnd.current,
+          0,
+          NECK_RADIUS * (0.9 + 0.1 * Math.sin((index / (NECK_SEGMENTS - 1)) * Math.PI)),
+        );
+        neck.setColorAt(index, _c.set(index === 0 || index === NECK_SEGMENTS - 1 ? "#64cbd6" : "#274566"));
+      }
     } else {
-      neck.setMatrixAt(0, _zero);
+      hideAll(neck);
     }
     neck.instanceMatrix.needsUpdate = true;
+    if (neck.instanceColor) neck.instanceColor.needsUpdate = true;
   });
 
   return (
     <group>
-      <mesh ref={headRef} geometry={getHeadGeometry()} material={headMat} frustumCulled={false} renderOrder={-1} />
-      <instancedMesh ref={neckRef} args={[getBoneGeometry(), neckMat, 1]} frustumCulled={false} />
+      <mesh
+        ref={headRef}
+        geometry={getHeadGeometry()}
+        material={headMat}
+        frustumCulled={false}
+        renderOrder={-1}
+        castShadow
+      />
+      <instancedMesh
+        ref={neckRef}
+        args={[getBoneGeometry(), neckMat, NECK_SEGMENTS]}
+        frustumCulled={false}
+        castShadow
+      />
     </group>
   );
 }
@@ -1068,7 +1277,7 @@ function FaceRig({ sampleRef }: { sampleRef: SampleRef }) {
       const F = st.face;
       for (let s = 0; s < FACE_SEGMENTS.length; s += 2) {
         const a = FACE_SEGMENTS[s], b = FACE_SEGMENTS[s + 1];
-        const i = s; // vertex index of first endpoint (2 vertices per segment)
+        const i = s;
         if (st.faceValid[a] && st.faceValid[b]) {
           pos.setXYZ(i, F[a * 3], F[a * 3 + 1], F[a * 3 + 2]);
           pos.setXYZ(i + 1, F[b * 3], F[b * 3 + 1], F[b * 3 + 2]);
@@ -1111,12 +1320,12 @@ function FaceRig({ sampleRef }: { sampleRef: SampleRef }) {
   );
 }
 
-/** Full 21-landmark hand: thin bones, joints, optional palm fan. Fades when the hand drops out. */
 function HandRig({ slot, color, sampleRef }: { slot: 0 | 1; color: string; sampleRef: SampleRef }) {
   const groupRef = useRef<THREE.Group>(null);
   const bonesRef = useRef<THREE.InstancedMesh>(null);
   const jointsRef = useRef<THREE.InstancedMesh>(null);
   const palmRef = useRef<THREE.Mesh>(null);
+  const correction = useRef(new THREE.Vector3());
 
   const mats = useMemo(
     () => ({
@@ -1165,6 +1374,75 @@ function HandRig({ slot, color, sampleRef }: { slot: 0 | 1; color: string; sampl
     mats.joint.opacity = alpha;
     mats.palm.opacity = alpha * 0.22;
 
+    correction.current.set(0, 0, 0);
+    const P = st.pose;
+    if (
+      P[11 * 4 + 3] >= THRESH && P[12 * 4 + 3] >= THRESH &&
+      P[23 * 4 + 3] >= THRESH && P[24 * 4 + 3] >= THRESH &&
+      valid[0]
+    ) {
+      const shoulderY = (P[11 * 4 + 1] + P[12 * 4 + 1]) / 2;
+      const hipY = (P[23 * 4 + 1] + P[24 * 4 + 1]) / 2;
+      const shoulderCenterX = (P[11 * 4] + P[12 * 4]) / 2;
+      const shoulderCenterZ = (P[11 * 4 + 2] + P[12 * 4 + 2]) / 2;
+      const hipCenterX = (P[23 * 4] + P[24 * 4]) / 2;
+      const hipCenterZ = (P[23 * 4 + 2] + P[24 * 4 + 2]) / 2;
+      const wristT = THREE.MathUtils.clamp(
+        (shoulderY - pts[1]) / Math.max(shoulderY - hipY, 1e-5),
+        0,
+        1,
+      );
+      const wristX = pts[0] - THREE.MathUtils.lerp(shoulderCenterX, hipCenterX, wristT);
+      const wristZ = pts[2] - THREE.MathUtils.lerp(shoulderCenterZ, hipCenterZ, wristT);
+      const directionLength = Math.hypot(wristX, wristZ);
+      const directionX = directionLength > 1e-5 ? wristX / directionLength : (slot === 0 ? -1 : 1);
+      const directionZ = directionLength > 1e-5 ? wristZ / directionLength : 0;
+      let requiredOffset = 0;
+      const shoulderWidth = Math.max(Math.hypot(
+        P[11 * 4] - P[12 * 4],
+        P[11 * 4 + 2] - P[12 * 4 + 2],
+      ) * 0.52, 0.12);
+      const hipWidth = Math.max(Math.abs(P[23 * 4] - P[24 * 4]) * 0.52, 0.1);
+
+      for (let joint = 0; joint < 21; joint++) {
+        if (!valid[joint]) continue;
+        const offset = joint * 3;
+        const t = THREE.MathUtils.clamp(
+          (shoulderY - pts[offset + 1]) / Math.max(shoulderY - hipY, 1e-5),
+          0,
+          1,
+        );
+        if (pts[offset + 1] > shoulderY + 0.08 || pts[offset + 1] < hipY - 0.08) continue;
+        const profile = t < 0.2
+          ? THREE.MathUtils.lerp(0.72, 1.16, t / 0.2)
+          : t < 0.6
+            ? THREE.MathUtils.lerp(1.16, 1.14, (t - 0.2) / 0.4)
+            : THREE.MathUtils.lerp(1.14, 1.04, (t - 0.6) / 0.4);
+        const radiusX = Math.max(THREE.MathUtils.lerp(shoulderWidth, hipWidth, t) * profile, 0.09);
+        const radiusZ = Math.max(radiusX * 0.62, 0.08);
+        const relativeX = pts[offset] - THREE.MathUtils.lerp(shoulderCenterX, hipCenterX, t);
+        const relativeZ = pts[offset + 2] - THREE.MathUtils.lerp(shoulderCenterZ, hipCenterZ, t);
+        const a = directionX * directionX / (radiusX * radiusX) +
+          directionZ * directionZ / (radiusZ * radiusZ);
+        const b = 2 * (
+          relativeX * directionX / (radiusX * radiusX) +
+          relativeZ * directionZ / (radiusZ * radiusZ)
+        );
+        const c = relativeX * relativeX / (radiusX * radiusX) +
+          relativeZ * relativeZ / (radiusZ * radiusZ) - 1;
+        const discriminant = b * b - 4 * a * c;
+        if (c < 0 && discriminant >= 0 && a > 0) {
+          requiredOffset = Math.max(requiredOffset, (-b + Math.sqrt(discriminant)) / (2 * a));
+        }
+      }
+
+      if (requiredOffset > 0) {
+        const clearance = requiredOffset + 0.025;
+        correction.current.set(directionX * clearance, 0, directionZ * clearance);
+      }
+    }
+    group.position.copy(correction.current);
+
     for (let i = 0; i < HAND_CONN.length; i++) {
       const c = HAND_CONN[i];
       if (valid[c[0]] && valid[c[1]]) placeBone(bones, i, pts, c[0] * 3, pts, c[1] * 3, HAND_BONE_RADIUS[i]);
@@ -1181,7 +1459,7 @@ function HandRig({ slot, color, sampleRef }: { slot: 0 | 1; color: string; sampl
     if (palm.visible) {
       const pos = palmGeo.getAttribute("position") as THREE.BufferAttribute;
       for (let k = 0; k < PALM_FAN.length; k++) {
-        const j = valid[PALM_FAN[k]] ? PALM_FAN[k] : 0; // missing palm vertex collapses onto the wrist
+        const j = valid[PALM_FAN[k]] ? PALM_FAN[k] : 0;
         pos.setXYZ(k, pts[j * 3], pts[j * 3 + 1], pts[j * 3 + 2]);
       }
       pos.needsUpdate = true;
@@ -1205,7 +1483,7 @@ function HandRig({ slot, color, sampleRef }: { slot: 0 | 1; color: string; sampl
 interface PlaybackState { playing: boolean; speed: number }
 
 function PlaybackDriver({
-  seq, sampleRef, playheadRef, playbackRef, fps, onFrame,
+  seq, sampleRef, playheadRef, playbackRef, fps, onFrame, loop, onComplete, restartToken,
 }: {
   seq: SolvedSequence;
   sampleRef: SampleRef;
@@ -1213,9 +1491,20 @@ function PlaybackDriver({
   playbackRef: React.MutableRefObject<PlaybackState>;
   fps: number;
   onFrame: (frame: number) => void;
+  loop: boolean;
+  onComplete?: () => void;
+  restartToken: number;
 }) {
   const lastShown = useRef(-1);
   const lastPlayhead = useRef(-100);
+  const completed = useRef(false);
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
+
+  useEffect(() => {
+    completed.current = false;
+  }, [restartToken]);
+
   useFrame((_, delta) => {
     const n = seq.frames.length;
     if (n === 0) return;
@@ -1224,11 +1513,22 @@ function PlaybackDriver({
     let ph = playheadRef.current;
     if (pb.playing && n > 1) {
       ph += dt * fps * pb.speed;
-      if (ph >= n) ph %= n;
+      if (ph >= n) {
+        if (loop) {
+          ph %= n;
+        } else {
+          ph = n - 1;
+          pb.playing = false;
+          if (!completed.current) {
+            completed.current = true;
+            onCompleteRef.current?.();
+          }
+        }
+      }
       playheadRef.current = ph;
     }
     ph = Math.min(Math.max(ph, 0), n - 1 + 0.999);
-    const snap = Math.abs(ph - lastPlayhead.current) > 2.5; // seek or loop wrap: no smoothing streaks
+    const snap = Math.abs(ph - lastPlayhead.current) > 2.5;
     lastPlayhead.current = ph;
     sampleFrame(seq, sampleRef.current, Math.min(ph, n - 1), dt, snap);
     const shown = Math.min(Math.floor(ph), n - 1);
@@ -1240,7 +1540,9 @@ function PlaybackDriver({
   return null;
 }
 
-type ViewKind = "front" | "side" | "angle" | "reset" | "zoomIn" | "zoomOut" | "zoomReset";
+type ViewKind =
+  | "front" | "side" | "angle" | "reset"
+  | "focusHands" | "focusFace";
 interface ViewCommand { kind: ViewKind; nonce: number }
 
 const VIEW_DIRS = {
@@ -1257,21 +1559,32 @@ function computeFraming(b: Bounds, aspect: number): { center: THREE.Vector3; dis
   const halfD = Math.max((b.maxZ - b.minZ) / 2, 0);
   const t = Math.tan(THREE.MathUtils.degToRad(FOV) / 2);
   const distance =
-    Math.max((halfH * 1.12) / t, (halfW * 1.12) / (t * Math.max(aspect, 0.2))) + halfD + 0.3;
+    Math.max((halfH * 1.08) / t, (halfW * 1.08) / (t * Math.max(aspect, 0.2))) + halfD + 0.15;
   return { center, distance };
 }
 
 type OrbitControlsHandle = React.ElementRef<typeof OrbitControls>;
 
 function CameraRig({
-  bounds, command, onZoom,
-}: { bounds: Bounds; command: ViewCommand; onZoom: (zoom: number) => void }) {
+  bounds, command, horizontalOnly, sampleRef, viewResetToken,
+}: {
+  bounds: Bounds;
+  command: ViewCommand;
+  horizontalOnly: boolean;
+  sampleRef: SampleRef;
+  viewResetToken: number;
+}) {
   const camera = useThree((s) => s.camera);
   const size = useThree((s) => s.size);
+  const gl = useThree((s) => s.gl);
   const controlsRef = useRef<OrbitControlsHandle>(null);
   const goal = useRef<{ pos: THREE.Vector3; target: THREE.Vector3 } | null>(null);
+  const focusRef = useRef<{ kind: "hands" | "face"; dist: number } | null>(null);
+  const focusPoint = useRef(new THREE.Vector3());
+  const focusInit = useRef(false);
   const interacted = useRef(false);
-  const lastPct = useRef(100);
+  const lastViewResetToken = useRef(viewResetToken);
+  const dragging = useRef(false);
   const aspect = size.width / Math.max(size.height, 1);
   const framing = useMemo(() => computeFraming(bounds, aspect), [bounds, aspect]);
   const framingRef = useRef(framing);
@@ -1289,16 +1602,29 @@ function CameraRig({
     }
   }, [camera]);
 
-  // New sequence: reset the view.
   useLayoutEffect(() => {
     interacted.current = false;
     goal.current = null;
+    focusRef.current = null;
+    focusInit.current = false;
     placeFront();
   }, [bounds, placeFront]);
-  // Resize/aspect change: re-frame only if the user has not moved the camera.
+
   useEffect(() => {
     if (!interacted.current) placeFront();
   }, [framing.distance, placeFront]);
+
+  useEffect(() => {
+    const el = gl.domElement;
+    const down = () => { dragging.current = true; };
+    const up = () => { dragging.current = false; };
+    el.addEventListener("pointerdown", down);
+    window.addEventListener("pointerup", up);
+    return () => {
+      el.removeEventListener("pointerdown", down);
+      window.removeEventListener("pointerup", up);
+    };
+  }, [gl]);
 
   useEffect(() => {
     if (command.nonce === 0) return;
@@ -1307,109 +1633,141 @@ function CameraRig({
     const target = ctl ? ctl.target.clone() : center.clone();
     const offset = camera.position.clone().sub(target);
     const current = offset.length() || base;
-    const keepDir = offset.clone().normalize();
-    const clamp = (d: number) => Math.min(Math.max(d, base / 4), base / 0.4);
     switch (command.kind) {
       case "front":
       case "side":
       case "angle":
-        goal.current = { pos: center.clone().addScaledVector(VIEW_DIRS[command.kind], current), target: center.clone() };
+        focusRef.current = null;
+        goal.current = {
+          pos: center.clone().addScaledVector(VIEW_DIRS[command.kind], current),
+          target: center.clone(),
+        };
         break;
       case "reset":
         interacted.current = false;
-        goal.current = { pos: center.clone().addScaledVector(VIEW_DIRS.front, base), target: center.clone() };
+        focusRef.current = null;
+        focusInit.current = false;
+        goal.current = null;
+        camera.position.copy(center).addScaledVector(VIEW_DIRS.front, base);
+        if (ctl) {
+          ctl.target.copy(center);
+          ctl.update();
+        } else {
+          camera.lookAt(center);
+        }
         break;
-      case "zoomIn":
-        goal.current = { pos: target.clone().addScaledVector(keepDir, clamp(current / 1.25)), target };
-        break;
-      case "zoomOut":
-        goal.current = { pos: target.clone().addScaledVector(keepDir, clamp(current * 1.25)), target };
-        break;
-      case "zoomReset":
-        goal.current = { pos: target.clone().addScaledVector(keepDir, base), target };
+      case "focusHands":
+      case "focusFace":
+        interacted.current = true;
+        goal.current = null;
+        focusRef.current = {
+          kind: command.kind === "focusHands" ? "hands" : "face",
+          dist: framingRef.current.distance * 0.34,
+        };
+        focusInit.current = false;
         break;
     }
   }, [command, camera]);
 
+  useEffect(() => {
+    if (lastViewResetToken.current === viewResetToken) return;
+    lastViewResetToken.current = viewResetToken;
+    const { center, distance } = framingRef.current;
+    interacted.current = false;
+    focusRef.current = null;
+    focusInit.current = false;
+    goal.current = null;
+    camera.position.copy(center).addScaledVector(VIEW_DIRS.front, distance);
+    const controls = controlsRef.current;
+    if (controls) {
+      controls.target.copy(center);
+      controls.update();
+    } else {
+      camera.lookAt(center);
+    }
+  }, [viewResetToken, camera]);
+
   useFrame((_, delta) => {
     const ctl = controlsRef.current;
     if (!ctl) return;
-    const g = goal.current;
-    if (g) {
-      const k = 1 - Math.exp(-delta * 9);
-      camera.position.lerp(g.pos, k);
-      ctl.target.lerp(g.target, k);
+
+    (ctl as unknown as { zoomToCursor?: boolean }).zoomToCursor = !focusRef.current;
+
+    if (focusRef.current) {
+      const st = sampleRef.current;
+      if (focusRef.current.kind === "face" && st.headValid) {
+        _p.set(st.head[1], st.head[2], st.head[3]);
+      } else {
+        let nx = 0, ny = 0, nz = 0, n = 0;
+        for (let h = 0; h < 2; h++) {
+          if (st.handAlpha[h] > 0.4 && st.handValid[h][0] === 1) {
+            nx += st.hands[h][0]; ny += st.hands[h][1]; nz += st.hands[h][2]; n++;
+          }
+        }
+        if (n === 0) {
+          const P = st.pose;
+          for (const i of [15, 16]) {
+            if (P[i * 4 + 3] >= THRESH) {
+              nx += P[i * 4]; ny += P[i * 4 + 1]; nz += P[i * 4 + 2]; n++;
+            }
+          }
+        }
+        if (n === 0 && st.headValid) { nx = st.head[1]; ny = st.head[2]; nz = st.head[3]; n = 1; }
+        if (n > 0) _p.set(nx / n, ny / n, nz / n);
+        else _p.set(0, 0, 0);
+      }
+      if (!focusInit.current) { focusPoint.current.copy(_p); focusInit.current = true; }
+      else focusPoint.current.lerp(_p, 1 - Math.exp(-delta * 6));
+
+      const k = 1 - Math.exp(-delta * 7);
+      ctl.target.lerp(focusPoint.current, k);
+      _d.copy(camera.position).sub(ctl.target);
+      if (_d.lengthSq() < 1e-6) _d.set(0, 0, 1);
+      _d.normalize();
+      camera.position.copy(ctl.target).addScaledVector(_d, focusRef.current.dist);
       ctl.update();
-      const eps = framingRef.current.distance * 0.002;
-      if (camera.position.distanceToSquared(g.pos) < eps * eps) {
-        camera.position.copy(g.pos);
-        ctl.target.copy(g.target);
+    } else {
+      const g = goal.current;
+      if (g) {
+        const k = 1 - Math.exp(-delta * 9);
+        camera.position.lerp(g.pos, k);
+        ctl.target.lerp(g.target, k);
         ctl.update();
-        goal.current = null;
+        const eps = framingRef.current.distance * 0.002;
+        if (camera.position.distanceToSquared(g.pos) < eps * eps) {
+          camera.position.copy(g.pos);
+          ctl.target.copy(g.target);
+          ctl.update();
+          goal.current = null;
+        }
       }
     }
-    const dist = camera.position.distanceTo(ctl.target);
-    const pct = Math.max(5, Math.round((framingRef.current.distance / Math.max(dist, 1e-6)) * 20) * 5);
-    if (pct !== lastPct.current) {
-      lastPct.current = pct;
-      onZoom(pct / 100);
-    }
+
   });
 
   return (
     <OrbitControls
       ref={controlsRef}
       makeDefault
+      enableZoom
       enableDamping
       dampingFactor={0.1}
       rotateSpeed={0.8}
       zoomSpeed={0.8}
       screenSpacePanning
-      minDistance={framing.distance / 4}
-      maxDistance={framing.distance / 0.4}
+      enablePan
+      minPolarAngle={horizontalOnly ? Math.PI / 2 : 0}
+      maxPolarAngle={horizontalOnly ? Math.PI / 2 : Math.PI}
+      minDistance={framing.distance / 7}
+      maxDistance={framing.distance}
       onStart={() => {
         interacted.current = true;
-        goal.current = null;
+        if (dragging.current) {
+          goal.current = null;
+          focusRef.current = null;
+        }
       }}
     />
-  );
-}
-
-function Floor({ bounds }: { bounds: Bounds }) {
-  const grid = useMemo(() => {
-    const g = new THREE.GridHelper(1, 24, "#4a5090", "#2b3060");
-    const m = g.material as THREE.LineBasicMaterial;
-    m.transparent = true;
-    m.opacity = 0.26;
-    m.depthWrite = false;
-    return g;
-  }, []);
-  useEffect(
-    () => () => {
-      grid.geometry.dispose();
-      (grid.material as THREE.Material).dispose();
-    },
-    [grid],
-  );
-  if (!Number.isFinite(bounds.minY)) return null;
-  const height = bounds.maxY - bounds.minY;
-  const floorY = bounds.minY - Math.max(height * 0.06, 0.08);
-  const gridSize = Math.max(bounds.maxX - bounds.minX, height) * 2.2;
-  const cx = (bounds.minX + bounds.maxX) / 2;
-  const cz = (bounds.minZ + bounds.maxZ) / 2;
-  return (
-    <>
-      <primitive object={grid} position={[cx, floorY, cz]} scale={gridSize} />
-      <ContactShadows
-        position={[cx, floorY + 0.002, cz]}
-        scale={gridSize}
-        far={height * 1.6}
-        blur={2.4}
-        opacity={0.45}
-        resolution={256}
-        color="#05060f"
-      />
-    </>
   );
 }
 
@@ -1421,29 +1779,51 @@ interface ViewerProps {
   playbackRef: React.MutableRefObject<PlaybackState>;
   command: ViewCommand;
   onFrame: (frame: number) => void;
-  onZoom: (zoom: number) => void;
   onFail: () => void;
+  loop: boolean;
+  onComplete?: () => void;
+  restartToken: number;
+  horizontalOnly: boolean;
+  viewResetToken: number;
 }
 
 function SceneContent({
-  seq, fps, hasPoseData, playheadRef, playbackRef, command, onFrame, onZoom,
+  seq, fps, hasPoseData, playheadRef, playbackRef, command, onFrame,
+  loop, onComplete, restartToken, horizontalOnly, viewResetToken,
 }: Omit<ViewerProps, "onFail">) {
   const sampleRef = useMemo<SampleRef>(() => ({ current: createSampleState() }), [seq]);
   return (
     <>
-      <hemisphereLight args={["#c7d2fe", "#1e1b4b", 0.55]} />
-      <directionalLight position={[3, 5, 4]} intensity={1.3} />
-      <directionalLight position={[-4, 3, -4]} intensity={0.9} color="#818cf8" />
-      <directionalLight position={[-3, 1, 3]} intensity={0.35} color="#38bdf8" />
+      <color attach="background" args={["#2B3D5B"]} />
+      <hemisphereLight args={["#eaf0ff", "#182642", 0.82]} />
+      <directionalLight
+        position={[3, 5, 4]}
+        intensity={1.45}
+        color="#f5f4f1"
+        castShadow
+        shadow-mapSize={[2048, 2048]}
+        shadow-bias={-0.0004}
+        shadow-normalBias={0.025}
+      />
+      <directionalLight position={[-4, 3, -4]} intensity={0.72} color="#9cbcff" />
+      <directionalLight position={[3, 2, -2]} intensity={0.26} color="#55DDE0" />
       <PlaybackDriver
         seq={seq} sampleRef={sampleRef} playheadRef={playheadRef}
-        playbackRef={playbackRef} fps={fps} onFrame={onFrame}
+        playbackRef={playbackRef} fps={fps} onFrame={onFrame} loop={loop}
+        onComplete={onComplete} restartToken={restartToken}
       />
-      <CameraRig bounds={seq.bounds} command={command} onZoom={onZoom} />
-      <Floor bounds={seq.bounds} />
-      <TorsoRig sampleRef={sampleRef} />
+      <CameraRig
+        bounds={seq.bounds}
+        command={command}
+        horizontalOnly={horizontalOnly}
+        sampleRef={sampleRef}
+        viewResetToken={viewResetToken}
+      />
+      <RoundAlpanaStage seq={seq} />
+      <TorsoRig sampleRef={sampleRef} playbackRef={playbackRef} />
       <HeadRig sampleRef={sampleRef} />
       <BodyRig sampleRef={sampleRef} pairs={hasPoseData ? RIG_POSE_PAIRS : RIG_GUIDE_PAIRS} />
+      <DhutiRig sampleRef={sampleRef} />
       <FaceRig sampleRef={sampleRef} />
       <HandRig slot={0} color={COLOR.handLeft} sampleRef={sampleRef} />
       <HandRig slot={1} color={COLOR.handRight} sampleRef={sampleRef} />
@@ -1473,9 +1853,16 @@ const Skeleton3DViewer = React.memo(function Skeleton3DViewer({ onFail, ...scene
       <ViewerBoundary onError={onFail}>
         <Canvas
           dpr={[1, 2]}
-          gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
+          shadows
+          gl={{
+            antialias: true,
+            alpha: true,
+            powerPreference: "high-performance",
+            toneMapping: THREE.ACESFilmicToneMapping,
+          }}
           camera={{ fov: FOV, near: 0.05, far: 200, position: [0, 0, 6] }}
           onCreated={({ gl }) => {
+            gl.toneMappingExposure = 1.05;
             gl.domElement.addEventListener("webglcontextlost", onFail, { once: true });
           }}
         >
@@ -1498,27 +1885,32 @@ function detectWebGL(): boolean {
 }
 
 /* ==========================================================================
- * 9. PUBLIC COMPONENT (same props as before)
+ * 8. PUBLIC COMPONENT
  * ========================================================================== */
 
 interface LandmarkSimulationProps {
-  frames?: number[][][];              // F x 42 x 3
-  // F x 33 x 4 (optional, 258-dim runs). Typed as a tuple rather than
-  // number[][] because the visibility column is index 3 of every landmark and
-  // the type is what keeps a plain (x, y, z) clip from being passed in and read
-  // as though p[3] were a visibility score.
+  frames?: number[][][];
   pose?: PosePoint[][];
   faceMesh?: number[][][];
-  faceMeshConnections?: [number, number][];
   faceMeshError?: string;
   fps?: number;
   title?: string;
+  minimal?: boolean;
+  loop?: boolean;
+  onFrameChange?: (frame: number) => void;
+  onComplete?: () => void;
+  restartToken?: number;
+  horizontalOnly?: boolean;
+  autoPlay?: boolean;
+  viewResetToken?: number;
 }
 
 const VIEW_BUTTONS: { label: string; kind: ViewKind }[] = [
   { label: "FRONT", kind: "front" },
   { label: "SIDE", kind: "side" },
   { label: "3/4", kind: "angle" },
+  { label: "HANDS", kind: "focusHands" },
+  { label: "FACE", kind: "focusFace" },
   { label: "RESET", kind: "reset" },
 ];
 
@@ -1526,25 +1918,30 @@ export function LandmarkSimulation({
   frames,
   pose,
   faceMesh,
-  faceMeshConnections,
   faceMeshError,
   fps = 15,
   title,
+  minimal = false,
+  loop = true,
+  onFrameChange,
+  onComplete,
+  restartToken = 0,
+  horizontalOnly = true, // same stage angle everywhere => both viewers match
+  autoPlay = true,
+  viewResetToken = 0,
 }: LandmarkSimulationProps) {
   const [currentFrame, setCurrentFrame] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(autoPlay);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(1);
-  const [zoom, setZoom] = useState(1);
   const [webgl, setWebgl] = useState<boolean | null>(null);
   const [viewerFailed, setViewerFailed] = useState(false);
   const [viewCommand, setViewCommand] = useState<ViewCommand>({ kind: "reset", nonce: 0 });
 
-  // The 3D scene advances a fractional playhead itself; React state only
-  // mirrors the integer frame for the UI.
   const playheadRef = useRef(0);
-  const playbackRef = useRef<PlaybackState>({ playing: true, speed: 1 });
-  playbackRef.current.playing = isPlaying;
+  const playbackRef = useRef<PlaybackState>({ playing: autoPlay, speed: 1 });
+  playbackRef.current.playing = minimal ? autoPlay : isPlaying;
   playbackRef.current.speed = playbackSpeed;
+  const lastRestartTokenRef = useRef(restartToken);
 
   const totalFrames = frames?.length ?? 0;
   const poseAlignments = useMemo(
@@ -1567,11 +1964,15 @@ export function LandmarkSimulation({
     () =>
       frames?.length
         ? solveSequence(
-            frames, pose, poseAlignments, alignedFaceFrames, faceMesh,
-            Boolean(faceMeshConnections?.length),
+            frames,
+            pose,
+            poseAlignments,
+            alignedFaceFrames,
+            faceMesh,
+            Boolean(faceMesh?.some((frame) => frame.length > 0)),
           )
         : null,
-    [frames, pose, poseAlignments, alignedFaceFrames, faceMesh, faceMeshConnections],
+    [frames, pose, poseAlignments, alignedFaceFrames, faceMesh],
   );
 
   const mode: "pending" | "3d" | "unavailable" =
@@ -1582,6 +1983,7 @@ export function LandmarkSimulation({
     ? [0, 21].filter((offset) => !isMissingHand(currentFrameData, offset)).length
     : 0;
   const currentFaceMeshCount = alignedFaceFrames?.[currentFrame]?.length ?? 0;
+  const displayTitle = title?.replace(/^.*onnx_models[\\/]\d+[:/\\]?/i, "") ?? title;
 
   useEffect(() => {
     setWebgl(detectWebGL());
@@ -1594,23 +1996,28 @@ export function LandmarkSimulation({
     }
   }, [totalFrames]);
 
-  const handleFrame = useCallback((frame: number) => setCurrentFrame(frame), []);
-  const handleZoom = useCallback((value: number) => setZoom(value), []);
+  useEffect(() => {
+    if (lastRestartTokenRef.current === restartToken) return;
+    lastRestartTokenRef.current = restartToken;
+    playheadRef.current = 0;
+    playbackRef.current.playing = true;
+    setIsPlaying(true);
+    setCurrentFrame(0);
+  }, [restartToken]);
+
+  const handleFrame = useCallback((frame: number) => {
+    setCurrentFrame(frame);
+    onFrameChange?.(frame);
+  }, [onFrameChange]);
   const handleFail = useCallback(() => setViewerFailed(true), []);
   const sendView = (kind: ViewKind) =>
     setViewCommand((c) => ({ kind, nonce: c.nonce + 1 }));
-
-  const zoomBy = (direction: 1 | -1) => sendView(direction > 0 ? "zoomIn" : "zoomOut");
-  const resetZoom = () => sendView("zoomReset");
-  const minZoom = 0.4;
-  const maxZoom = 4;
 
   const seek = (value: number) => {
     playheadRef.current = value;
     setCurrentFrame(value);
   };
 
-  // Honest empty state: this sign simply has no extracted sequence yet.
   if (totalFrames === 0) {
     return (
       <div className="aspect-video w-full bg-background border border-border rounded-md flex flex-col items-center justify-center space-y-2">
@@ -1627,55 +2034,58 @@ export function LandmarkSimulation({
     "px-2 py-0.5 rounded text-[10px] border border-border bg-surface/80 text-text-secondary backdrop-blur hover:text-text-primary";
 
   return (
-    <div className="bg-surface border border-border rounded-md overflow-hidden flex flex-col">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 border-b border-border bg-surface-elevated/50 px-3 py-2 tech-mono text-[11px] text-text-secondary">
-        <span>
+    <div className={minimal
+      ? "relative aspect-[16/10] w-full overflow-hidden rounded-xl border border-border bg-background"
+      : "bg-surface border border-border rounded-md overflow-hidden flex flex-col"}>
+      {!minimal && <div className="flex min-w-0 flex-nowrap items-center gap-x-2 overflow-hidden whitespace-nowrap border-b border-border bg-surface-elevated/50 px-3 py-2 tech-mono text-[11px] text-text-secondary">
+        <span className="shrink-0">
           Frame: <strong className="text-text-primary">{currentFrame + 1}/{totalFrames}</strong>
         </span>
-        <span aria-hidden="true">|</span>
-        <span>FPS: <strong className="text-accent-primary">{fps}</strong></span>
-        <span aria-hidden="true">|</span>
-        <span>
-          Hands: <strong className="text-status-approved">{currentHandsCount} (21 pts each)</strong>
+        <span className="shrink-0" aria-hidden="true">|</span>
+        <span className="shrink-0">FPS: <strong className="text-accent-primary">{fps}</strong></span>
+        <span className="shrink-0" aria-hidden="true">|</span>
+        <span className="shrink-0">
+          Hands: <strong className="text-status-approved">{currentHandsCount}</strong>
         </span>
-        <span aria-hidden="true">|</span>
+        <span className="shrink-0" aria-hidden="true">|</span>
         {pose?.length ? (
-          <span>
-            Pose: <strong className="text-[#818CF8]">{POSE_POINTS} pts</strong>
+          <span className="shrink-0">
+            Pose: <strong className="text-[#818CF8]">{POSE_POINTS}</strong>
           </span>
         ) : (
-          <span className="text-[#818CF8]">Body guide</span>
+          <span className="shrink-0 text-[#818CF8]">Body guide</span>
         )}
         {currentFaceMeshCount > 0 ? (
           <>
-            <span aria-hidden="true">|</span>
-            <span className="text-sky-300">Face mesh: {currentFaceMeshCount} pts</span>
+            <span className="shrink-0" aria-hidden="true">|</span>
+            <span className="shrink-0 text-sky-300">Face: {currentFaceMeshCount}</span>
           </>
         ) : faceMesh ? (
           <>
-            <span aria-hidden="true">|</span>
-            <span className="text-text-muted">Face not detected in this frame</span>
+            <span className="shrink-0" aria-hidden="true">|</span>
+            <span className="shrink-0 text-text-muted">No face</span>
           </>
         ) : faceMeshError ? (
           <>
-            <span aria-hidden="true">|</span>
-            <span
-              className="text-status-unknown"
-              title={faceMeshError}
-            >
-              Dense face mesh unavailable
+            <span className="shrink-0" aria-hidden="true">|</span>
+            <span className="shrink-0 text-status-unknown" title={faceMeshError}>
+              Face mesh unavailable
             </span>
           </>
         ) : null}
-        {title && (
+        {displayTitle && (
           <>
-            <span aria-hidden="true">|</span>
-            <span className="text-accent-secondary">{title}</span>
+            <span className="shrink-0" aria-hidden="true">|</span>
+            <span className="min-w-0 truncate text-accent-secondary" title={title}>
+              {displayTitle}
+            </span>
           </>
         )}
-      </div>
+      </div>}
 
-      <div className="relative aspect-video w-full bg-background flex items-center justify-center canvas-grid-bg overflow-hidden">
+      <div className={minimal
+        ? "absolute inset-0 flex items-center justify-center canvas-grid-bg overflow-hidden"
+        : "relative aspect-video w-full bg-background flex items-center justify-center canvas-grid-bg overflow-hidden"}>
         {mode === "3d" && seq && (
           <Skeleton3DViewer
             seq={seq}
@@ -1685,8 +2095,12 @@ export function LandmarkSimulation({
             playbackRef={playbackRef}
             command={viewCommand}
             onFrame={handleFrame}
-            onZoom={handleZoom}
             onFail={handleFail}
+            loop={loop}
+            onComplete={onComplete}
+            restartToken={restartToken}
+            horizontalOnly={horizontalOnly}
+            viewResetToken={viewResetToken}
           />
         )}
         {mode === "unavailable" && (
@@ -1695,18 +2109,19 @@ export function LandmarkSimulation({
           </div>
         )}
 
-        <div className="absolute right-2 top-2 flex flex-wrap justify-end gap-1 tech-mono">
-          {mode === "3d" &&
-            VIEW_BUTTONS.map(({ label, kind }) => (
-              <button key={kind} type="button" onClick={() => sendView(kind)} className={overlayButton}>
-                {label}
-              </button>
-            ))}
-        </div>
+        {!minimal && (
+          <div className="absolute right-2 top-2 flex flex-wrap justify-end gap-1 tech-mono">
+            {mode === "3d" &&
+              VIEW_BUTTONS.map(({ label, kind }) => (
+                <button key={kind} type="button" onClick={() => sendView(kind)} className={overlayButton}>
+                  {label}
+                </button>
+              ))}
+          </div>
+        )}
       </div>
 
-      {/* Timeline Controls */}
-      <div className="p-3 bg-surface-elevated/50 border-t border-border flex items-center justify-between tech-mono text-xs">
+      {!minimal && <div className="p-3 bg-surface-elevated/50 border-t border-border flex items-center justify-between tech-mono text-xs">
         <div className="flex items-center space-x-2">
           <button
             onClick={() => setIsPlaying(!isPlaying)}
@@ -1739,40 +2154,8 @@ export function LandmarkSimulation({
               {spd}x
             </button>
           ))}
-          <div className="ml-2 flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => zoomBy(-1)}
-              disabled={zoom <= minZoom}
-              aria-label="Zoom out"
-              title="Zoom out"
-              className="rounded border border-border bg-surface p-1.5 text-text-secondary hover:text-text-primary disabled:opacity-40"
-            >
-              <ZoomOut size={14} />
-            </button>
-            <button
-              type="button"
-              onClick={resetZoom}
-              aria-label={`Reset zoom, currently ${Math.round(zoom * 100)}%`}
-              title="Reset zoom"
-              className="min-w-12 text-center text-[10px] text-text-secondary hover:text-text-primary"
-            >
-              {Math.round(zoom * 100)}%
-            </button>
-            <button
-              type="button"
-              onClick={() => zoomBy(1)}
-              disabled={zoom >= maxZoom}
-              aria-label="Zoom in"
-              title="Zoom in"
-              className="rounded border border-border bg-surface p-1.5 text-text-secondary hover:text-text-primary disabled:opacity-40"
-            >
-              <ZoomIn size={14} />
-            </button>
-          </div>
         </div>
 
-        {/* Timeline Scrubber */}
         <div className="flex-1 mx-6 flex items-center">
           <input
             type="range"
@@ -1787,7 +2170,7 @@ export function LandmarkSimulation({
         <div className="text-[11px] text-text-secondary">
           {((currentFrame / fps)).toFixed(2)}s / {(totalFrames / fps).toFixed(2)}s
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

@@ -22,10 +22,10 @@ export default function AdminSettingsPage() {
     ["API PORT", "8200"],
     ["ACTIVE MODEL", `${health?.active_model ?? "—"} (${health?.model_run ?? "—"})`],
     ["MODEL CONTRACT", `${health?.contract?.kind ?? "—"} · ${health?.contract?.feature_width ?? "—"}-dim · ${health?.contract?.frames ?? 1} frames`],
-    ["CLASSES", String(health?.active_classes ?? 0)],
+    ["SIGN VOCABULARY", String(health?.vocabulary_classes ?? 0)],
     ["LLM ENDPOINT", `${health?.llm_model ?? "—"} · ${health?.inference_mode ?? "—"}`],
     ["TTS ENGINE", "edge-tts → BanglaTTS fallback"],
-    ["REFERENCE COVERAGE", `${health?.reference_coverage?.with_media ?? 0}/${health?.reference_coverage?.total_classes ?? 0}`],
+    ["MODEL SEQUENCE COVERAGE", `${health?.sequence_coverage?.with_landmark_sequences ?? 0}/${health?.sequence_coverage?.total_classes ?? 0}`],
   ];
 
   return (

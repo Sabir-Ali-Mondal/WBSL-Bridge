@@ -2,11 +2,12 @@
 backend/main.py
 Complete FastAPI backend for WBSL Bridge.
 Loads the active run from models/onnx_models/ via the registry, serves predictions,
-NMM, TTS, NLG, reference media, and REAL community ingestion (uploaded video -> landmarks -> .npy + manifest).
+NMM, TTS, NLG, model-bundled landmark simulations, and community ingestion
+(uploaded video -> landmarks -> .npy + manifest).
 
 Run:
     cd "d:\\Download\\Projects\\WBSL Bridge"
-    & "tests\\.venv\\Scripts\\python.exe" -m uvicorn backend.main:app --reload --port 8200
+    & ".venv\\Scripts\\python.exe" -m uvicorn backend.main:app --reload --port 8200
 """
 
 import json
@@ -20,14 +21,13 @@ from pathlib import Path
 import cv2
 import numpy as np
 import onnxruntime as ort
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Request
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from pydantic import BaseModel
 
 # Local imports
 from backend.extract import process_bgr_frame, HANDS_DIM, HOLISTIC_DIM
-from backend.face_mesh import extract_video_face_mesh
 from backend.nmm import detect_nmm, reset_nmm_state, emotion_available
 from backend.streaming import get_session, last_vector
 from backend.llm_engine import (
@@ -69,25 +69,13 @@ else:
     WORD_MAP = {}
 
 # ─────────────────────────────────────────────
-# REFERENCE MEDIA STORAGE (videos / images per sign)
-# ─────────────────────────────────────────────
-MEDIA_DIR = ROOT / "backend" / "media"
-MEDIA_DIR.mkdir(exist_ok=True)
-SIGN_MEDIA_PATH = ROOT / "backend" / "data" / "sign_media.json"
-if SIGN_MEDIA_PATH.exists():
-    with open(SIGN_MEDIA_PATH, "r", encoding="utf-8") as f:
-        SIGN_MEDIA = json.load(f)
-else:
-    SIGN_MEDIA = {}
-
-
-# ─────────────────────────────────────────────
 # COMMUNITY DATASET STORAGE (manifest + npy)
 # ─────────────────────────────────────────────
-DATASET_DIR = ROOT / "dataset"
+DATASET_DIR = ROOT / "backend" / "data" / "community_dataset"
 SAMPLES_DIR = DATASET_DIR / "samples"
 SAMPLES_DIR.mkdir(parents=True, exist_ok=True)
 MANIFEST_PATH = DATASET_DIR / "manifest.jsonl"
+TRAINING_DATA_DIR = ROOT / "model_training_zone" / "dataset"
 
 
 def _load_manifest():
@@ -109,10 +97,6 @@ def _write_manifest(items):
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
 
-def _persist_sign_media():
-    with open(SIGN_MEDIA_PATH, "w", encoding="utf-8") as f:
-        json.dump(SIGN_MEDIA, f, ensure_ascii=False, indent=2)
-
 # ─────────────────────────────────────────────
 # MODEL REGISTRY (auto-discovery + admin selection)
 # ─────────────────────────────────────────────
@@ -124,12 +108,9 @@ def _persist_sign_media():
 # startup. The admin panel can override the choice; the override is stored in
 # models/active_model.json and survives restarts.
 #
-# The extractions below serve a dynamic vocabulary -- zero-vocabulary signs
-# currently get an all-zero placeholder face, because that is the only face a
-# user can see during a non-manual rather than a manual sign. Every class the
-# active model can emit must therefore be able to be expressed as a single
-# 258-dim holistic vector.
+# Each model bundle includes replay sequences for the classes it can emit.
 SEQ_T = 32
+NON_SIGN_CLASSES = {"NONE", "BACKGROUND"}
 # Feature widths the serving layer can actually feed. Both are produced by
 # backend/extract.py; the graph's declared input width picks between them.
 SERVABLE_WIDTHS = (HANDS_DIM, HOLISTIC_DIM)
@@ -189,6 +170,17 @@ def _discover_models():
                     classes = json.loads(classes_file.read_text(encoding="utf-8"))
                 except Exception:
                     classes = []
+            missing_sequences = [
+                label for label in classes
+                if label not in NON_SIGN_CLASSES
+                and not (folder / "npy" / f"{label}.npy").is_file()
+            ]
+            if missing_sequences:
+                print(
+                    f"[WBSL Backend] Skipping {onnx_file}: missing bundled "
+                    f"sequences for {', '.join(missing_sequences[:5])}"
+                )
+                continue
             # A static classifier is only usable if it takes a frame vector this
             # layer can produce (126 hands, or 258 hands+pose); temporal runs
             # ingest a (T, width) sequence. Both are probed, so a run with no
@@ -214,6 +206,37 @@ def _discover_models():
             except Exception as exc:                   # noqa: BLE001
                 print(f"[WBSL Backend] Skipping unloadable graph {onnx_file}: {exc}")
                 continue
+            invalid_sequence = None
+            bundled_width = None
+            for label in classes:
+                if label in NON_SIGN_CLASSES:
+                    continue
+                sequence_path = folder / "npy" / f"{label}.npy"
+                try:
+                    sequence = np.load(sequence_path, mmap_mode="r", allow_pickle=False)
+                except (OSError, ValueError) as exc:
+                    invalid_sequence = f"{label}: {exc}"
+                    break
+                sequence_width = sequence.shape[-1] if sequence.ndim in (2, 3) else None
+                if (
+                    sequence_width not in SERVABLE_WIDTHS
+                    or (input_width is not None and sequence_width != input_width)
+                    or (bundled_width is not None and sequence_width != bundled_width)
+                ):
+                    invalid_sequence = (
+                        f"{label} has shape {sequence.shape}; expected "
+                        f"a 126- or 258-wide landmark sequence matching the graph"
+                    )
+                    break
+                bundled_width = sequence_width
+            if invalid_sequence:
+                print(
+                    f"[WBSL Backend] Skipping {onnx_file}: invalid bundled "
+                    f"landmark sequence ({invalid_sequence})"
+                )
+                continue
+            if input_width is None:
+                input_width = bundled_width
             # The graph's own shape is the authority. The filename heuristic is
             # kept only as a tie-breaker for graphs whose sequence axis is
             # dynamic (rare here, but a run named *_lstm with a symbolic T is
@@ -405,11 +428,39 @@ def _active_width() -> int:
     return width if width in SERVABLE_WIDTHS else HANDS_DIM
 
 
+def _active_run_dir():
+    """Return the bundle directory for the currently selected ONNX model."""
+    active = REGISTRY.active
+    if not active:
+        return None
+    return Path(active["path"]).parent
+
+
+def _model_sequence_path(label: str):
+    """Resolve a sequence only from the active model's bundled training data."""
+    normalized = label.upper().replace(" ", "_")
+    if normalized == "NONE" or normalized not in REGISTRY.active_classes:
+        return None
+    run_dir = _active_run_dir()
+    if run_dir is None:
+        return None
+    path = run_dir / "npy" / f"{normalized}.npy"
+    return path if path.is_file() else None
+
+
+def _available_model_classes():
+    """Vocabulary that the active model can both recognize and replay."""
+    return [
+        label for label in REGISTRY.active_classes
+        if label not in NON_SIGN_CLASSES and _model_sequence_path(label) is not None
+    ]
+
+
 def resample_feature_width(seq: np.ndarray, width: int) -> np.ndarray:
     """Re-widen a stored landmark clip to the width the active graph expects.
 
-    Community recordings and the ``dataset_train/*`` pools store the 126-dim
-    two-hand vector, so a 258-dim graph cannot be fed one as-is. Only the pose
+    Community recordings store the 126-dim two-hand vector, so a 258-dim graph
+    cannot be fed one as-is. Only the pose
     block (columns 126:258) is missing; the hand block and its normalization are
     already shared, so the pose columns are zero-padded rather than recomputed
     from video that is no longer on hand. The model then sees a sign performed
@@ -497,6 +548,7 @@ def _refresh_catalog_sample_counts():
 
 def _build_catalog():
     sample_counts = _sample_counts_by_label()
+    classes = _available_model_classes()
     catalog = [
         {
             "id": str(i),
@@ -504,39 +556,27 @@ def _build_catalog():
             "bengali_meaning": _bengali_map.get(c, WORD_BENGALI.get(c, "")),
             "category": "ISL Alphabet" if c in _bengali_map else "ISL Word",
             "type": "word",
+            "has_landmarks": True,
             **sample_counts.get(c, {
                 "approved_samples": 0,
                 "pending_samples": 0,
                 "rejected_samples": 0,
             }),
-            "reference_video_url": None,
             "language": "ISL",
         }
-        for i, c in enumerate(ACTIVE_CLASSES)
+        for i, c in enumerate(classes)
     ]
-    for s in catalog:                       # attach stored reference media
-        m = SIGN_MEDIA.get(s["label"])
-        s["reference_media"] = m
-        if m and m["type"] == "video":
-            s["reference_video_url"] = m["url"]
     return catalog
 
 
 def _coverage_summary():
-    """How much of the flat plate can the user actually see?
-
-    ``active_classes`` is what the *model* can recognise. ``with_media`` is what
-    the Text->Sign page can *play*. Those two numbers are different, and until
-    this function existed the gap was invisible: the UI reported 97 available
-    signs while only 2 had a reference image. Anything that quotes a "signs
-    available" figure should quote this, not len(ACTIVE_CLASSES).
-    """
-    total = len(ACTIVE_CLASSES)
-    present = [c for c in ACTIVE_CLASSES if c in SIGN_MEDIA]
+    """Report classes bundled with replayable sequences for the active model."""
+    available = set(_available_model_classes())
+    recognized = [c for c in REGISTRY.active_classes if c not in NON_SIGN_CLASSES]
     return {
-        "total_classes": total,
-        "with_media": len(present),
-        "missing": [c for c in ACTIVE_CLASSES if c not in SIGN_MEDIA],
+        "total_classes": len(recognized),
+        "with_landmark_sequences": len(available),
+        "missing_sequences": [c for c in recognized if c not in available],
     }
 
 
@@ -621,6 +661,23 @@ def _check_model_available(path):
     desc = next((m for m in REGISTRY.models if m["path"] == path), None)
     if desc is None:
         return f"Model not in registry: {path}"
+    try:
+        classes = json.loads(Path(desc["classes_path"]).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return f"Cannot read the class list for '{desc['name']}': {exc}"
+    run_dir = Path(desc["path"]).parent
+    missing_sequences = [
+        label for label in classes
+        if label not in NON_SIGN_CLASSES
+        and not (run_dir / "npy" / f"{label}.npy").is_file()
+    ]
+    if missing_sequences:
+        preview = ", ".join(missing_sequences[:5])
+        suffix = "..." if len(missing_sequences) > 5 else ""
+        return (
+            f"'{desc['name']}' is missing bundled landmark sequences for "
+            f"{preview}{suffix}. Re-train it with the current training pipeline."
+        )
     # Both contracts are servable: the frame route handles rank 2, the clip
     # route handles rank 3. What is NOT servable is a graph whose last axis is
     # not one of the feature vectors this layer emits -- feed it anything else
@@ -662,6 +719,7 @@ def health(response: Response):
         "model_version": "LSTM-unified" if REGISTRY.temporal_session else "MLP-static",
         "unified": REGISTRY.temporal_session is not None,
         "active_classes": len(REGISTRY.active_classes),
+        "vocabulary_classes": len(_available_model_classes()),
         "active_model": REGISTRY.active["name"] if REGISTRY.active else None,
         "model_run": REGISTRY.active["run"] if REGISTRY.active else None,
         "model_path": REGISTRY.active_id(),
@@ -683,7 +741,7 @@ def health(response: Response):
                              else None),
             "endpoint": active.get("endpoint", "/api/predict/frame"),
         },
-        "reference_coverage": _coverage_summary(),
+        "sequence_coverage": _coverage_summary(),
         "emotion_available": emotion_available(),
     }
 
@@ -1092,6 +1150,7 @@ async def stream_frame(session_id: str = "default", file: UploadFile = File(...)
         return {"ready": False, "buffered": len(sess.buf), "detail": "throttled"}
     sess.last_infer = now
 
+    nmm = detect_nmm(fr)
     tail = np.array(list(sess.buf), np.float32)
     want_t = (REGISTRY.active or {}).get("frames") or SEQ_T
 
@@ -1140,9 +1199,9 @@ async def stream_frame(session_id: str = "default", file: UploadFile = File(...)
         motion, spread = idle_stats if idle_stats else (0.0, 0.0)
         return {"ready": False, "buffered": len(sess.buf),
                 "detail": "idle",
-                "motion": round(motion, 5), "spread": round(spread, 5)}
+                "motion": round(motion, 5), "spread": round(spread, 5),
+                "nmm": nmm, "emotion": nmm.get("emotion")}
 
-    nmm = detect_nmm(fr)
     return {**best, "ready": True, "buffered": len(sess.buf),
             "frames_used": int(want_t),
             "nmm": nmm, "emotion": nmm.get("emotion"), "metrics": nmm.get("metrics")}
@@ -1150,22 +1209,15 @@ async def stream_frame(session_id: str = "default", file: UploadFile = File(...)
 
 @app.get("/api/coverage")
 def coverage():
-    """Vocabulary coverage: model classes vs playable reference media.
-
-    Backs the site-wide honesty counter. ``total_classes`` is what the model can
-    recognise; ``with_media`` is what Text->Sign can actually play. They are not
-    the same number and the UI must not conflate them."""
+    """Vocabulary and replay coverage for the currently selected model."""
     summary = _coverage_summary()
-    missing = set(summary["missing"])
     return {
         **summary,
-        "total_with_media": len(SIGN_MEDIA),
         "by_category": {
             cat: {
                 "total": sum(1 for s in sign_catalog if s["category"] == cat),
-                "with_media": sum(
-                    1 for s in sign_catalog
-                    if s["category"] == cat and s["label"] not in missing
+                "with_landmark_sequences": sum(
+                    1 for s in sign_catalog if s["category"] == cat
                 ),
             }
             for cat in sorted({s["category"] for s in sign_catalog})
@@ -1175,9 +1227,7 @@ def coverage():
                 "label": s["label"],
                 "bengali": s["bengali_meaning"],
                 "category": s["category"],
-                "has_media": s["label"] not in missing,
-                "media_type": (SIGN_MEDIA.get(s["label"]) or {}).get("type"),
-                "media_url": (SIGN_MEDIA.get(s["label"]) or {}).get("url"),
+                "has_landmarks": True,
             }
             for s in sign_catalog
         ],
@@ -1191,52 +1241,66 @@ def coverage():
 # ─────────────────────────────────────────────
 @app.get("/api/simulation/frames")
 def simulation_frames(label: str = "", sample_id: str = ""):
-    """Real extracted landmarks for one sign, shaped for the replay canvas.
-
-    The response says which contract it is in ``width``, because the two are not
-    interchangeable: a 126-dim recording has hands only, a 258-dim one has hands
-    AND pose. The client draws the pose layer only when it is present, rather
-    than synthesising a body for a two-hand clip.
-    """
+    """Replay a model-bundled class sequence or a specific community sample."""
     arr = None
+    face_mesh = None
     source = ""
-    source_label = label
     if sample_id:
         rec = next((r for r in _load_manifest() if r["sample_id"] == sample_id), None)
-        if rec and (ROOT / rec["landmark_path"]).exists():
-            arr = np.load(ROOT / rec["landmark_path"])
-            source = f"community:{sample_id}"
-            source_label = rec["label"]
+        if rec:
+            sample_path = (ROOT / rec["landmark_path"]).resolve()
+            if sample_path.parent != SAMPLES_DIR.resolve() and SAMPLES_DIR.resolve() not in sample_path.parents:
+                raise HTTPException(status_code=400, detail="Invalid community sample path")
+            if sample_path.is_file():
+                arr = np.load(sample_path, allow_pickle=False)
+                source = f"community:{sample_id}"
     elif label:
-        safe = label.upper().replace(" ", "_")
-        source_label = safe
-        # The 258-dim daily pool is searched FIRST because those sequences are
-        # the ones that carry a pose block worth drawing. The 126-dim pools are
-        # the fallback, not the default.
-        for p in (ROOT / "dataset_train" / "daily_video" / f"{safe}.npy",
-                  ROOT / "dataset_train" / "unified_video" / f"{safe}.npy",
-                  ROOT / "dataset_train" / "unified_static" / f"{safe}.npy"):
-            if p.exists():
-                loaded = np.load(p)
-                # daily_video/'unified_video' hold stacks of clips; the static
-                # pool holds hold-sequences. In every case a single clip is what
-                # the replay wants, so the first axis is index-of-sample for the
-                # 3-D pools and index-of-frame for a bare (F, D) recording.
-                arr = loaded[0] if (loaded.ndim == 3 or loaded.ndim == 1) else loaded
-                source = f"extracted:{p.parent.name}"
-                break
-        if arr is None:
-            rec = next((r for r in _load_manifest()
-                        if r["label"].upper() == safe and (ROOT / r["landmark_path"]).exists()), None)
-            if rec:
-                arr = np.load(ROOT / rec["landmark_path"])
-                source = f"community:{rec['sample_id']}"
+        sequence_path = _model_sequence_path(label)
+        if sequence_path:
+            loaded = np.load(sequence_path, allow_pickle=False)
+            arr = loaded[0] if loaded.ndim == 3 else loaded
+            source = f"{REGISTRY.active['run']}:{sequence_path.stem}"
+            face_mesh_path = sequence_path.with_name(
+                f"{sequence_path.stem}.face.npy"
+            )
+            if face_mesh_path.is_file():
+                try:
+                    face_sequences = np.load(face_mesh_path, allow_pickle=False)
+                except (OSError, ValueError) as exc:
+                    raise HTTPException(
+                        status_code=422,
+                        detail=f"Bundled face-mesh sequence cannot be loaded: {exc}",
+                    ) from exc
+                if (
+                    face_sequences.ndim != 4
+                    or face_sequences.shape[-2:] != (468, 3)
+                    or (loaded.ndim == 3 and face_sequences.shape[:2] != loaded.shape[:2])
+                    or (
+                        loaded.ndim == 2
+                        and (
+                            face_sequences.shape[0] != 1
+                            or face_sequences.shape[1] != loaded.shape[0]
+                        )
+                    )
+                ):
+                    raise HTTPException(
+                        status_code=422,
+                        detail="Bundled face mesh must align with model sequences "
+                        "and have shape (samples, frames, 468, 3).",
+                    )
+                face_mesh = np.asarray(face_sequences[0], dtype=np.float32)
     if arr is None:
-        raise HTTPException(status_code=404, detail="No extracted landmark sequence for this sign yet")
+        raise HTTPException(
+            status_code=404,
+            detail="No landmark sequence is bundled for this active-model sign.",
+        )
 
-    arr = arr[:64]
+    arr = np.asarray(arr, dtype=np.float32)
     if arr.ndim == 1:                                   # a single frame was stored
         arr = arr[None]
+    if arr.ndim != 2 or arr.shape[-1] not in (HANDS_DIM, HOLISTIC_DIM):
+        raise HTTPException(status_code=422, detail="Bundled landmark sequence has an invalid shape")
+    arr = arr[:64]
 
     if arr.shape[-1] == HOLISTIC_DIM:                   # 258 = hands 126 + pose 33x4
         hands = arr[:, :126].reshape(len(arr), 42, 3)
@@ -1246,42 +1310,18 @@ def simulation_frames(label: str = "", sample_id: str = ""):
     else:
         result = {"frames": arr.reshape(len(arr), 42, 3).tolist(), "points": 42,
                   "count": int(len(arr)), "source": source, "width": HANDS_DIM}
-
-    media = SIGN_MEDIA.get(source_label) or SIGN_MEDIA.get(
-        source_label.upper().replace(" ", "_")
-    )
-    if media and media.get("type") == "video" and media.get("filename"):
-        video_path = (MEDIA_DIR / media["filename"]).resolve()
-        if video_path.parent != MEDIA_DIR.resolve():
-            result["face_mesh_error"] = "Invalid source video path for Face Mesh."
-        else:
-            try:
-                face_mesh, face_connections = extract_video_face_mesh(
-                    video_path,
-                    len(arr),
-                )
-                result["face_mesh"] = face_mesh
-                result["face_mesh_connections"] = face_connections
-                result["face_mesh_source"] = video_path.name
-            except (FileNotFoundError, OSError, ValueError) as exc:
-                result["face_mesh_error"] = str(exc)
-    else:
-        result["face_mesh_error"] = "No original reference video is available for Face Mesh."
-
+    if face_mesh is not None:
+        face_mesh = face_mesh[:len(arr)]
+        result["face_mesh"] = [
+            frame.tolist() if np.any(frame) else []
+            for frame in face_mesh
+        ]
     return result
-
-
-@app.get("/api/dataset/reference")
-def dataset_reference(label: str):
-    m = SIGN_MEDIA.get(label) or SIGN_MEDIA.get(label.upper().replace(" ", "_"))
-    if not m:
-        raise HTTPException(status_code=404, detail="No reference sample for this sign")
-    return {"label": label, "type": m["type"], "url": m["url"]}
 
 
 @app.get("/api/dataset/index")
 def dataset_index(label: str = "", kind: str = ""):
-    idx = ROOT / "dataset" / "index.jsonl"
+    idx = TRAINING_DATA_DIR / "index.jsonl"
     if not idx.exists():
         return {"items": []}
     items = []
@@ -1375,48 +1415,57 @@ class TextToSignRequest(BaseModel):
     text: str
 
 
+@app.get("/api/text-to-sign/vocabulary")
+def text_to_sign_vocabulary():
+    glosses = _available_model_classes()
+    return {"glosses": glosses, "available_signs": len(glosses)}
+
+
 @app.post("/api/text-to-sign")
 def text_to_sign(payload: TextToSignRequest):
+    vocabulary = set(_available_model_classes())
+    if not vocabulary:
+        raise HTTPException(
+            status_code=503,
+            detail="The active model has no bundled landmark sequences.",
+        )
     raw = (payload.text.lower()
            .replace("।", " ").replace("?", " ")
            .replace(",", " ").replace("!", " "))
     tokens = raw.split()
     max_n = max((len(k.split()) for k in WORD_MAP), default=1)
     gloss_sequence = []
+    unmapped_words = []
     i = 0
     while i < len(tokens):
         hit = None
+        consumed = 1
         # longest phrase match first ("good morning", "তোমার নাম কি")
         for n in range(min(max_n, len(tokens) - i), 1, -1):
             phrase = " ".join(tokens[i:i + n])
             if phrase in WORD_MAP:
                 hit = WORD_MAP[phrase]
-                i += n
+                consumed = n
                 break
         if hit is None:
             w = tokens[i]
             if w in WORD_MAP:
                 hit = WORD_MAP[w]
-            elif w.upper() in ACTIVE_CLASSES:
+            elif w.upper() in vocabulary:
                 hit = w.upper()
             else:
-                hit = f"[{w}]"
-            i += 1
-        # A value may be a list of glosses (e.g. pronouns fingerspelled as letters)
-        gloss_sequence.extend(_as_glosses(hit))
-    media = []
-    for g in gloss_sequence:
-        m = SIGN_MEDIA.get(g)
-        media.append({
-            "gloss": g,
-            "type": m["type"] if m else None,
-            "url": m["url"] if m else None,
-        })
+                unmapped_words.append(w)
+        mapped = [g.upper() for g in _as_glosses(hit) if g.upper() in vocabulary]
+        gloss_sequence.extend(mapped)
+        if hit is not None and not mapped:
+            unmapped_words.append(" ".join(tokens[i:i + consumed]))
+        i += consumed
+
     return {
         "input_text": payload.text,
         "gloss_sequence": gloss_sequence,
-        "available_signs": len(ACTIVE_CLASSES),
-        "media": media,
+        "available_signs": len(vocabulary),
+        "unmapped_words": unmapped_words,
     }
 
 
@@ -1425,35 +1474,41 @@ def text_to_sign_llm(payload: TextToSignRequest):
     """Plan a signable gloss sequence with the LLM instead of the phrase table.
 
     The dictionary route above is deterministic and free but cannot generalise:
-    any word outside WORD_MAP and the model's classes returns as ``[word]``, which
-    has no media and cannot be signed. This route asks the model to express the
-    sentence using only what the system can actually play.
+    words outside WORD_MAP and the active model's classes are reported as
+    unmapped. This route asks the model to express the sentence using only the
+    active model's replayable vocabulary.
 
     503 rather than an empty 200 when the model is unconfigured or unreachable:
     the caller falls back to the dictionary, and "the LLM is unavailable" is a
     different situation from "this sentence has no signs", which the caller must
     be able to tell apart.
     """
-    # Both halves matter: ACTIVE_CLASSES is what the recogniser can name, and
-    # SIGN_MEDIA is what the player can render. A gloss needs to be in the union
-    # to be useful -- recognition-only classes are still worth planning if media
-    # exists for them, and vice versa.
-    vocab = sorted(set(ACTIVE_CLASSES) | set(SIGN_MEDIA.keys()))
+    vocab = sorted(_available_model_classes())
+    if not vocab:
+        raise HTTPException(
+            status_code=503,
+            detail="The active model has no bundled landmark sequences.",
+        )
     res = break_into_glosses(payload.text, vocab)
 
     if not res["gloss_sequence"]:
         raise HTTPException(status_code=503, detail=res.get("status", "llm_unavailable"))
 
+    gloss_sequence = [
+        gloss.upper() for gloss in res["gloss_sequence"]
+        if gloss.upper() in set(vocab)
+    ]
+    if not gloss_sequence:
+        raise HTTPException(
+            status_code=503,
+            detail="The language model did not return signs from the active vocabulary.",
+        )
+
     return {
         "input_text": payload.text,
-        "gloss_sequence": res["gloss_sequence"],
-        "available_signs": len(ACTIVE_CLASSES),
-        "media": [
-            {"gloss": g,
-             "type": (SIGN_MEDIA.get(g) or {}).get("type"),
-             "url": (SIGN_MEDIA.get(g) or {}).get("url")}
-            for g in res["gloss_sequence"]
-        ],
+        "gloss_sequence": gloss_sequence,
+        "available_signs": len(vocab),
+        "unmapped_words": [],
         "engine": "llm",
     }
 
@@ -1473,204 +1528,6 @@ def needs_data():
             for s in needs
         ]
     }
-
-
-# ─────────────────────────────────────────────
-# MEDIA UPLOAD / SERVE / DELETE (admin)
-# ─────────────────────────────────────────────
-ALLOWED_VIDEO_EXT = {".mp4", ".webm", ".mov"}
-ALLOWED_IMAGE_EXT = {".png", ".jpg", ".jpeg", ".webp"}
-
-
-@app.post("/api/admin/signs/{sign_id}/media")
-async def upload_sign_media(sign_id: str, file: UploadFile = File(...)):
-    sign = next((s for s in sign_catalog if s["id"] == sign_id), None)
-    if sign is None:
-        raise HTTPException(status_code=404, detail="Sign not found")
-    ext = Path(file.filename or "").suffix.lower()
-    if ext in ALLOWED_VIDEO_EXT:
-        mtype = "video"
-    elif ext in ALLOWED_IMAGE_EXT:
-        mtype = "image"
-    else:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Unsupported type {ext}. Use mp4/webm/mov or png/jpg/webp.",
-        )
-    old = SIGN_MEDIA.get(sign["label"])
-    if old:
-        oldp = MEDIA_DIR / old["filename"]
-        if oldp.exists():
-            oldp.unlink()
-    safe = re.sub(r"[^A-Za-z0-9_-]", "_", sign["label"])
-    filename = f"{safe}{ext}"
-    target_path = MEDIA_DIR / filename
-    data = await file.read()
-    target_path.write_bytes(data)
-
-    # If it is a video, ensure it is universally playable H.264 (avc1)
-    if mtype == "video":
-        try:
-            cap = cv2.VideoCapture(str(target_path))
-            fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-            w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-            h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-            fourcc = cv2.VideoWriter_fourcc(*"avc1")
-            temp_out = str(target_path) + ".h264.mp4"
-            writer = cv2.VideoWriter(temp_out, fourcc, fps, (w, h))
-            frame_cnt = 0
-            while True:
-                ret, fr = cap.read()
-                if not ret:
-                    break
-                writer.write(fr)
-                frame_cnt += 1
-            cap.release()
-            writer.release()
-            if frame_cnt > 0 and Path(temp_out).exists() and Path(temp_out).stat().st_size > 0:
-                filename = f"{safe}.mp4"
-                final_path = MEDIA_DIR / filename
-                if target_path.exists() and target_path != final_path:
-                    target_path.unlink()
-                Path(temp_out).replace(final_path)
-        except Exception as exc:
-            print(f"[Media Upload] Transcode warning: {exc}")
-    SIGN_MEDIA[sign["label"]] = {
-        "type": mtype,
-        "filename": filename,
-        "url": f"/api/media/{filename}",
-    }
-    _persist_sign_media()
-    sign["reference_media"] = SIGN_MEDIA[sign["label"]]
-    sign["reference_video_url"] = SIGN_MEDIA[sign["label"]]["url"] if mtype == "video" else None
-    return {"success": True, "media": SIGN_MEDIA[sign["label"]]}
-
-
-@app.get("/api/media/{filename}/frames")
-def extract_media_frames(filename: str, max_frames: int = 40):
-    """Fallback frame sequence for any video file that browser cannot decode natively."""
-    filepath = MEDIA_DIR / filename
-    if not filepath.exists():
-        raise HTTPException(status_code=404, detail="Media not found")
-
-    cap = cv2.VideoCapture(str(filepath))
-    total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 1
-    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-    step = max(1, total // max_frames)
-
-    import base64
-    frames = []
-    idx = 0
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-        if idx % step == 0 and len(frames) < max_frames:
-            # Resize thumbnail for ultra-fast canvas flip
-            h, w = frame.shape[:2]
-            scale = 480 / max(h, 480)
-            if scale < 1.0:
-                frame = cv2.resize(frame, (int(w * scale), int(h * scale)))
-            ok, buf = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 80])
-            if ok:
-                b64 = base64.b64encode(buf.tobytes()).decode("ascii")
-                frames.append(f"data:image/jpeg;base64,{b64}")
-        idx += 1
-    cap.release()
-
-    return {
-        "filename": filename,
-        "fps": fps / step,
-        "count": len(frames),
-        "frames": frames,
-    }
-
-
-@app.api_route("/api/media/{filename}", methods=["GET", "HEAD", "OPTIONS"])
-def serve_media(filename: str, request: Request):
-    """Serve reference video/image with full byte-range support, HEAD inspection, and CORS."""
-    filepath = MEDIA_DIR / filename
-    if not filepath.exists():
-        raise HTTPException(status_code=404, detail="Media not found")
-    mt = {
-        ".mp4": "video/mp4", ".webm": "video/webm", ".mov": "video/quicktime",
-        ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp",
-    }.get(filepath.suffix.lower(), "application/octet-stream")
-
-    size = filepath.stat().st_size
-    headers = {
-        "Accept-Ranges": "bytes",
-        "Cache-Control": "public, max-age=3600, must-revalidate",
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
-        "Access-Control-Allow-Headers": "Range, Content-Type, Accept",
-        "Access-Control-Expose-Headers": "Content-Range, Content-Length, Accept-Ranges",
-    }
-
-    if request.method == "OPTIONS":
-        return Response(status_code=204, headers=headers)
-
-    if request.method == "HEAD":
-        return Response(
-            status_code=200,
-            media_type=mt,
-            headers={**headers, "Content-Length": str(size)},
-        )
-
-    rng = request.headers.get("range")
-    if not rng:
-        return FileResponse(str(filepath), media_type=mt, headers=headers)
-
-    m = re.match(r"bytes=(\d*)-(\d*)$", rng.strip())
-    if not m:
-        return FileResponse(str(filepath), media_type=mt, headers=headers)
-    start_s, end_s = m.group(1), m.group(2)
-    if start_s == "":
-        if end_s == "":
-            return FileResponse(str(filepath), media_type=mt, headers=headers)
-        n = int(end_s)
-        start = max(size - n, 0)
-        end = size - 1
-    else:
-        start = int(start_s)
-        end = int(end_s) if end_s else size - 1
-    end = min(end, size - 1)
-    if start > end or start >= size:
-        return Response(
-            status_code=416,
-            headers={**headers, "Content-Range": f"bytes */{size}"},
-        )
-
-    length = end - start + 1
-    with open(filepath, "rb") as f:
-        f.seek(start)
-        chunk = f.read(length)
-    return Response(
-        content=chunk,
-        status_code=206,
-        media_type=mt,
-        headers={
-            **headers,
-            "Content-Range": f"bytes {start}-{end}/{size}",
-            "Content-Length": str(length),
-        },
-    )
-
-
-@app.delete("/api/admin/signs/{sign_id}/media")
-def delete_sign_media(sign_id: str):
-    sign = next((s for s in sign_catalog if s["id"] == sign_id), None)
-    if sign is None:
-        raise HTTPException(status_code=404, detail="Sign not found")
-    old = SIGN_MEDIA.pop(sign["label"], None)
-    if old:
-        p = MEDIA_DIR / old["filename"]
-        if p.exists():
-            p.unlink()
-    _persist_sign_media()
-    sign["reference_media"] = None
-    sign["reference_video_url"] = None
-    return {"success": True}
 
 
 # ─────────────────────────────────────────────
@@ -1767,6 +1624,13 @@ async def ingest_sample(
 ):
     """Real upload: decode video server-side, extract 126-dim landmarks every
     3rd frame, save .npy + append manifest record. No simulation."""
+    canonical_label = label.upper().replace(" ", "_")
+    if canonical_label not in _available_model_classes():
+        raise HTTPException(
+            status_code=400,
+            detail="Sign is not part of the active model vocabulary.",
+        )
+
     import os
     import tempfile
 
@@ -1803,9 +1667,10 @@ async def ingest_sample(
         )
 
     arr = np.array(frames, dtype=np.float32)
-    safe_label = re.sub(r"[^A-Za-z0-9_-]", "_", label)
-    sample_id = f"v001_{safe_label}_{signer_id}_{time.strftime('%Y%m%dT%H%M%S')}"
-    label_dir = SAMPLES_DIR / safe_label / signer_id
+    safe_label = re.sub(r"[^A-Za-z0-9_-]", "_", canonical_label)
+    safe_signer_id = re.sub(r"[^A-Za-z0-9_-]", "_", signer_id) or "anonymous"
+    sample_id = f"v001_{safe_label}_{safe_signer_id}_{time.strftime('%Y%m%dT%H%M%S')}"
+    label_dir = SAMPLES_DIR / safe_label / safe_signer_id
     label_dir.mkdir(parents=True, exist_ok=True)
     npy_path = label_dir / f"{sample_id}.npy"
     np.save(npy_path, arr)
@@ -1813,7 +1678,7 @@ async def ingest_sample(
     record = {
         "sample_id": sample_id,
         "session_id": session_id,
-        "label": label,
+        "label": canonical_label,
         "signer_id": signer_id,
         "split": "unassigned",
         "source": "community",

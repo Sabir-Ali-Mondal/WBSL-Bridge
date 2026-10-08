@@ -102,7 +102,7 @@ A system that ignores facial non-manual markers translates all three scenarios i
 2.  **Sub-5ms Geometric NMM Detection:** Design deterministic algorithms for eyebrow raises/furrows, head shakes/nods, and mouth aperture without heavy neural networks.
 3.  **Temporal Neural Inference:** Train and deploy continuous Recurrent Neural Networks (`DailyNet` BiLSTM-Attention) via ONNX Runtime with integrated background/idle gating (`NONE` class).
 4.  **Constrained Bengali NLG:** Develop a 50-criteria prompt driving local Small Language Models (`gemma-4-E4B`) to output grammatical West Bengal Bengali without hallucination.
-5.  **Bidirectional Synthesis:** Build a reverse translation pipeline converting spoken/written Bengali into gloss sequences and reference videos.
+5.  **Bidirectional Synthesis:** Build a reverse translation pipeline converting spoken/written Bengali into the active model's gloss vocabulary and bundled landmark simulations.
 6.  **DPDP Compliance:** Create a privacy-preserving community collection pipeline that strips raw video on-device, saving only anonymized kinematic matrices.
 
 ---
@@ -422,19 +422,22 @@ Spoken or typed Bengali text is mapped into an ordered sign gloss sequence throu
                        ["WHAT_IS_YOUR_NAME"]
                                    │
                                    ▼
-                       Reference Media Resolution
-                       - Video: /api/media/WHAT_IS_YOUR_NAME.mp4
-                       - Fallback: /api/media/WHAT_IS_YOUR_NAME.mp4/frames
+                       Active Model Sequence Resolution
+                       - Model bundle: models/onnx_models/<id>/npy/WHAT_IS_YOUR_NAME.npy
+                       - Class list and sequence belong to the same run
                                    │
                                    ▼
-                       Client Video Player Sequencing
-                       (Plays sign video seamlessly in browser)
+                       Client Landmark Simulation
+                       (Uses the active model's extracted coordinates)
 ```
 
-### 7.3 Dual-Engine Video Player & Canvas Fallback
-The client interface renders reference videos corresponding to planned glosses. To guarantee playback across all operating systems and browsers, `VideoPlayer.tsx` operates two fallback engines:
-*   **Engine 1 (Native Video):** Decodes universal H.264 (AVC1) MP4 files using browser hardware acceleration with byte-range streaming support (HTTP 206).
-*   **Engine 2 (Canvas Frame Engine):** If the native video decoder encounters an unsupported codec or corrupt container, the player automatically fetches server-decoded JPEG frame sequences from `/api/media/{filename}/frames` and paints them to an HTML5 Canvas at 14 FPS, guaranteeing playback.
+### 7.3 Active-Model Landmark Simulation
+The reverse translation pipeline resolves each gloss only against the class list
+and `.npy` sequences bundled with the active ONNX run. `LandmarkSimulation`
+replays the extracted hand and, where available, pose landmarks. The same
+sequence endpoint powers the Admin Dataset preview and the contributor
+"watch and copy" step, keeping the visible vocabulary consistent with the
+recognizer without a separate image/video library.
 
 ### 7.4 Dual-Engine Bengali Text-to-Speech (TTS)
 `backend/tts_engine.py` manages a dual-engine fallback pipeline:

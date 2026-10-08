@@ -4,6 +4,7 @@ import { useParams, useRouter } from "next/navigation";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { PrivacyGate } from "@/components/recording/PrivacyGate";
 import { UploadRecovery } from "@/components/recording/UploadRecovery";
+import { LandmarkSimulation } from "@/components/simulation/LandmarkSimulation";
 import { useCamera } from "@/hooks/useCamera";
 import { useRecording } from "@/hooks/useRecording";
 import { useRecordingStore } from "@/store/recording-store";
@@ -13,6 +14,14 @@ import { toast } from "sonner";
 import axios from "axios";
 
 const API_BASE = "http://localhost:8200";
+
+interface LandmarkReplay {
+  label: string;
+  frames: number[][][];
+  pose?: [number, number, number, number][][];
+  face_mesh?: number[][][];
+  source: string;
+}
 
 export default function ContributeSessionPage() {
   const params = useParams();
@@ -37,7 +46,7 @@ export default function ContributeSessionPage() {
 
   const [countdown, setCountdown] = useState<number | null>(null);
   const [uploadError, setUploadError] = useState(false);
-  const [refMedia, setRefMedia] = useState<{ type: string; url: string } | null>(null);
+  const [refMedia, setRefMedia] = useState<LandmarkReplay | null>(null);
 
   useEffect(() => {
     if (consentGiven && !isReady) {
@@ -45,18 +54,24 @@ export default function ContributeSessionPage() {
     }
   }, [consentGiven, isReady, startCamera]);
 
-  // A sign chosen on /contribute lands in SIGN_SELECTED — advance into the
-  // reference step so the signer can watch the real sample before recording.
+  // Show the same active-model sequence used by Text -> Sign and the dataset viewer.
   useEffect(() => {
-    if (consentGiven && state === "SIGN_SELECTED") setState("REFERENCE_VIEW");
-  }, [consentGiven, state, setState]);
-
-  // Real reference sample for the sign being collected (404 -> honest empty state).
-  useEffect(() => {
-    if (!currentSignLabel) return;
-    axios.get(`${API_BASE}/api/dataset/reference`, { params: { label: currentSignLabel } })
-      .then((r) => setRefMedia(r.data))
-      .catch(() => setRefMedia(null));
+    if (!currentSignLabel) {
+      return;
+    }
+    let cancelled = false;
+    axios.get<LandmarkReplay>(`${API_BASE}/api/simulation/frames`, {
+      params: { label: currentSignLabel },
+    })
+      .then((r) => {
+        if (!cancelled) setRefMedia({ ...r.data, label: currentSignLabel });
+      })
+      .catch(() => {
+        if (!cancelled) setRefMedia(null);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, [currentSignLabel]);
 
   // Handle countdown before recording starts
@@ -116,7 +131,7 @@ export default function ContributeSessionPage() {
         <PrivacyGate
           onConsent={(sId, saveVideo) => {
             setConsent(sId, saveVideo);
-            setState("READY_TO_RECORD");
+            setState("REFERENCE_VIEW");
           }}
         />
       </PageContainer>
@@ -173,31 +188,24 @@ export default function ContributeSessionPage() {
         )}
       </div>
 
-      {/* Watch & copy the real reference sample before recording */}
+      {/* Watch and copy the active model's landmark sequence before recording */}
       {state === "REFERENCE_VIEW" && (
         <div className="p-4 bg-surface rounded-lg border border-border space-y-3">
           <div className="text-xs font-mono uppercase text-text-muted">
-            REFERENCE SAMPLE — watch it, then copy the sign
+            ACTIVE MODEL SIGN — watch it, then copy the sign
           </div>
-          {refMedia?.type === "video" ? (
-            <video
-              src={`${API_BASE}${refMedia.url}`}
-              controls
-              loop
-              autoPlay
-              muted
-              playsInline
-              className="w-full aspect-video object-contain rounded border border-border bg-background"
-            />
-          ) : refMedia?.type === "image" ? (
-            <img
-              src={`${API_BASE}${refMedia.url}`}
-              alt={currentSignLabel || "reference"}
-              className="w-full aspect-video object-contain rounded border border-border bg-background"
+          {refMedia?.label === currentSignLabel && refMedia.frames.length ? (
+            <LandmarkSimulation
+              key={`${currentSignLabel}-${refMedia.source}`}
+              frames={refMedia.frames}
+              pose={refMedia.pose}
+              faceMesh={refMedia.face_mesh}
+              fps={15}
+              title={refMedia.source}
             />
           ) : (
             <div className="aspect-video w-full bg-background border border-border rounded flex items-center justify-center text-xs font-mono text-text-muted">
-              No reference sample yet — record the first one
+              No landmark sequence is bundled for this sign in the active model.
             </div>
           )}
           <button

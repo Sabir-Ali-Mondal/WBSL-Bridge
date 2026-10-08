@@ -55,6 +55,8 @@ SKIP_DIRS = {
 
     "uploads",
     "generated",
+    "dataset",
+    "dataset_train",
 
     "tests",
     "llm",

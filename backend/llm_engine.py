@@ -95,21 +95,14 @@ def build_user_message(gloss_text: str, meta: dict | None = None) -> str:
         if nmm.get("emphasis"):
             lines.append("- EMPHASIS: mouth opening detected on the marked token(s).")
 
+    gloss_with_affect = gloss_text
     emotion = meta.get("emotion")
     if isinstance(emotion, dict):
         dominant = emotion.get("dominant")
-        confidence = emotion.get("confidence")
-        if dominant and dominant != "neutral":
-            pct = (
-                f" ({round(float(confidence) * 100)}% confidence)"
-                if isinstance(confidence, (int, float))
-                else ""
-            )
-            lines.append(
-                f"- AFFECT: dominant facial emotion is {dominant}{pct}. "
-                "This colour the whole utterance; keep it out of the text unless "
-                "the gloss itself carries an [emotion] marker."
-            )
+        if dominant in {
+            "happy", "sad", "angry", "neutral", "surprise", "fear", "disgust"
+        }:
+            gloss_with_affect = f"{gloss_text} {{{dominant}-face}}"
 
     intensity = meta.get("intensity")
     if isinstance(intensity, (int, float)) and intensity > 1.0:
@@ -122,14 +115,14 @@ def build_user_message(gloss_text: str, meta: dict | None = None) -> str:
     if hand:
         lines.append(f"- DOMINANT HAND: {hand}.")
 
-    if not lines:
+    if not lines and gloss_with_affect == gloss_text:
         return gloss_text
 
     return (
         "SIGN METADATA (detected non-manual markers and affect):\n"
         + "\n".join(lines)
         + "\n\nGLOSS:\n"
-        + gloss_text
+        + gloss_with_affect
     )
 
 
@@ -204,6 +197,11 @@ If no emotion marker is present, treat the word as neutral.
 [?] appears ONLY on the last word of a complete direct question.
 [negation] marks only the semantic unit being negated.
 Emotion: happy, sad, angry, neutral, surprise, fear, disgust.
+
+The input may end with one utterance-level affect tag such as {happy-face}.
+This tag applies to the complete ordered gloss before it, not only its last
+word. Preserve the emotion in the natural tone of the Bengali output; do not
+translate the tag as a literal word or add words that are not in the gloss.
 
 CORE RULE:
 Preserve COMPLETE meaning, event order, subjects, objects, tense, time,

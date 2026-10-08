@@ -11,8 +11,8 @@ import Link from "next/link";
  * The public /dataset explorer now lives here.
  *
  * Dataset browsing is a curator/researcher activity -- the public portal links
- * to it only from the footer -- so it is owned by the Admin Console, which is
- * where the rest of the dataset tooling (catalog, media, contributions) sits.
+ * to it only from the footer -- so it is owned by the Admin Console, alongside
+ * model vocabulary and contributor submissions.
  */
 export default function AdminDatasetPage() {
   const [viewMode, setViewMode] = useState<"grid" | "table">("table");
@@ -46,9 +46,7 @@ export default function AdminDatasetPage() {
           Sign Lexicon & Dataset Browser
         </h1>
         <p className="mt-2 text-[11px] font-mono text-text-muted">
-          Source files: <code>dataset_train/daily_video/&lt;SIGN&gt;.npy</code>,{" "}
-          <code>dataset_train/unified_video/&lt;SIGN&gt;.npy</code>,{" "}
-          <code>dataset_train/unified_static/&lt;SIGN&gt;.npy</code>
+          Vocabulary and simulation sequences are loaded from the currently selected model bundle.
         </p>
       </div>
 

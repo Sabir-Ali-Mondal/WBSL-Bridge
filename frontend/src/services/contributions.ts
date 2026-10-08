@@ -30,18 +30,4 @@ export const contributionService = {
     return res.data;
   },
 
-  uploadSignMedia: async (signId: string, file: File): Promise<{ success: boolean; media: { type: string; filename: string; url: string } }> => {
-    const fd = new FormData();
-    fd.append("file", file);
-    const res = await apiClient.post(`/admin/signs/${signId}/media`, fd, {
-      headers: { "Content-Type": "multipart/form-data" },
-      timeout: 180000,
-    });
-    return res.data;
-  },
-
-  deleteSignMedia: async (signId: string): Promise<{ success: boolean }> => {
-    const res = await apiClient.delete(`/admin/signs/${signId}/media`);
-    return res.data;
-  },
 };

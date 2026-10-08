@@ -16,7 +16,7 @@ __pycache__/
 *$py.class
 *.so
 
-# Virtual environments (tests/ holds three of them, ~5 GB total)
+# Project-local virtual environments
 .venv/
 .venv-*/
 venv/
@@ -24,6 +24,9 @@ env/
 ENV/
 .conda/
 pyvenv.cfg
+
+# Local model assets that are required at runtime but too large for Git.
+/models/emotion/
 
 # Packaging / builds
 build/
@@ -78,38 +81,21 @@ torch/
 # -----------------------------------------------------------------------------
 # Datasets & generated media  (large / regenerable — do not commit)
 # -----------------------------------------------------------------------------
-# Raw sign-language corpora (tests/Indian Sign Language_Dataset is ~269 MB)
-tests/Indian Sign Language_Dataset/
-tests/dataset_landmarks/
-tests/dataset_continuous/
-tests/HELLO
-dataset/samples/
-tests/vit_emotion.onnx.data
-tests/vit_emotion.onnx
-tests/*.onnx
-tests/*.onnx.data
+# Local contributor recordings
+backend/data/community_dataset/manifest.jsonl
+backend/data/community_dataset/samples/
 
 
-dataset/Indian Sign Language_Dataset/ISL_STATIC1
-dataset/Indian Sign Language_Dataset/ISL_STATIC2
-dataset/Indian Sign Language_Dataset/ISL_VIDEO
-
-backend/media_fmp4_backup
-backend/media
+/model_training_zone/dataset/
+/model_training_zone/dataset_train/
 backend/tts_output
 
 # Generated TTS audio output (regenerated on every request)
 backend/tts_output/*
 !backend/tts_output/.gitkeep
 
-# Uploaded / captured media (keep the folder, drop the contents)
-backend/media/*
-!backend/media/.gitkeep
+# Common binary artifacts produced by training and capture pipelines.
 
-# Common media blobs produced by capture & synthesis pipelines.
-# NOTE: *.mp4 / *.png are deliberately NOT listed here — they are project
-# assets (e.g. frontend/public/background.mp4, the WBSL logo). Generated audio
-# is covered by the backend/tts_output/* rule above.
 *.wav
 *.m4a
 *.flac
@@ -119,7 +105,7 @@ backend/media/*
 *.hdf5
 *.parquet
 *.arrow
-
+models/onnx_models
 
 # -----------------------------------------------------------------------------
 # Node / Next.js  (frontend has its own .gitignore too — this is a backstop
@@ -177,7 +163,6 @@ frontend_dev.err.log
 *.suo
 *.user
 *~
-.vscode
 
 # -----------------------------------------------------------------------------
 # OS cruft

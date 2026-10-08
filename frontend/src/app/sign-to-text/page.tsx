@@ -40,6 +40,8 @@ interface Prediction {
     negation: boolean;
     affirmation: boolean;
     emphasis: boolean;
+    emotion?: EmotionResult | null;
+    metrics?: NmmMetrics | null;
   };
   emotion?: EmotionResult | null;
   metrics?: NmmMetrics | null;
@@ -83,6 +85,7 @@ interface StreamResult {
   label?: string;
   confidence?: number;
   margin?: number;
+  emotion?: EmotionResult | null;
   detail?: string;
   buffered?: number;
   top3?: { label: string; confidence: number }[];
@@ -236,6 +239,7 @@ export default function SignToTextPage() {
     label: "",
     at: 0,
   });
+  const idleSinceRef = useRef<number | null>(null);
 
   const [activeClasses, setActiveClasses] = useState(35);
 
@@ -255,7 +259,7 @@ export default function SignToTextPage() {
   });
 
   const [coverage, setCoverage] = useState<{
-    with_media: number;
+    with_landmark_sequences: number;
     total_classes: number;
   } | null>(null);
 
@@ -271,16 +275,16 @@ export default function SignToTextPage() {
         setUnifiedActive(!!res.data.unified);
         setEmotionAvailable(!!res.data.emotion_available);
 
-        if (typeof res.data.active_classes === "number") {
-          setActiveClasses(res.data.active_classes);
+        if (typeof res.data.vocabulary_classes === "number") {
+          setActiveClasses(res.data.vocabulary_classes);
         }
 
         if (res.data.contract) {
           setContract(res.data.contract);
         }
 
-        if (res.data.reference_coverage) {
-          setCoverage(res.data.reference_coverage);
+        if (res.data.sequence_coverage) {
+          setCoverage(res.data.sequence_coverage);
         }
       })
       .catch(() => {
@@ -332,6 +336,7 @@ export default function SignToTextPage() {
 
       frameBufferRef.current = [];
       candidateRef.current = null;
+      idleSinceRef.current = null;
 
       if (!intervalRef.current) {
         // 100 ms = 10 uploads/s. The server throttles its own inference to every
@@ -405,7 +410,7 @@ export default function SignToTextPage() {
 
     return history
       .map((h, i) => {
-        let tok = h.gloss;
+        let tok = `[${h.gloss.toLowerCase()}]`;
 
         if (h.negation) {
           tok += "[negation]";
@@ -464,6 +469,7 @@ export default function SignToTextPage() {
 
       setPrediction(res.data);
       setNmmFlags(res.data.nmm);
+      setEmotion(res.data.emotion ?? res.data.nmm?.emotion ?? null);
 
       if (
         res.data.detected &&
@@ -737,6 +743,7 @@ export default function SignToTextPage() {
     setRepeatBlocked(false);
 
     candidateRef.current = null;
+    idleSinceRef.current = null;
 
     lastAppendRef.current = {
       label: "",
@@ -875,10 +882,33 @@ export default function SignToTextPage() {
    */
   const commitFromStream = (data: StreamResult) => {
     const label = data.label;
+    const incomingEmotion = data.emotion ?? data.nmm?.emotion ?? null;
+    if (incomingEmotion) setEmotion(incomingEmotion);
+
+    const markIdle = () => {
+      candidateRef.current = null;
+      if (!lastAppendRef.current.label) return;
+
+      const now = Date.now();
+      idleSinceRef.current ??= now;
+      if (
+        now - idleSinceRef.current >=
+        thresholdsRef.current.repeat_cooldown_ms
+      ) {
+        lastAppendRef.current = { label: "", at: 0 };
+        idleSinceRef.current = null;
+        setRepeatBlocked(false);
+      }
+    };
 
     if (!data.ready || !label) {
       setLive(null);
-      candidateRef.current = null;
+      const detail = data.detail?.toLowerCase() ?? "";
+      if (detail === "idle" || detail.includes("no hands")) {
+        markIdle();
+      } else if (detail !== "throttled" && detail !== "filling") {
+        candidateRef.current = null;
+      }
       return;
     }
 
@@ -894,9 +924,7 @@ export default function SignToTextPage() {
       emphasis: false,
     };
 
-    const emo = (data.nmm?.emotion ?? null) as EmotionResult | null;
-
-    if (emo) setEmotion(emo);
+    const emo = (incomingEmotion ?? null) as EmotionResult | null;
 
     setPrediction({
       detected: true,
@@ -917,7 +945,14 @@ export default function SignToTextPage() {
     const isBackground = label === "NONE" || label === "BACKGROUND";
     setLive(isBackground ? null : { label, confidence, margin });
 
-    if (isBackground || !decisive) {
+    if (isBackground) {
+      markIdle();
+      return;
+    }
+
+    idleSinceRef.current = null;
+
+    if (!decisive) {
       candidateRef.current = null;
       return;
     }
@@ -932,21 +967,22 @@ export default function SignToTextPage() {
     const now = Date.now();
     const last = lastAppendRef.current;
 
-    if (last.label === label && now - last.at < T.repeat_cooldown_ms) {
-      // Swallowing this silently makes the UI look dead while the model is
-      // actually recognising the sign again. Surface it instead.
+    if (last.label === label) {
       setRepeatBlocked(true);
-      setTimeout(() => setRepeatBlocked(false), 1200);
+      candidateRef.current = null;
       return;
     }
 
-    lastAppendRef.current = { label, at: now };
     candidateRef.current = null;
+    setRepeatBlocked(false);
 
     // "Clear" is the one thing that resets the server's window: the model would
     // otherwise keep reading the previous signer state after the user wiped the
     // sequence and started over.
-    if (autoDetect) appendGloss(label, { gloss: label, ...nn });
+    if (autoDetect) {
+      lastAppendRef.current = { label, at: now };
+      appendGloss(label, { gloss: label, ...nn });
+    }
   };
 
   /**
@@ -1006,6 +1042,14 @@ export default function SignToTextPage() {
 
       if (!res.data.ready || !res.data.label) {
         setLive(null);
+        if (res.data.emotion || res.data.nmm?.emotion) {
+          commitFromStream(res.data);
+        } else if (
+          res.data.detail?.toLowerCase() === "idle" ||
+          res.data.detail?.toLowerCase().includes("no hands")
+        ) {
+          commitFromStream(res.data);
+        }
         return;
       }
 
@@ -1106,17 +1150,17 @@ export default function SignToTextPage() {
           {coverage && (
             <div className="px-2.5 py-1 rounded bg-surface border border-border text-[9px] font-mono">
               <span className="text-text-muted">
-                MEDIA{" "}
+                MODEL{" "}
               </span>
               <span
                 className={
-                  coverage.with_media ===
+                  coverage.with_landmark_sequences ===
                   coverage.total_classes
                     ? "text-accent-primary font-bold"
                     : "text-status-warning font-bold"
                 }
               >
-                {coverage.with_media}/
+                {coverage.with_landmark_sequences}/
                 {coverage.total_classes}
               </span>
             </div>
@@ -1290,7 +1334,7 @@ export default function SignToTextPage() {
               <div className="mb-2 flex items-center justify-between gap-2 px-2 py-1.5 rounded bg-background border border-border">
                 <span className="text-[8px] font-mono uppercase text-text-muted">
                   {repeatBlocked
-                    ? "COOLDOWN"
+                    ? "WAIT FOR RELEASE"
                     : "HOLDING"}
                 </span>
 

@@ -9,7 +9,7 @@
 WBSL Bridge resolves the critical technological void in regional sign translation through:
 
 1. **Sign-to-Bengali (Forward Pipeline):** Real-time computer vision extraction (126-dim hands or 258-dim holistic hands+pose), continuous temporal windowing, non-manual marker (NMM) parsing, facial affect classification, constrained Natural Language Generation (NLG) via Large Language Models (LLM), and dual-engine Bengali Text-to-Speech (TTS).
-2. **Bengali-to-Sign (Reverse Pipeline):** Automatic Speech Recognition (ASR/STT) via int8-quantized Whisper, deterministic phrase mapping or zero-hallucination LLM-driven gloss decomposition, and gapless reference video playback.
+2. **Bengali-to-Sign (Reverse Pipeline):** Automatic Speech Recognition (ASR/STT) via int8-quantized Whisper, deterministic phrase mapping or constrained LLM gloss decomposition, and sequential replay of the active model's landmark sequences.
 3. **Privacy-Preserving Kinematic Ingestion:** DPDP Act 2023–compliant community data pipeline that strips raw video frames on client/edge, persisting only normalized float32 kinematic vectors for model retraining.
 
 ---
@@ -92,10 +92,11 @@ WBSL Bridge resolves the critical technological void in regional sign translatio
 +=============================================================================================================================================+
 |                                                  PERSISTENCE, ARTIFACTS & DATA STORAGE                                                      |
 +=============================================================================================================================================+
-|  /models/onnx_models/<id>/           /backend/media/                   /dataset/manifest.jsonl          /backend/data/                      |
-|  - *.onnx (Graph)                    - *.mp4 (H.264 Universal AVC1)   - Review Queue Status             - gloss_map.json (Lexicon)          |
-|  - *.onnx.data (Weights)             - *.webp / *.png (Keyframes)      - DPDP Pseudonym Signer IDs       - sign_media.json (Media Map)       |
-|  - *_classes.json (Label list)       - Range Requests (206 Partial)    - Relative *.npy Landmark Paths   active_model.json (Pointer)         |
+|  /models/onnx_models/<id>/           /backend/data/community_dataset/   /model_training_zone/            /backend/data/                      |
+|  - *.onnx (Graph)                    - manifest.jsonl                  - Raw corpora and working data    - gloss_map.json (Lexicon)          |
+|  - *.onnx.data (Weights)             - Review Queue Status              - train_holistic.py               - active_model.json (Pointer)       |
+|  - *_classes.json (Label list)       - Relative *.npy Landmark Paths   - train_unified.py                - TTS output and runtime config    |
+|  - npy/<GLOSS>.npy + face sidecar    - Contributor recordings         - build_index helper               -                                  |
 +=============================================================================================================================================+
 ```
 
@@ -322,18 +323,14 @@ Bengali String / Audio STT ──> Lexicon Matcher (backend/main.py: text_to_sig
                        (e.g., ["HELLO", "WHAT_IS_YOUR_NAME"])
                                        │
                                        ▼
-                       Media Resolver (sign_media.json)
-                       Resolves each gloss to Reference Media:
-                       - Video: H.264 (AVC1) in MP4 container
-                       - Image: WebP / PNG
+                       Active Model Bundle Resolver
+                       Resolves each gloss and optional face mesh to <run>/npy/
+                       using the selected model's class list
                                        │
                                        ▼
-                       Client Media Sequencing (VideoPlayer.tsx)
-                       - Seamless playback transitions
-                       - Dual-Engine Playback:
-                         * Engine 1: Native HTML5 Video Element
-                         * Engine 2: Server-side frame extraction via Canvas
-                           fallback (JPEG stream at 14 FPS) if codec fails
+                       Client Landmark Simulation
+                       Uses the same 126-dim or 258-dim sequence as
+                       Admin Dataset and contributor showcase
 ```
 
 ---
@@ -417,8 +414,7 @@ WBSL Bridge/
 ├── backend/
 │   ├── data/
 │   │   ├── gloss_map.json            # Bengali-to-WBSL lexical lookup tables
-│   │   └── sign_media.json           # Catalog mappings to reference videos and images
-│   ├── media/                        # H.264/WebP reference media library
+│   │   └── community_dataset/        # Contributor landmark samples and manifest
 │   ├── tts_output/                   # Audio cache for generated TTS files
 │   ├── extract.py                    # Hand & holistic MediaPipe extraction pipelines
 │   ├── llm_engine.py                 # Anti-hallucination Bengali NLG logic & SSE streamer
@@ -428,20 +424,20 @@ WBSL Bridge/
 │   ├── streaming.py                  # Rolling landmark buffer for continuous live signing
 │   ├── stt_engine.py                 # faster-whisper int8 speech-to-text runner
 │   └── tts_engine.py                 # edge-tts & BanglaTTS dual synthesis engines
-├── dataset/
-│   ├── manifest.jsonl                # Master database of community-contributed samples
-│   ├── index.jsonl                   # Cross-referenced index of all project data assets
-│   └── samples/                      # Structured .npy kinematic storage: [label]/[signer]/
-├── dataset_train/                    # Extracted training pools: daily_video/, unified_video/
+├── model_training_zone/
+│   ├── dataset/                      # Raw training corpora and generated index
+│   ├── dataset_train/                # Extracted working pools and reports
+│   ├── train_holistic.py             # Holistic video trainer
+│   └── train_unified.py              # Legacy two-hand video trainer
 ├── frontend/                         # Next.js 16 App Router interface
 │   ├── src/
 │   │   ├── app/                      # Routes: /sign-to-text, /text-to-sign, /contribute, /admin
-│   │   ├── components/               # React UI modules (VideoPlayer, LandmarkSimulation, etc.)
+│   │   ├── components/               # React UI modules, including LandmarkSimulation
 │   │   ├── hooks/                    # useCamera, useRecording, useSystemStatus
 │   │   ├── lib/                      # Type declarations, vector constants, utilities
 │   │   └── store/                    # Zustand stores for client state management
 ├── models/
-│   ├── onnx_models/                  # Discovered inference runs (<id>/*.onnx)
+│   ├── onnx_models/                  # Graph/classes/reports plus npy sequences and face sidecars
 │   └── active_model.json             # Persistent pointer to the active serving graph
 ├── train_holistic.py                 # Training script for 258-dim holistic BiLSTM + Attention
 └── train_unified.py                  # Training script for 126-dim temporal LSTM models

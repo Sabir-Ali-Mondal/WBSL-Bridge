@@ -42,7 +42,7 @@ export function EmotionPanel({ emotion, compact = false, offline = false }: Prop
           Affect
         </div>
         <p className="text-[11px] text-text-muted mt-2 leading-relaxed">
-          Affect offline — tests/vit_emotion.onnx not installed.
+          Affect offline — models/emotion/vit_emotion.onnx not installed.
         </p>
       </div>
     );

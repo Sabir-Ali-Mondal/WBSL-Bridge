@@ -1,16 +1,15 @@
 """
 tools/build_index.py
 
-Writes ONE coordinated master index at dataset/index.jsonl covering every data
-coordinate in the project: raw sources, extracted hold-sequences, video
-sequences, reference media, community samples and trained models.
+Writes ONE coordinated master index for raw sources, extracted sequences,
+community samples and trained model bundles.
 
 Every record carries sample_id / kind / label / source / path / split /
 verification so downstream tooling can join on a single key.
 
 Run:
     cd "d:\\Download\\Projects\\WBSL Bridge"
-    & "tests\\.venv\\Scripts\\python.exe" tools\\build_index.py
+    & ".venv\\Scripts\\python.exe" tools\\build_index.py
 """
 import json
 from pathlib import Path
@@ -18,9 +17,10 @@ from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parent.parent
-DS = ROOT / "dataset" / "Indian Sign Language_Dataset"
-DT = ROOT / "dataset_train"
-OUT = ROOT / "dataset" / "index.jsonl"
+ZONE = ROOT / "model_training_zone"
+DS = ZONE / "dataset" / "Indian Sign Language_Dataset"
+DT = ZONE / "dataset_train"
+OUT = ZONE / "dataset" / "index.jsonl"
 recs = []
 
 
@@ -29,7 +29,7 @@ def rel(p):
 
 
 # ── 1. Raw static images (ISL_STATIC1 + ISL_STATIC2) ──
-for cd in sorted(d for d in (DS / "ISL_STATIC2").iterdir() if d.is_dir()):
+for cd in sorted(d for d in (DS / "ISL_STATIC2").glob("*") if d.is_dir()):
     n = len(list(cd.glob("*.jpg")))
     if (DS / "ISL_STATIC1" / cd.name).exists():
         n += len(list((DS / "ISL_STATIC1" / cd.name).glob("*.jpg")))
@@ -38,7 +38,7 @@ for cd in sorted(d for d in (DS / "ISL_STATIC2").iterdir() if d.is_dir()):
                  "split": "unassigned", "verification": "n/a"})
 
 # ── 2. Raw videos (ISL_VIDEO) ──
-for vd in sorted(d for d in (DS / "ISL_VIDEO").iterdir() if d.is_dir()):
+for vd in sorted(d for d in (DS / "ISL_VIDEO").glob("*") if d.is_dir()):
     g = vd.name.upper().replace(" ", "_")
     recs.append({"sample_id": f"RAW_VIDEO_{g}", "kind": "raw_videos", "label": g,
                  "source": "ISL_VIDEO", "path": rel(vd), "count": len(list(vd.glob("*.mp4"))),
@@ -58,17 +58,8 @@ for p in sorted((DT / "unified_video").glob("*.npy")):
                  "source": "extracted", "path": rel(p), "sequences": int(a.shape[0]),
                  "frames": int(a.shape[1]), "split": "train+val", "verification": "n/a"})
 
-# ── 5. Reference media (one auto-copied sample per class) ──
-sm = ROOT / "backend" / "data" / "sign_media.json"
-if sm.exists():
-    for label, m in json.loads(sm.read_text(encoding="utf-8")).items():
-        recs.append({"sample_id": f"REF_{label}", "kind": "reference_media", "label": label,
-                     "source": "auto-copied", "path": f"backend/media/{m['filename']}",
-                     "media_type": m["type"], "url": m["url"],
-                     "split": "n/a", "verification": "admin-approved"})
-
-# ── 6. Community samples (real uploads: video -> landmarks -> npy) ──
-man = ROOT / "dataset" / "manifest.jsonl"
+# ── 5. Community samples ──
+man = ROOT / "backend" / "data" / "community_dataset" / "manifest.jsonl"
 if man.exists():
     for line in man.read_text(encoding="utf-8").splitlines():
         if not line.strip():
@@ -80,13 +71,7 @@ if man.exists():
                      "split": r.get("split", "unassigned"),
                      "verification": r.get("verification", "pending")})
 
-# ── 7. Trained models ──
-#
-# The two flat artefacts below are the legacy layout. Every run written since
-# train_daily6.py lives in models/onnx_models/<id>/ and was previously invisible
-# to this index -- so the index listed 2 models while the registry was serving a
-# third. Both layouts are walked, and each run is recorded with its report when
-# one was written.
+# ── 6. Trained models and their simulation sequences ──
 RUNS = ROOT / "models" / "onnx_models"
 for run in sorted((d for d in RUNS.iterdir() if d.is_dir() and d.name.isdigit()),
                   key=lambda d: int(d.name)):
@@ -101,6 +86,18 @@ for run in sorted((d for d in RUNS.iterdir() if d.is_dir() and d.name.isdigit())
                 rec["metrics"] = json.loads(rp.read_text(encoding="utf-8"))
                 break
         recs.append(rec)
+    for p in sorted((run / "npy").glob("*.npy")):
+        if p.name.endswith(".face.npy"):
+            continue
+        a = np.load(p, mmap_mode="r", allow_pickle=False)
+        recs.append({"sample_id": f"SEQ_RUN{run.name}_{p.stem}", "kind": "model_sequence",
+                     "label": p.stem, "source": "model-bundle", "run": f"onnx_models/{run.name}",
+                     "path": rel(p), "sequences": int(a.shape[0]) if a.ndim == 3 else 1,
+                     "frames": int(a.shape[1]) if a.ndim == 3 else int(a.shape[0]),
+                     "feature_width": int(a.shape[-1]),
+                     "has_face_mesh": (run / "npy" / f"{p.stem}.face.npy").is_file(),
+                     "split": "n/a",
+                     "verification": "n/a"})
 
 for mp_ in [("sign_mlp.onnx", "MLP-static"), ("sign_unified_lstm.onnx", "LSTM-unified")]:
     if (ROOT / "models" / mp_[0]).exists():
@@ -114,6 +111,7 @@ if rep.exists():
         if r["kind"] == "model" and "unified" in r["label"]:
             r["metrics"] = json.loads(rep.read_text(encoding="utf-8"))
 
+OUT.parent.mkdir(parents=True, exist_ok=True)
 OUT.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in recs), encoding="utf-8")
 kinds = {}
 for r in recs:

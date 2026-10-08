@@ -97,7 +97,6 @@ export default function AdminSignDetailPage() {
           frames={sim?.frames}
           pose={sim?.pose}
           faceMesh={sim?.face_mesh}
-          faceMeshConnections={sim?.face_mesh_connections}
           faceMeshError={sim?.face_mesh_error}
           fps={15}
           title={sim?.source}

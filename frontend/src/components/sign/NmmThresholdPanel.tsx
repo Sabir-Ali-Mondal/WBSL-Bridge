@@ -165,8 +165,8 @@ const SLIDERS: SliderSpec[] = [
   },
   {
     key: "repeat_cooldown_ms",
-    label: "Repeat cooldown",
-    hint: "How long the same sign is suppressed after being added, so holding one sign does not repeat it.",
+    label: "Release before repeating",
+    hint: "How long the camera must detect an idle/release state before the same sign can be added again.",
     min: 300,
     max: 5000,
     step: 100,

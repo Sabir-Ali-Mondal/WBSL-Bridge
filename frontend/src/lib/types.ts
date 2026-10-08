@@ -48,7 +48,7 @@ export interface Sign {
   approved_samples: number;
   pending_samples: number;
   rejected_samples: number;
-  reference_video_url: string | null;
+  has_landmarks: boolean;
   language: "WBSL" | "ISL" | "BdSL";
 }
 

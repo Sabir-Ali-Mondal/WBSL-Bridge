@@ -13,13 +13,16 @@ What makes this run different from train_daily6.py:
     translation, jitter) because 6 classes over a few clips per class is a very
     small training set.
 
-Saves to models/onnx_models/<next_id>/ (the registry auto-discovers it).
-Run:  python train_holistic.py --force --epochs 60
+Saves the graph, classes, and report to models/onnx_models/<next_id>/, and
+source sequences plus aligned face-mesh sidecars to
+models/onnx_models/<next_id>/npy/ (the registry auto-discovers the bundle).
+Run:  python model_training_zone/train_holistic.py --force --epochs 60
 Use --force to re-extract videos instead of reusing existing .npy files.
 """
 
 import argparse
 import json
+import shutil
 import sys
 import time
 from pathlib import Path
@@ -31,7 +34,8 @@ import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parent.parent
+TRAINING_ZONE = ROOT / "model_training_zone"
 sys.path.insert(0, str(ROOT))
 
 # The feature contract is imported, never re-typed: the pose block written here
@@ -39,12 +43,12 @@ sys.path.insert(0, str(ROOT))
 # on a tensor it will never see. See backend/pose.py.
 from backend.pose import POSE_DIM, pose_from_landmarks  # noqa: E402
 
-DS = ROOT / "dataset" / "Indian Sign Language_Dataset"
+DS = TRAINING_ZONE / "dataset" / "Indian Sign Language_Dataset"
 if not (DS / "ISL_VIDEO").exists():
     sys.exit("Dataset not found (ISL_VIDEO missing)")
 
 VD = DS / "ISL_VIDEO"
-RAW = ROOT / "dataset_train" / "daily_video"          # shared with train_daily6 (skip-existing)
+RAW = TRAINING_ZONE / "dataset_train" / "daily_video"
 MODELS = ROOT / "models" / "onnx_models"
 MODELS.mkdir(parents=True, exist_ok=True)
 RAW.mkdir(parents=True, exist_ok=True)
@@ -61,11 +65,15 @@ DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 _hol = mp.solutions.holistic.Holistic(static_image_mode=False, min_detection_confidence=0.5)
 
 
-def frame_vec(bgr):
-    """BYTE-IDENTICAL geometry to backend/extract.extract_holistic_frame."""
+def frame_vec_and_face(bgr):
+    """Return the model vector and aligned MediaPipe face mesh for one frame."""
     res = _hol.process(cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB))
+    face = (
+        np.array([[p.x, p.y, p.z] for p in res.face_landmarks.landmark], np.float32)
+        if res.face_landmarks else None
+    )
     if not res.left_hand_landmarks or not res.right_hand_landmarks or res.pose_landmarks is None:
-        return None
+        return None, face
     lh = np.array([[p.x, p.y, p.z] for p in res.left_hand_landmarks.landmark], np.float32)
     rh = np.array([[p.x, p.y, p.z] for p in res.right_hand_landmarks.landmark], np.float32)
     pose = pose_from_landmarks(res.pose_landmarks)
@@ -73,60 +81,178 @@ def frame_vec(bgr):
     lh = (lh - ref) / scale
     rh = (rh - ref) / scale
     pose[:, :3] = (pose[:, :3] - ref) / scale
-    return np.concatenate([lh.flatten(), rh.flatten(), pose.flatten()]).astype(np.float32)
+    features = np.concatenate([lh.flatten(), rh.flatten(), pose.flatten()]).astype(np.float32)
+    return features, face
 
 
-def seq_from_video(path, start_frac, end_frac):
+def seq_from_video_with_face(path, start_frac, end_frac):
     """Even-sample SEQ_T frames between two fractions of the clip.
 
     ``start_frac``/``end_frac`` are what separate a sign from the NONE class:
     the same clip yields a signing sequence at 0.10–0.90 and a rest sequence at
-    its head/tail, where the hands are down and the signer is idle.
+    its head/tail, where the hands are down and the signer is idle. Face frames
+    use the same sampled indices so they remain aligned with model features.
     """
     cap = cv2.VideoCapture(str(path))
     F = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     if F < 8:
         cap.release()
-        return None
+        return None, None
     idxs = np.linspace(int(F * start_frac),
                        max(int(F * start_frac) + 1, int(F * end_frac) - 1),
                        SEQ_T).astype(int)
-    out, last, good = [], None, 0
+    out, face_out, last, good = [], [], None, 0
     for ix in idxs:
         cap.set(cv2.CAP_PROP_POS_FRAMES, int(ix))
         ok, fr = cap.read()
         if not ok:
             out.append(None)
+            face_out.append(None)
             continue
-        v = frame_vec(fr)
+        v, face = frame_vec_and_face(fr)
         if v is not None:
             last = v
             good += 1
         out.append(v if v is not None else last)
+        face_out.append(face)
     cap.release()
     if good < SEQ_T // 2:
-        return None
-    return np.array([o if o is not None else np.zeros(DIM, np.float32) for o in out], np.float32)
+        return None, None
+    features = np.array(
+        [o if o is not None else np.zeros(DIM, np.float32) for o in out],
+        np.float32,
+    )
+    face_shape = (SEQ_T, 468, 3)
+    faces = np.stack([
+        face if face is not None and face.shape == face_shape[1:] else
+        np.zeros(face_shape[1:], np.float32)
+        for face in face_out
+    ])
+    return features, faces
 
 
-def build(force=False):
+def seq_from_video(path, start_frac, end_frac):
+    """Model-sequence-only wrapper used by negative-window extraction."""
+    return seq_from_video_with_face(path, start_frac, end_frac)[0]
+
+
+def face_seq_from_video(path, face_mesh, start_frac=0.10, end_frac=0.90):
+    """Extract only visualization landmarks at the model sequence's sample frames."""
+    cap = cv2.VideoCapture(str(path))
+    if not cap.isOpened():
+        cap.release()
+        raise RuntimeError(f"Cannot open video for face-mesh extraction: {path}")
+    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    if frame_count < 8:
+        cap.release()
+        raise RuntimeError(f"Cannot align face mesh to short video: {path}")
+
+    start = int(frame_count * start_frac)
+    indices = np.linspace(
+        start,
+        max(start + 1, int(frame_count * end_frac) - 1),
+        SEQ_T,
+    ).astype(int)
+    empty_face = np.zeros((468, 3), np.float32)
+    faces = []
+    current_index = -1
+    for index in indices:
+        while current_index < index:
+            ok, frame = cap.read()
+            if not ok:
+                cap.release()
+                raise RuntimeError(
+                    f"Cannot read frame {index} while extracting face mesh: {path}"
+                )
+            current_index += 1
+        height, width = frame.shape[:2]
+        scale = min(1.0, 640 / max(height, width))
+        if scale < 1.0:
+            frame = cv2.resize(
+                frame,
+                (round(width * scale), round(height * scale)),
+                interpolation=cv2.INTER_AREA,
+            )
+        result = face_mesh.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        if result.multi_face_landmarks:
+            points = np.array(
+                [[point.x, point.y, point.z]
+                 for point in result.multi_face_landmarks[0].landmark],
+                np.float32,
+            )
+            faces.append(points if points.shape == (468, 3) else empty_face.copy())
+        else:
+            faces.append(empty_face.copy())
+    cap.release()
+    return np.stack(faces)
+
+
+def build(force, model_dir):
     print("=" * 70)
     print(" EXTRACTING (258-DIM HOLISTIC) + REST CLASS".center(70))
     print("=" * 70)
     print(f"  DATASET : {VD}")
+    sequence_dir = model_dir / "npy"
+    sequence_dir.mkdir(parents=True, exist_ok=True)
     t0 = time.time()
+    face_detector = None
 
-    for t in TARGETS:
-        g = t.upper().replace(" ", "_")
-        dest = RAW / f"{g}.npy"
-        if not force and dest.exists():
-            print(f"  SKIP {g}")
-            continue
-        vids = sorted((VD / t).glob("*.mp4")) if (VD / t).exists() else []
-        seqs = [s for s in (seq_from_video(f, 0.10, 0.90) for f in vids) if s is not None]
-        if seqs:
-            np.save(dest, np.stack(seqs))
-        print(f"  DONE {g}: {len(seqs)}/{len(vids)}")
+    try:
+        for t in TARGETS:
+            g = t.upper().replace(" ", "_")
+            dest = RAW / f"{g}.npy"
+            vids = sorted((VD / t).glob("*.mp4")) if (VD / t).exists() else []
+            stored_sequences = (
+                np.load(dest, mmap_mode="r", allow_pickle=False)
+                if not force and dest.exists()
+                else None
+            )
+
+            if stored_sequences is not None and vids and len(stored_sequences) == len(vids):
+                if face_detector is None:
+                    face_detector = mp.solutions.face_mesh.FaceMesh(
+                        static_image_mode=False,
+                        max_num_faces=1,
+                        min_detection_confidence=0.5,
+                    )
+                faces = [
+                    face_seq_from_video(video, face_detector)
+                    for video in vids
+                ]
+                sequence_count = len(stored_sequences)
+            else:
+                extracted = [
+                    seq_from_video_with_face(video, 0.10, 0.90)
+                    for video in vids
+                ]
+                valid = [
+                    (features, face)
+                    for features, face in extracted
+                    if features is not None
+                ]
+                sequences = [features for features, _ in valid]
+                faces = [face for _, face in valid]
+                if stored_sequences is not None and len(stored_sequences) != len(sequences):
+                    raise RuntimeError(
+                        f"{g}: cached feature sequence count ({len(stored_sequences)}) "
+                        f"does not match re-extracted videos ({len(sequences)}); "
+                        "cannot safely align face meshes."
+                    )
+                if sequences and (force or stored_sequences is None):
+                    np.save(dest, np.stack(sequences))
+                sequence_count = len(sequences)
+
+            if dest.exists():
+                shutil.copyfile(dest, sequence_dir / dest.name)
+            if faces:
+                np.save(
+                    sequence_dir / f"{g}.face.npy",
+                    np.stack(faces).astype(np.float16),
+                )
+            print(f"  DONE {g}: {sequence_count}/{len(vids)}")
+    finally:
+        if face_detector is not None:
+            face_detector.close()
 
     dest = RAW / "NONE.npy"
     if force or not dest.exists():
@@ -151,6 +277,8 @@ def build(force=False):
         if idle:
             np.save(dest, np.stack(idle))
             print(f"  DONE NONE: {len(idle)}")
+    if dest.exists():
+        shutil.copyfile(dest, sequence_dir / dest.name)
     print(f"  extraction finished in {time.time() - t0:.1f}s")
 
 
@@ -266,7 +394,7 @@ def next_model_id():
     return max([int(p.name) for p in MODELS.iterdir() if p.name.isdigit()], default=0) + 1
 
 
-def train(epochs):
+def train(epochs, out):
     print("=" * 70)
     print(" TRAINING DAILY LSTM (BiLSTM + ATTENTION, 258-DIM)".center(70))
     print("=" * 70)
@@ -274,11 +402,11 @@ def train(epochs):
     names, tr, va = [], [], []
     rng = np.random.default_rng(42)
     for c in CLASSES:
-        p = RAW / f"{c}.npy"
+        p = out / "npy" / f"{c}.npy"
         if not p.exists():
             print(f"  WARN {c}: no extracted data, class dropped")
             continue
-        a = np.load(p)
+        a = np.load(p, allow_pickle=False)
         a = a[rng.permutation(len(a))]
         nv = max(2, int(0.2 * len(a)))
         va.append(a[:nv])
@@ -335,9 +463,6 @@ def train(epochs):
     model.load_state_dict(best_state)
     model.eval().cpu()
 
-    mid = next_model_id()
-    out = MODELS / str(mid)
-    out.mkdir(parents=True, exist_ok=True)
     torch.onnx.export(
         model, torch.randn(1, SEQ_T, DIM), str(out / "sign_daily_lstm.onnx"),
         opset_version=18, input_names=["sequence"], output_names=["logits"],
@@ -350,7 +475,7 @@ def train(epochs):
               open(out / "daily_report.json", "w", encoding="utf-8"), indent=1)
 
     print("-" * 70)
-    print(f"  saved models/onnx_models/{mid}/  (best {best:.1f}%)")
+    print(f"  saved models/onnx_models/{out.name}/  (best {best:.1f}%)")
     print(f"  next: Admin -> Models Registry -> RESCAN -> SET ACTIVE")
     print(f"        a {DIM}-dim graph makes the backend select the holistic extractor")
 
@@ -360,5 +485,7 @@ if __name__ == "__main__":
     ap.add_argument("--force", action="store_true", help="re-extract even if .npy exists")
     ap.add_argument("--epochs", type=int, default=EPOCHS)
     a = ap.parse_args()
-    build(a.force)
-    train(a.epochs)
+    model_dir = MODELS / str(next_model_id())
+    model_dir.mkdir(parents=True, exist_ok=False)
+    build(a.force, model_dir)
+    train(a.epochs, model_dir)

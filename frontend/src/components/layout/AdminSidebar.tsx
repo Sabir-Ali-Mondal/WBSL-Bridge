@@ -5,10 +5,9 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   CheckSquare,
-  BookOpen,
   Database,
   Cpu,
-  Video,
+  Activity,
   Settings,
   ArrowLeft,
 } from "lucide-react";
@@ -16,10 +15,9 @@ import {
 const links = [
   { label: "Dashboard", href: "/admin", icon: LayoutDashboard },
   { label: "Contributions", href: "/admin/contributions", icon: CheckSquare },
-  { label: "Signs Catalog", href: "/admin/signs", icon: BookOpen },
   { label: "Dataset Explorer", href: "/admin/dataset", icon: Database },
   { label: "Models Registry", href: "/admin/models", icon: Cpu },
-  { label: "Video Inspector", href: "/admin/videos", icon: Video },
+  { label: "Model Simulation", href: "/admin/videos", icon: Activity },
   { label: "System Settings", href: "/admin/settings", icon: Settings },
 ];
 

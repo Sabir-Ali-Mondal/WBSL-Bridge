@@ -1,9 +1,19 @@
 $root = "D:\Download\Projects\WBSL Bridge"
+$python = Join-Path $root ".venv\Scripts\python.exe"
+$requirements = Join-Path $root "requirements.txt"
 
 $backendScript  = Join-Path $env:TEMP "wbsl-backend.ps1"
 $frontendScript = Join-Path $env:TEMP "wbsl-frontend.ps1"
 $aiScript       = Join-Path $env:TEMP "wbsl-ai.ps1"
 $backendPort    = 8200
+
+if (-not (Test-Path -LiteralPath $python -PathType Leaf)) {
+    throw "The project Python environment is missing. Run: py -3.11 -m venv .venv; .\.venv\Scripts\python.exe -m pip install -r requirements.txt"
+}
+
+if (-not (Test-Path -LiteralPath $requirements -PathType Leaf)) {
+    throw "Python dependency manifest not found: $requirements"
+}
 
 $backendListeners = @(
     Get-NetTCPConnection -State Listen -LocalPort $backendPort -ErrorAction SilentlyContinue
@@ -24,7 +34,7 @@ foreach ($listener in $backendListeners) {
 # Backend
 @"
 Set-Location '$root'
-& 'tests\.venv\Scripts\python.exe' -m uvicorn backend.main:app --reload --port $backendPort
+& '$python' -m uvicorn backend.main:app --reload --port $backendPort
 "@ | Set-Content -Path $backendScript -Encoding UTF8
 
 # Frontend

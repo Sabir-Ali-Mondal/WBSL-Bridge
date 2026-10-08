@@ -2,7 +2,7 @@
 import React from "react";
 import Link from "next/link";
 import { useQuery } from "@tanstack/react-query";
-import { CheckSquare, Database, BookOpen, ArrowUpRight } from "lucide-react";
+import { CheckSquare, Database, ArrowUpRight } from "lucide-react";
 import { statsService, AdminStats } from "@/services/stats";
 
 export default function AdminDashboardPage() {
@@ -94,25 +94,6 @@ export default function AdminDashboardPage() {
           </div>
           <div className="flex items-center space-x-1 text-xs font-mono text-accent-secondary font-bold">
             <span>Open Explorer</span>
-            <ArrowUpRight size={14} />
-          </div>
-        </Link>
-
-        <Link
-          href="/admin/signs"
-          className="p-6 rounded-lg bg-surface border border-border hover:border-text-primary transition-all flex flex-col justify-between space-y-4"
-        >
-          <div>
-            <div className="w-10 h-10 rounded bg-surface-elevated text-text-primary flex items-center justify-center mb-3">
-              <BookOpen size={20} />
-            </div>
-            <h3 className="font-semibold text-text-primary">Signs & Reference Media</h3>
-            <p className="text-xs text-text-secondary mt-1">
-              Attach or replace the reference video and image for each catalog sign.
-            </p>
-          </div>
-          <div className="flex items-center space-x-1 text-xs font-mono text-text-primary font-bold">
-            <span>Manage Media</span>
             <ArrowUpRight size={14} />
           </div>
         </Link>

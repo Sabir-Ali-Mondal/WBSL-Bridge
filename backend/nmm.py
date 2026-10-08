@@ -27,7 +27,7 @@ _face_mesh = mp.solutions.face_mesh.FaceMesh(
 
 # Initialize ViT Emotion Model ONCE
 ROOT = Path(__file__).resolve().parent.parent
-VIT_PATH = ROOT / "tests" / "vit_emotion.onnx"
+VIT_PATH = ROOT / "models" / "emotion" / "vit_emotion.onnx"
 _vit_session = None
 _vit_input_name = None
 
@@ -212,6 +212,12 @@ def detect_nmm(frame_bgr: np.ndarray, custom_thresholds: dict | None = None) -> 
     }
 
     if not results.multi_face_landmarks:
+        _last_emotion = {
+            "dominant": "neutral",
+            "confidence": 1.0,
+            "scores": {"neutral": 1.0},
+        }
+        flags["emotion"] = _last_emotion
         return flags
 
     lm = results.multi_face_landmarks[0]
@@ -302,6 +308,6 @@ def reset_nmm_state():
 
 
 def emotion_available() -> bool:
-    """False when tests/vit_emotion.onnx is not installed; the UI can then say
+    """False when the local ViT model is not installed; the UI can then say
     affect is offline instead of showing a permanently neutral panel."""
     return _vit_session is not None
