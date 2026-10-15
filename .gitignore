@@ -89,6 +89,7 @@ backend/data/community_dataset/samples/
 /model_training_zone/dataset/
 /model_training_zone/dataset_train/
 backend/tts_output
+models/active_model.json
 
 # Generated TTS audio output (regenerated on every request)
 backend/tts_output/*

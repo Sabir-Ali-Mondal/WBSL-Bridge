@@ -1,4 +1,5 @@
 "use client";
+import "@/lib/threeSetup";
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "sonner";

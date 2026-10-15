@@ -132,19 +132,21 @@ export function ContinuousSignSimulation({
   if (!normalizedGlosses.length) return null;
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between gap-3 px-1">
-        <span className="text-[9px] font-mono uppercase tracking-[0.18em] text-text-muted">
-          Model Landmark Sequence
-        </span>
+    <div className="flex flex-col h-full space-y-2">
+      <div className="flex items-start justify-between gap-3 px-1 mb-1">
         <div className="flex items-center gap-2">
-          <span className="text-[9px] font-mono tabular-nums text-text-secondary">
+          <div className="inline-flex items-center px-2 py-0.5 rounded border border-border/80 bg-surface text-[10px] font-mono font-bold text-text-secondary uppercase tracking-wider w-fit">
+            {data ? `${data.segments.length} SIGNS` : `${normalizedGlosses.length} SIGNS`}
+          </div>
+        </div>
+        <div className="flex items-center gap-2 pt-0.5">
+          <span className="text-[10px] font-mono tabular-nums text-text-secondary">
             {data ? `${activeSegment + 1}/${data.segments.length}` : "—"}
           </span>
           <button
             type="button"
             onClick={onResetView}
-            className="inline-flex items-center gap-1 rounded-md border border-border bg-background px-2 py-1 text-[9px] font-mono uppercase tracking-wider text-text-secondary transition-colors hover:border-accent-primary/50 hover:text-text-primary"
+            className="inline-flex items-center gap-1 rounded border border-border/80 bg-surface/80 px-2.5 py-1 text-[9px] font-mono uppercase tracking-wider text-text-secondary transition-colors hover:border-border hover:text-text-primary"
             aria-label="Reset simulation view"
             title="Reset simulation view"
           >
@@ -163,23 +165,25 @@ export function ContinuousSignSimulation({
           Could not load every active-model landmark sequence.
         </div>
       ) : (
-        <>
-          <LandmarkSimulation
-            frames={data.frames}
-            pose={data.pose}
-            faceMesh={data.faceMesh}
-            fps={15}
-            minimal
-            loop={false}
-            autoPlay={playing}
-            restartToken={restartToken}
-            onFrameChange={handleFrameChange}
-            onComplete={handleComplete}
-            horizontalOnly
-            viewResetToken={viewResetToken}
-          />
+        <div className="flex flex-col flex-1">
+          <div className="flex-1 w-full overflow-hidden rounded-xl">
+            <LandmarkSimulation
+              frames={data.frames}
+              pose={data.pose}
+              faceMesh={data.faceMesh}
+              fps={15}
+              minimal
+              loop={false}
+              autoPlay={playing}
+              restartToken={restartToken}
+              onFrameChange={handleFrameChange}
+              onComplete={handleComplete}
+              horizontalOnly
+              viewResetToken={viewResetToken}
+            />
+          </div>
           <div
-            className="grid gap-1.5 pt-1"
+            className="grid gap-2 pt-3"
             style={{ gridTemplateColumns: `repeat(${data.segments.length}, minmax(0, 1fr))` }}
             aria-label="Model landmark sequence progress"
             role="progressbar"
@@ -194,23 +198,23 @@ export function ContinuousSignSimulation({
                 title={segment.gloss}
               >
                 <div
-                  className={`h-1.5 rounded-full transition-colors ${
-                    index === activeSegment
-                      ? "bg-accent-secondary"
-                      : index < activeSegment
+                  className={`h-1.5 rounded-full transition-colors duration-200 ${
+                    index < activeSegment
                       ? "bg-accent-primary"
-                      : "bg-accent-primary/25"
+                      : index === activeSegment
+                      ? "bg-accent-secondary"
+                      : "bg-[#133827]"
                   }`}
                 />
-                <div className={`mt-1 truncate text-center text-[9px] font-mono ${
-                  index === activeSegment ? "text-text-primary" : "text-text-muted"
+                <div className={`mt-1.5 truncate text-center text-[10px] font-mono ${
+                  index === activeSegment ? "text-text-primary font-bold" : "text-text-muted"
                 }`}>
                   {segment.gloss}
                 </div>
               </div>
             ))}
           </div>
-        </>
+        </div>
       )}
     </div>
   );

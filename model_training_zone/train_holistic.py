@@ -1,4 +1,6 @@
 """
+This is older
+
 train_holistic.py — 258-dim daily-conversation model with NONE class + BiLSTM attention.
 
 What makes this run different from train_daily6.py:

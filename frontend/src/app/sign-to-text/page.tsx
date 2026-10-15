@@ -11,6 +11,8 @@ import {
   type MarkerGates,
 } from "@/components/sign/NmmThresholdPanel";
 import { EmotionPanel } from "@/components/sign/EmotionPanel";
+import { CameraFramingGuide } from "@/components/camera/CameraFramingGuide";
+import { FramingWarningArea } from "@/components/camera/FramingWarningArea";
 import {
   Camera,
   CameraOff,
@@ -1082,118 +1084,38 @@ export default function SignToTextPage() {
     : "—";
 
   return (
-    <PageContainer className="w-full max-w-[1400px] mx-auto px-4 sm:px-5 lg:px-6 py-4 lg:py-5 overflow-x-hidden">
-      {/* HEADER */}
-      <div className="flex items-center justify-between gap-3 pb-3 border-b border-border/70 min-w-0">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-wider shrink-0">
-            <span
-              className={`w-1.5 h-1.5 rounded-full ${
-                backendOnline
-                  ? "bg-accent-primary animate-pulse"
-                  : "bg-status-error"
-              }`}
-            />
-
-            <span
-              className={
-                backendOnline
-                  ? "text-accent-primary"
-                  : "text-status-error"
-              }
-            >
-              {backendOnline
-                ? "ONLINE"
-                : "OFFLINE"}
-            </span>
-          </div>
-
-          <div className="h-4 w-px bg-border hidden sm:block" />
-
-          <h1 className="text-lg sm:text-xl font-bold tracking-tight text-text-primary truncate">
-            Sign{" "}
-            <span className="text-accent-primary">
-              →
-            </span>{" "}
-            Bengali
-          </h1>
-
-          {isTemporal && (
-            <span className="hidden sm:inline-flex items-center gap-1 px-2 py-1 rounded border border-accent-primary/40 bg-accent-primary/10 text-[9px] font-mono text-accent-primary uppercase">
-              <Activity size={10} />
-              Temporal
-            </span>
-          )}
-        </div>
-
-        <div className="hidden sm:flex items-center gap-2 shrink-0">
-          <div className="px-2.5 py-1 rounded bg-surface border border-border text-[9px] font-mono">
-            <span className="text-text-muted">
-              MODEL{" "}
-            </span>
-            <span className="text-text-primary font-bold">
-              {unifiedActive
-                ? "LSTM"
-                : "MLP"}
-            </span>
-          </div>
-
-          <div className="px-2.5 py-1 rounded bg-surface border border-border text-[9px] font-mono">
-            <span className="text-text-muted">
-              CLS{" "}
-            </span>
-            <span className="text-accent-primary font-bold">
-              {activeClasses}
-            </span>
-          </div>
-
-          {coverage && (
-            <div className="px-2.5 py-1 rounded bg-surface border border-border text-[9px] font-mono">
-              <span className="text-text-muted">
-                MODEL{" "}
-              </span>
-              <span
-                className={
-                  coverage.with_landmark_sequences ===
-                  coverage.total_classes
-                    ? "text-accent-primary font-bold"
-                    : "text-status-warning font-bold"
-                }
-              >
-                {coverage.with_landmark_sequences}/
-                {coverage.total_classes}
-              </span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* OFFLINE */}
+    <PageContainer className="w-full max-w-[1600px] px-3 sm:px-6 lg:px-8 py-4 lg:py-6">
+      {/* OFFLINE NOTIFICATION */}
       {!backendOnline && (
-        <div className="mt-3 p-2.5 rounded-lg bg-status-error/10 border border-status-error/30 text-[10px] font-mono text-status-error">
-          Backend is not running. Start:
-          {" "}
-          <code className="bg-surface px-1 rounded">
-            uvicorn backend.main:app --reload --port 8200
-          </code>
+        <div className="mb-4 p-2.5 rounded-xl bg-status-error/10 border border-status-error/30 text-xs font-mono text-status-error flex items-center justify-between">
+          <span>Backend is not running. Start: <code className="bg-surface px-1.5 py-0.5 rounded border border-border">uvicorn backend.main:app --reload --port 8200</code></span>
         </div>
       )}
 
-      {/* MAIN DESKTOP WORKSPACE */}
-      <div className="mt-4 grid grid-cols-1 lg:grid-cols-[1.02fr_0.78fr_1.18fr] gap-4 lg:items-stretch min-w-0">
-        {/* LEFT: CAMERA + AFFECT */}
-        <div className="min-w-0 flex flex-col gap-3 lg:h-[650px]">
-          <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-text-secondary flex items-center gap-2 shrink-0">
-            <Camera size={12} className="text-accent-primary" />
-            Camera
+      {/* MAIN WORKSPACE 3-COLUMN LAYOUT */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr_1.1fr] gap-4 lg:gap-6 items-start">
+
+        {/* COLUMN 1: CAMERA & FRAMING */}
+        <section className="flex flex-col rounded-2xl border border-border/80 bg-surface/50 p-4 sm:p-5 backdrop-blur-sm gap-3.5">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-text-muted select-none font-semibold">
+              Camera Feed
+            </span>
+            <span className="text-[10px] font-mono uppercase tracking-wider text-text-muted">
+              {cameraActive
+                ? isTemporal
+                  ? streamUnavailable
+                    ? "BATCH MODE"
+                    : `${buffered}/${contract.frames * 6} BUFFER`
+                  : "POLLING 1S"
+                : "STANDBY"}
+            </span>
           </div>
 
-          {/* CAMERA */}
-          <div className="relative w-full aspect-[16/10] lg:aspect-auto lg:h-[285px] bg-black rounded-xl overflow-hidden border border-border/80 shadow-lg flex items-center justify-center shrink-0">
-            <canvas
-              ref={canvasRef}
-              className="hidden"
-            />
+          {/* Camera Viewport Container */}
+          <div className="relative w-full aspect-[16/10] bg-black rounded-xl overflow-hidden border border-border shadow-lg flex items-center justify-center">
+            <canvas ref={canvasRef} className="hidden" />
 
             <video
               ref={videoRef}
@@ -1201,524 +1123,403 @@ export default function SignToTextPage() {
               playsInline
               muted
               className={`w-full h-full object-cover scale-x-[-1] ${
-                cameraActive
-                  ? ""
-                  : "hidden"
+                cameraActive ? "" : "hidden"
               }`}
             />
 
-            {!cameraActive &&
-              cameraError && (
-                <div className="absolute inset-0 bg-surface flex items-center justify-center p-4">
-                  <div className="text-center space-y-2 max-w-xs">
-                    <CameraOff
-                      size={24}
-                      className="mx-auto text-status-error"
-                    />
+            {/* SVG Camera Framing Guide (first 5 seconds of camera activation) */}
+            <CameraFramingGuide cameraActive={cameraActive} />
 
-                    <p className="text-[11px] font-semibold text-text-primary">
-                      Camera unavailable
-                    </p>
-
-                    <p className="text-[10px] text-text-secondary">
-                      {cameraError}
-                    </p>
-
-                    <button
-                      onClick={
-                        startCamera
-                      }
-                      className="px-3 py-1.5 rounded bg-accent-primary text-black text-[10px] font-mono font-semibold"
-                    >
-                      Request Permissions
-                    </button>
-                  </div>
+            {/* Camera Offline / Permissions state */}
+            {!cameraActive && cameraError && (
+              <div className="absolute inset-0 bg-surface flex items-center justify-center p-4">
+                <div className="text-center space-y-2 max-w-xs">
+                  <CameraOff size={24} className="mx-auto text-status-error" />
+                  <p className="text-xs font-semibold text-text-primary">Camera unavailable</p>
+                  <p className="text-[10px] text-text-secondary">{cameraError}</p>
+                  <button
+                    onClick={startCamera}
+                    className="px-3 py-1.5 rounded-lg bg-accent-primary text-black text-[10px] font-mono font-bold hover:brightness-110"
+                  >
+                    Request Permissions
+                  </button>
                 </div>
-              )}
+              </div>
+            )}
 
-            {!cameraActive &&
-              !cameraError && (
-                <div className="absolute inset-0 bg-surface flex items-center justify-center">
-                  <div className="text-center space-y-2">
-                    <Camera
-                      size={28}
-                      className="mx-auto text-text-muted"
-                    />
+            {/* Camera Inactive placeholder */}
+            {!cameraActive && !cameraError && (
+              <div className="absolute inset-0 bg-surface/90 flex flex-col items-center justify-center p-6 text-center">
+                <button
+                  onClick={startCamera}
+                  disabled={!backendOnline}
+                  className="px-5 py-2 rounded-xl bg-accent-primary text-black font-mono text-xs uppercase font-bold hover:brightness-110 active:scale-95 transition-all shadow-md disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Start Camera
+                </button>
+                <p className="text-[10px] font-mono text-text-muted mt-2">
+                  Upper body and hand pose will be tracked in real time
+                </p>
+              </div>
+            )}
 
-                    <button
-                      onClick={
-                        startCamera
-                      }
-                      disabled={
-                        !backendOnline
-                      }
-                      className="px-5 py-2 rounded bg-accent-primary text-black font-mono text-[10px] uppercase font-bold hover:bg-accent-primary/90 transition-colors disabled:opacity-50"
-                    >
-                      Start Camera
-                    </button>
-                  </div>
-                </div>
-              )}
-
-            {isProcessing &&
-              cameraActive && (
-                <div className="absolute top-2 right-2 bg-surface/90 border border-border px-2 py-1 rounded text-[9px] font-mono text-status-pending">
-                  PROCESSING...
-                </div>
-              )}
+            {isProcessing && cameraActive && (
+              <div className="absolute top-2.5 right-2.5 bg-surface/90 border border-border px-2 py-0.5 rounded text-[9px] font-mono text-status-pending backdrop-blur shadow-sm">
+                PROCESSING...
+              </div>
+            )}
           </div>
 
-          {/* CAMERA STATUS */}
-          <div className="h-9 flex items-center justify-between px-3 rounded-lg bg-surface/60 border border-border/80 shrink-0">
-            <span className="flex items-center gap-2 text-[9px] font-mono text-text-secondary">
-              <span
-                className={`w-1.5 h-1.5 rounded-full ${
-                  cameraActive
-                    ? "bg-accent-primary animate-pulse"
-                    : "bg-text-muted"
-                }`}
-              />
+          {/* Framing Warning Guidance Area */}
+          <FramingWarningArea
+            cameraActive={cameraActive}
+            handsDetected={prediction?.hands_detected ?? (live ? 1 : 0)}
+            hasFace={Boolean(prediction?.nmm?.metrics || prediction?.detected)}
+            detected={Boolean(prediction?.detected)}
+            confidence={prediction?.confidence ?? 0}
+          />
 
-              {cameraActive
-                ? isTemporal
-                  ? streamUnavailable
-                    ? "BATCH FALLBACK · POLLING"
-                    : `${buffered}/${contract.frames * 6} BUFFER · LIVE`
-                  : "POLLING 1S"
-                : "CAMERA OFF"}
-            </span>
+          {/* Camera Controls Bar */}
+          {cameraActive && (
+            <div className="h-9 flex items-center justify-between px-3.5 rounded-xl bg-surface/80">
+              <span className="flex items-center gap-2 text-[10px] font-mono text-text-secondary">
+                <span className="w-2 h-2 rounded-full bg-accent-primary animate-pulse" />
+                Live Tracking Active
+              </span>
 
-            {cameraActive && (
               <button
                 onClick={stopCamera}
-                className="px-2 py-1 rounded bg-status-error/10 border border-status-error/30 text-status-error text-[9px] font-mono"
+                className="px-2.5 py-1 rounded-lg bg-status-error/15 border border-status-error/40 text-status-error text-[10px] font-mono font-bold hover:bg-status-error/25 transition-colors"
               >
-                STOP
+                STOP CAMERA
               </button>
-            )}
-          </div>
-
-          {/* AFFECT */}
-          <div className="min-h-0 flex-1 rounded-xl border border-border/80 bg-surface/60 overflow-hidden">
-            <EmotionPanel emotion={emotion} offline={!emotionAvailable} />
-          </div>
-        </div>
-
-          {/* MIDDLE: RECOGNITION */}
-        <div className="min-w-0 flex flex-col gap-3 lg:h-[650px]">
-          <div className="flex items-center justify-between gap-2 shrink-0">
-            <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-text-secondary flex items-center gap-2">
-              <Sparkles
-                size={12}
-                className="text-accent-primary"
-              />
-              Recognition
             </div>
-
-            {/* Opens the NMM Controller modal. It lives here rather than as an
-                inline block because ten sliders plus five marker switches and
-                their explanations occupied a third of the column permanently,
-                pushing the actual recognition output off-screen. */}
-            <NmmThresholdPanel
-              values={thresholds}
-              onChange={setThresholds}
-              gates={markerGates}
-              onGatesChange={setMarkerGates}
-              variant="header"
-            />
-          </div>
-
-          {/* RECOGNITION RESULT */}
-          <div className="h-[150px] rounded-xl border border-border/80 bg-surface/60 p-3.5 flex flex-col min-h-0">
-            {live && (
-              <div className="mb-2 flex items-center justify-between gap-2 px-2 py-1.5 rounded bg-background border border-border">
-                <span className="text-[8px] font-mono uppercase text-text-muted">
-                  {repeatBlocked
-                    ? "WAIT FOR RELEASE"
-                    : "HOLDING"}
-                </span>
-
-                <span className="text-[9px] font-mono text-accent-secondary truncate">
-                  {live.label} ·{" "}
-                  {Math.round(
-                    live.confidence * 100
-                  )}
-                  %
-                </span>
-              </div>
-            )}
-
-            {prediction ? (
-              prediction.detected ? (
-                <div className="space-y-2 min-h-0 overflow-hidden">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xl font-bold font-mono text-accent-primary truncate">
-                      {prediction.label}
-                    </span>
-
-                    <span className="text-xs font-mono text-text-secondary shrink-0">
-                      {Math.round(
-                        prediction.confidence *
-                          100
-                      )}
-                      %
-                    </span>
-                  </div>
-
-                  <div className="space-y-1 pt-2 border-t border-border">
-                    {prediction.top5
-                      .slice(0, 5)
-                      .map(
-                        (
-                          item,
-                          idx
-                        ) => (
-                          <div
-                            key={idx}
-                            className="flex justify-between text-[9px] font-mono"
-                          >
-                            <span
-                              className={
-                                idx === 0
-                                  ? "text-text-primary font-semibold"
-                                  : "text-text-muted"
-                              }
-                            >
-                              {
-                                item.label
-                              }
-                            </span>
-
-                            <span
-                              className={
-                                idx === 0
-                                  ? "text-accent-primary"
-                                  : "text-text-muted"
-                              }
-                            >
-                              {Math.round(
-                                item.confidence *
-                                  100
-                              )}
-                              %
-                            </span>
-                          </div>
-                        )
-                      )}
-                  </div>
-                </div>
-              ) : (
-                <div className="flex-1 flex items-center justify-center">
-                  <span className="text-[9px] font-mono text-text-muted">
-                    NO HAND DETECTED
-                  </span>
-                </div>
-              )
-            ) : (
-              <div className="flex-1 flex items-center justify-center">
-                <span className="text-[9px] font-mono text-text-muted">
-                  WAITING
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* AUTO DETECT */}
-          {isTemporal && (
-            <label className="h-10 flex items-center justify-between px-3 rounded-lg bg-surface/60 border border-border cursor-pointer shrink-0">
-              <span className="text-[9px] font-mono text-text-secondary">
-                Auto-append
-              </span>
-
-              <input
-                type="checkbox"
-                checked={autoDetect}
-                onChange={(e) =>
-                  setAutoDetect(
-                    e.target.checked
-                  )
-                }
-                className="w-3.5 h-3.5 accent-[var(--accent-primary)]"
-              />
-            </label>
           )}
 
-          {/* NMM → LLM CONTEXT SPACER */}
-          <div className="flex-1 min-h-0 rounded-xl border border-border/50 bg-surface/20 p-3 hidden lg:flex flex-col justify-end gap-1">
-            <div className="text-[8px] font-mono text-text-muted">
-              {isTemporal
-                ? `${contract.frames}-frame temporal recognition`
-                : "Static frame recognition"}
-              {/* The feature width is not a detail the user can ignore: a
-                  258-dim run needs the signer's body in frame, because half its
-                  input is the pose block. Naming it here is what makes a run of
-                  "detected nothing" legible as "step back". */}
-              {contract.feature_kind === "hands_pose" &&
-                " · hands+pose (258)"}
-            </div>
+          {/* Emotion / Affect Panel */}
+          <EmotionPanel emotion={emotion} offline={!emotionAvailable} compact />
+        </section>
 
-            <div className="text-[8px] font-mono text-text-muted">
-              markers→LLM:{" "}
-              <span className="text-accent-secondary">
-                {nmm.question ||
-                nmm.wh_question ||
-                nmm.negation ||
-                nmm.affirmation ||
-                nmm.emphasis
-                  ? (
-                      [
-                        nmm.wh_question && "WH",
-                        nmm.question && "Q",
-                        nmm.negation && "NEG",
-                        nmm.affirmation && "AFM",
-                        nmm.emphasis && "EMP",
-                      ]
-                        .filter(Boolean)
-                        .join("+")
-                    )
-                  : "none"}
-              </span>
-            </div>
+        {/* COLUMN 2: LIVE RECOGNITION */}
+        <section className="flex flex-col rounded-2xl border border-border/80 bg-surface/50 p-4 sm:p-5 backdrop-blur-sm gap-3.5">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-text-muted select-none font-semibold">
+              Live Recognition
+            </span>
 
-            <div className="text-[8px] font-mono text-text-muted">
-              affect→LLM:{" "}
-              <span className="text-accent-secondary">
-                {emotion?.dominant ?? "—"}
-              </span>
+            <div className="flex items-center gap-2">
+              {isTemporal && (
+                <label className="flex items-center gap-1.5 cursor-pointer text-text-secondary text-[9px] font-mono">
+                  <span>Auto-append</span>
+                  <input
+                    type="checkbox"
+                    checked={autoDetect}
+                    onChange={(e) => setAutoDetect(e.target.checked)}
+                    className="w-3.5 h-3.5 accent-[var(--accent-primary)] rounded cursor-pointer"
+                  />
+                </label>
+              )}
+
+              <NmmThresholdPanel
+                values={thresholds}
+                onChange={setThresholds}
+                gates={markerGates}
+                onGatesChange={setMarkerGates}
+                variant="header"
+              />
             </div>
           </div>
-        </div>
 
-        {/* RIGHT: TRANSLATION */}
-        <div className="min-w-0 flex flex-col gap-3 lg:h-[650px]">
-          <div className="flex items-center justify-between shrink-0">
-            <div className="text-[10px] font-mono uppercase tracking-[0.14em] text-text-secondary">
-              Translation Workspace
+          {/* Recognition Result Card */}
+          <div className="rounded-xl bg-background/50 p-3 flex flex-col gap-2.5 min-w-0">
+            {live && (
+              <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-surface-elevated border border-border text-[9px] font-mono">
+                <span className="uppercase text-text-muted">
+                  {repeatBlocked ? "WAIT FOR RELEASE" : "HOLDING"}
+                </span>
+                <span className="text-accent-secondary font-bold truncate">
+                  {live.label} · {Math.round(live.confidence * 100)}%
+                </span>
+              </div>
+            )}
+
+            {prediction && prediction.detected ? (
+              <div className="space-y-3">
+                <div className="flex items-baseline justify-between gap-2 border-b border-border/60 pb-2.5">
+                  <span className="text-xl font-bold font-mono text-accent-primary truncate">
+                    {prediction.label}
+                  </span>
+                  <span className="text-xs font-mono font-bold text-text-primary px-2 py-0.5 rounded bg-surface-elevated border border-border">
+                    {Math.round(prediction.confidence * 100)}%
+                  </span>
+                </div>
+
+                {/* Top-5 Predictions Probability Bars */}
+                <div className="space-y-1.5 pt-1">
+                  <div className="text-[9px] font-mono uppercase text-text-muted tracking-wider">
+                    Confidence Distribution
+                  </div>
+                  {prediction.top5.slice(0, 5).map((item, idx) => (
+                    <div key={idx} className="space-y-0.5">
+                      <div className="flex justify-between text-[10px] font-mono">
+                        <span className={idx === 0 ? "text-text-primary font-bold" : "text-text-secondary"}>
+                          {item.label}
+                        </span>
+                        <span className={idx === 0 ? "text-accent-primary font-bold" : "text-text-muted"}>
+                          {Math.round(item.confidence * 100)}%
+                        </span>
+                      </div>
+                      <div className="w-full h-1 bg-surface-elevated rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-300 ${
+                            idx === 0 ? "bg-accent-primary" : "bg-text-muted/40"
+                          }`}
+                          style={{ width: `${Math.round(item.confidence * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="py-4 flex flex-col items-center justify-center text-center">
+                <Sparkles size={16} className="text-text-muted mb-1.5" />
+                <span className="text-xs font-mono text-text-secondary font-medium">
+                  {cameraActive ? "Awaiting Hand Gestures" : "Camera Standby"}
+                </span>
+                <span className="text-[10px] font-mono text-text-muted mt-1">
+                  Perform a WBSL sign within the guide frame
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Facial Expression & Non-Manual Markers (NMM) Badge Group */}
+          <div className="bg-background/50 rounded-xl p-3 flex flex-col gap-2">
+            <div className="text-[9px] font-mono uppercase tracking-wider text-text-muted">
+              Non-Manual Markers
             </div>
 
+            <div className="flex flex-wrap gap-1.5">
+              {[
+                { key: "wh_question", label: "WH-Question", active: nmm.wh_question },
+                { key: "question", label: "Question", active: nmm.question },
+                { key: "negation", label: "Negation", active: nmm.negation },
+                { key: "affirmation", label: "Affirmation", active: nmm.affirmation },
+                { key: "emphasis", label: "Emphasis", active: nmm.emphasis },
+              ].map((m) => (
+                <span
+                  key={m.key}
+                  className={`px-2 py-1 rounded-md border text-[9px] font-mono font-bold transition-all ${
+                    m.active
+                      ? "bg-accent-secondary/20 border-accent-secondary text-accent-secondary shadow-sm"
+                      : "bg-surface-elevated border-border text-text-muted opacity-60"
+                  }`}
+                >
+                  {m.label}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Pipeline Specifications Info Box */}
+          <div className="bg-background/50 rounded-xl p-2.5 flex flex-col gap-0.5 text-[9px] font-mono text-text-muted">
+            <div className="flex justify-between">
+              <span>Pipeline:</span>
+              <span className="text-text-secondary font-medium">
+                {isTemporal ? `${contract.frames}-frame temporal sequence` : "Static frame recognition"}
+              </span>
+            </div>
+            {contract.feature_kind === "hands_pose" && (
+              <div className="flex justify-between">
+                <span>Features:</span>
+                <span className="text-text-secondary font-medium">hands + body pose (258-dim)</span>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <span>Affect Input:</span>
+              <span className="text-accent-secondary font-medium">{emotion?.dominant ?? "—"}</span>
+            </div>
+          </div>
+        </section>
+
+        {/* COLUMN 3: TRANSLATION & SPEECH */}
+        <section className="flex flex-col rounded-2xl border border-border/80 bg-surface/50 p-4 sm:p-5 backdrop-blur-sm gap-3.5">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-text-muted select-none font-semibold">
+              Translation Workspace
+            </span>
             <div className="flex items-center gap-1.5">
               <button
-                onClick={
-                  handleBackspace
-                }
-                disabled={
-                  detectedHistory.length ===
-                  0
-                }
-                className="px-2 py-1 rounded bg-surface border border-border text-[8px] font-mono text-text-muted disabled:opacity-30"
+                onClick={handleBackspace}
+                disabled={detectedHistory.length === 0}
+                className="px-2 py-0.5 rounded-md bg-surface/80 hover:bg-surface-elevated border border-border/80 text-[9px] font-mono text-text-secondary hover:text-text-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1"
+                title="Remove last detected sign"
               >
-                <Delete
-                  size={10}
-                  className="inline mr-1"
-                />
+                <Delete size={10} />
                 Back
               </button>
 
               <button
-                onClick={
-                  handleClear
-                }
-                className="px-2 py-1 rounded bg-surface border border-border text-[8px] font-mono text-text-muted"
+                onClick={handleClear}
+                disabled={detectedHistory.length === 0 && !bengaliOutput}
+                className="px-2 py-0.5 rounded-md bg-surface/80 hover:bg-surface-elevated border border-border/80 text-[9px] font-mono text-text-secondary hover:text-text-primary transition-colors disabled:opacity-30 disabled:cursor-not-allowed flex items-center gap-1"
+                title="Clear all recognized signs and output"
               >
-                <Trash2
-                  size={10}
-                  className="inline mr-1"
-                />
+                <Trash2 size={10} />
                 Clear
               </button>
             </div>
           </div>
 
-          {/* SEQUENCE */}
-          <div className="h-[170px] rounded-xl border border-border/80 bg-surface/60 p-3 flex flex-col shrink-0">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[9px] font-mono uppercase text-text-muted">
-                Detected Sequence
-              </span>
-
-              <span className="text-[8px] font-mono text-text-muted">
-                {detectedHistory.length}{" "}
-                SIGNS
+          {/* Detected Sequence Card */}
+          <div className="bg-background/50 rounded-xl p-3 flex flex-col gap-2">
+            <div className="flex items-center justify-between text-[9px] font-mono uppercase text-text-muted">
+              <span>Gloss Sequence</span>
+              <span className="text-[8px] text-text-secondary font-bold">
+                {detectedHistory.length} SIGNS
               </span>
             </div>
 
-            <div className="h-[52px] rounded-lg bg-background border border-border p-2 overflow-y-auto">
-              {detectedHistory.length ===
-              0 ? (
-                <span className="text-[9px] font-mono text-text-muted">
-                  Awaiting input...
+            <div className="min-h-[46px] max-h-[72px] rounded-lg bg-surface/60 p-2 overflow-y-auto">
+              {detectedHistory.length === 0 ? (
+                <span className="text-[10px] font-mono text-text-muted flex items-center h-full">
+                  No signs recognized yet...
                 </span>
               ) : (
                 <div className="flex flex-wrap gap-1.5">
-                  {detectedHistory.map(
-                    (s, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => {
-                          setDetectedHistory(
-                            (prev) =>
-                              prev.slice(
-                                0,
-                                idx
-                              )
-                          );
-
-                          setBengaliOutput(
-                            ""
-                          );
-                        }}
-                        className={`px-2 py-1 rounded border font-mono text-[9px] font-bold ${
-                          s.negation
-                            ? "border-status-error/60 text-status-error"
-                            : idx ===
-                                detectedHistory.length -
-                                  1 &&
-                              anyQuestion
-                            ? "border-status-pending/60 text-status-pending"
-                            : "border-border text-accent-primary"
-                        }`}
-                      >
-                        [{s.gloss}]
-                      </button>
-                    )
-                  )}
+                  {detectedHistory.map((s, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => {
+                        setDetectedHistory((prev) => prev.slice(0, idx));
+                        setBengaliOutput("");
+                      }}
+                      title="Click to remove signs from here"
+                      className={`px-2 py-0.5 rounded-md border font-mono text-[9px] font-bold hover:brightness-110 transition-all ${
+                        s.negation
+                          ? "border-status-error/60 bg-status-error/10 text-status-error"
+                          : idx === detectedHistory.length - 1 && anyQuestion
+                          ? "border-status-pending/60 bg-status-pending/10 text-status-pending"
+                          : "border-border bg-surface-elevated text-accent-primary"
+                      }`}
+                    >
+                      {s.gloss}
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
 
+            {/* Quick Vocabulary Picker (for temporal testing) */}
             {isTemporal && (
-              <div className="flex gap-2 mt-2">
+              <div className="flex gap-2">
                 <select
                   value={pickSign}
-                  onChange={(e) =>
-                    setPickSign(
-                      e.target.value
-                    )
-                  }
-                  className="min-w-0 flex-1 px-2 py-1.5 rounded-lg bg-background border border-border text-[9px] font-mono text-text-primary focus:outline-none"
+                  onChange={(e) => setPickSign(e.target.value)}
+                  className="min-w-0 flex-1 px-2.5 py-1.5 rounded-lg bg-surface/80 border border-border/80 text-[10px] font-mono text-text-primary focus:outline-none"
                 >
                   {catalog.map((c) => (
-                    <option
-                      key={c.label}
-                      value={c.label}
-                    >
-                      {c.label}
-                      {c.bengali_meaning
-                        ? ` — ${c.bengali_meaning}`
-                        : ""}
+                    <option key={c.label} value={c.label}>
+                      {c.label} {c.bengali_meaning ? `— ${c.bengali_meaning}` : ""}
                     </option>
                   ))}
                 </select>
 
                 <button
-                  onClick={
-                    handleAddPick
-                  }
+                  onClick={handleAddPick}
                   disabled={!pickSign}
-                  className="px-3 rounded-lg bg-accent-primary/15 border border-accent-primary/40 text-[9px] font-mono text-accent-primary disabled:opacity-40"
+                  className="px-3 py-1.5 rounded-lg bg-surface-elevated hover:bg-surface-elevated/80 border border-border/80 text-[10px] font-mono font-semibold text-text-primary disabled:opacity-40 flex items-center gap-1"
                 >
-                  <Plus
-                    size={11}
-                    className="inline mr-1"
-                  />
+                  <Plus size={11} />
                   Add
                 </button>
               </div>
             )}
 
-            <div className="mt-auto text-[8px] font-mono text-text-muted truncate">
-              NLG:{" "}
-              <span className="text-text-secondary">
-                {glossPreview}
-              </span>
+            <div className="text-[8px] font-mono text-text-muted truncate pt-0.5">
+              NLG: <span className="text-text-secondary font-medium">{glossPreview}</span>
             </div>
           </div>
 
-          {/* BENGALI OUTPUT */}
-          <div className="flex-1 min-h-[250px] rounded-xl border border-border/80 bg-surface/60 p-3 flex flex-col">
-            <div className="text-[9px] font-mono uppercase text-text-muted mb-2">
-              Bengali Output
+          {/* Bengali Sentence Output Card */}
+          <div className="bg-background/50 rounded-xl p-3 flex flex-col gap-2">
+            <div className="text-[9px] font-mono uppercase tracking-wider text-text-muted">
+              Bengali Translation
             </div>
 
-            <div className="flex-1 min-h-0 rounded-lg bg-background border border-border p-4 flex items-center">
+            <div className="rounded-lg bg-surface/60 p-3 flex items-center justify-center text-center min-h-[64px]">
               {bengaliOutput ? (
-                <p className="font-bengali text-xl sm:text-2xl text-text-primary leading-relaxed">
+                <p className="font-bengali text-xl sm:text-2xl text-text-primary leading-relaxed font-semibold">
                   {bengaliOutput}
                 </p>
               ) : (
-                <span className="text-[9px] font-mono text-text-muted">
-                  Bengali translation will appear here
+                <span className="text-xs font-mono text-text-muted">
+                  Bengali natural language translation will generate here
                 </span>
               )}
             </div>
           </div>
 
-          {/* ACTION */}
-          <button
-            onClick={
-              handleStreamAndSpeak
-            }
-            disabled={
-              detectedHistory.length ===
-                0 ||
-              isGenerating
-            }
-            className="h-10 shrink-0 rounded-lg bg-accent-secondary text-white font-mono text-[9px] uppercase font-bold hover:bg-accent-secondary/90 transition-colors disabled:opacity-40 flex items-center justify-center gap-2"
-          >
-            {isGenerating ? (
-              <>
-                <Loader2
-                  size={12}
-                  className="animate-spin"
-                />
-                Streaming Bengali...
-              </>
-            ) : isPlayingAudio ? (
-              <>
-                <Volume2 size={12} />
-                Speaking...
-              </>
-            ) : (
-              <>
-                <Volume2 size={12} />
-                Stream Bengali in Voice
-              </>
-            )}
-          </button>
+          {/* Voice Output & Stream Button Card directly below Bengali translation */}
+          <div className="bg-background/50 rounded-xl p-3 flex flex-col gap-2.5">
+            {/* Voice Model Selector Tabs */}
+            <div className="flex items-center gap-2">
+              <span className="text-[9px] font-mono uppercase text-text-muted shrink-0">
+                Voice:
+              </span>
+              <div className="flex-1 grid grid-cols-2 gap-1.5">
+                <button
+                  onClick={() => setVoiceId("1")}
+                  className={`h-8 rounded-lg border text-[9px] font-mono font-semibold transition-all ${
+                    voiceId === "1"
+                      ? "bg-accent-primary/15 border-accent-primary text-accent-primary shadow-sm"
+                      : "bg-surface-elevated border-border text-text-secondary hover:text-text-primary"
+                  }`}
+                >
+                  Female · Nabanita
+                </button>
+                <button
+                  onClick={() => setVoiceId("2")}
+                  className={`h-8 rounded-lg border text-[9px] font-mono font-semibold transition-all ${
+                    voiceId === "2"
+                      ? "bg-accent-secondary/15 border-accent-secondary text-accent-secondary shadow-sm"
+                      : "bg-surface-elevated border-border text-text-secondary hover:text-text-primary"
+                  }`}
+                >
+                  Male · Pradeep
+                </button>
+              </div>
+            </div>
 
-          {/* VOICE */}
-          <div className="h-10 flex items-center gap-2 shrink-0">
-            <span className="text-[8px] font-mono uppercase text-text-muted shrink-0">
-              Voice
-            </span>
-
+            {/* Stream Bengali Action Button */}
             <button
-              onClick={() =>
-                setVoiceId("1")
-              }
-              className={`flex-1 h-8 rounded border text-[8px] font-mono ${
-                voiceId === "1"
-                  ? "bg-accent-primary/15 border-accent-primary text-accent-primary font-bold"
-                  : "border-border text-text-secondary"
-              }`}
+              onClick={handleStreamAndSpeak}
+              disabled={detectedHistory.length === 0 || isGenerating}
+              className="w-full h-11 rounded-xl bg-accent-secondary hover:brightness-110 active:scale-[0.99] text-white font-mono text-xs uppercase font-bold transition-all shadow-md disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              Female · Nabanita
-            </button>
-
-            <button
-              onClick={() =>
-                setVoiceId("2")
-              }
-              className={`flex-1 h-8 rounded border text-[8px] font-mono ${
-                voiceId === "2"
-                  ? "bg-accent-secondary/15 border-accent-secondary text-accent-secondary font-bold"
-                  : "border-border text-text-secondary"
-              }`}
-            >
-              Male · Pradeep
+              {isGenerating ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" />
+                  Generating Bengali Speech...
+                </>
+              ) : isPlayingAudio ? (
+                <>
+                  <Volume2 size={14} className="animate-pulse" />
+                  Speaking...
+                </>
+              ) : (
+                <>
+                  <Volume2 size={14} />
+                  Stream Bengali in Voice
+                </>
+              )}
             </button>
           </div>
-        </div>
+        </section>
+
       </div>
     </PageContainer>
   );

@@ -1,15 +1,17 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { ContinuousSignSimulation } from "@/components/simulation/ContinuousSignSimulation";
 import {
+  AlertTriangle,
   ArrowRight,
+  Check,
   Loader2,
-  Play,
-  Sparkles,
   Mic,
-  MicOff,
+  Play,
+  RotateCcw,
+  Square,
 } from "lucide-react";
 import { toast } from "sonner";
 import axios from "axios";
@@ -19,8 +21,287 @@ const API_BASE = "http://localhost:8200";
 interface TextToSignResult {
   input_text: string;
   gloss_sequence: string[];
+  unsupported_concepts?: string[];
+  unmapped_words?: string[];
+  status?: "success" | "partial" | "unresolved" | "error";
   available_signs: number;
-  unmapped_words: string[];
+  engine?: string;
+}
+
+interface FailedSlice {
+  seq: number;
+  blob: Blob;
+  lang: string;
+}
+
+type VoiceStatus = "idle" | "recording" | "finalizing" | "complete" | "warning";
+
+function writeString(view: DataView, offset: number, string: string) {
+  for (let i = 0; i < string.length; i++) {
+    view.setUint8(offset + i, string.charCodeAt(i));
+  }
+}
+
+/**
+ * Encodes Float32 mono samples into a standard 16-bit PCM RIFF/WAVE Blob.
+ * Faster-whisper / PyAV can decode standalone WAVs reliably without EBML container header errors.
+ */
+function encodeWAV(samples: Float32Array, sampleRate: number): Blob {
+  const buffer = new ArrayBuffer(44 + samples.length * 2);
+  const view = new DataView(buffer);
+
+  // RIFF chunk descriptor
+  writeString(view, 0, "RIFF");
+  view.setUint32(4, 36 + samples.length * 2, true);
+  writeString(view, 8, "WAVE");
+
+  // fmt sub-chunk
+  writeString(view, 12, "fmt ");
+  view.setUint32(16, 16, true); // Subchunk1Size (16 for PCM)
+  view.setUint16(20, 1, true); // AudioFormat (1 = PCM)
+  view.setUint16(22, 1, true); // NumChannels (1 = Mono)
+  view.setUint32(24, sampleRate, true); // SampleRate
+  view.setUint32(28, sampleRate * 2, true); // ByteRate (SampleRate * 1 * 2)
+  view.setUint16(32, 2, true); // BlockAlign (1 * 2)
+  view.setUint16(34, 16, true); // BitsPerSample (16 bits)
+
+  // data sub-chunk
+  writeString(view, 36, "data");
+  view.setUint32(40, samples.length * 2, true);
+
+  // 16-bit linear PCM with soft saturation clipping
+  let offset = 44;
+  for (let i = 0; i < samples.length; i++, offset += 2) {
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+  }
+
+  return new Blob([buffer], { type: "audio/wav" });
+}
+
+/**
+ * Downsamples audio buffer to target rate (default 16kHz for Whisper).
+ */
+function downsampleBuffer(
+  buffer: Float32Array,
+  inputRate: number,
+  outputRate = 16000
+): Float32Array {
+  if (inputRate === outputRate || buffer.length === 0) return buffer;
+  const ratio = inputRate / outputRate;
+  const newLength = Math.round(buffer.length / ratio);
+  const result = new Float32Array(newLength);
+  let offsetResult = 0;
+  let offsetBuffer = 0;
+  while (offsetResult < result.length) {
+    const nextOffsetBuffer = Math.round((offsetResult + 1) * ratio);
+    let accum = 0;
+    let count = 0;
+    for (let i = offsetBuffer; i < nextOffsetBuffer && i < buffer.length; i++) {
+      accum += buffer[i];
+      count++;
+    }
+    result[offsetResult] = count > 0 ? accum / count : 0;
+    offsetResult++;
+    offsetBuffer = nextOffsetBuffer;
+  }
+  return result;
+}
+
+function cleanWordForComparison(w: string): string {
+  return w
+    .replace(/[.,/#!$%^&*;:{}=\-_`~()।?!'"[\]{}|\\+@#]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * Calculates Root Mean Square (RMS) audio energy to detect silence/voice activity.
+ */
+function calculateRMS(samples: Float32Array): number {
+  if (samples.length === 0) return 0;
+  let sum = 0;
+  for (let i = 0; i < samples.length; i++) {
+    sum += samples[i] * samples[i];
+  }
+  return Math.sqrt(sum / samples.length);
+}
+
+interface WordSpan {
+  word: string;
+  start: number;
+  end: number;
+}
+
+function extractWordSpans(input: string): WordSpan[] {
+  const spans: WordSpan[] = [];
+  // Unicode-aware word matching (letters and numbers in any language)
+  const regex = /[\p{L}\p{N}]+/gu;
+  let m: RegExpExecArray | null;
+  while ((m = regex.exec(input)) !== null) {
+    spans.push({
+      word: m[0].toLowerCase(),
+      start: m.index,
+      end: m.index + m[0].length,
+    });
+  }
+  return spans;
+}
+
+/**
+ * Highlights genuinely unsupported concepts in the original text.
+ * Accurately handles:
+ * - Multiword concepts (e.g. "quantum physics")
+ * - Surrounding punctuation (e.g. "(apple),", Unicode quotes, Bengali dāṇḍi)
+ * - Case insensitivity and Unicode scripts (Bengali, Roman, Devanagari)
+ * - Repeated occurrences across the entire sentence
+ * - Overlapping candidate spans (merged deterministically)
+ * - Exact character preservation for textarea mirror alignment
+ */
+function renderHighlightedText(text: string, unsupportedConcepts: string[]) {
+  if (!unsupportedConcepts || unsupportedConcepts.length === 0 || !text) {
+    return text;
+  }
+
+  const textWordSpans = extractWordSpans(text);
+  if (textWordSpans.length === 0) return text;
+
+  const candidateSpans: Array<{ start: number; end: number }> = [];
+
+  for (const concept of unsupportedConcepts) {
+    if (!concept) continue;
+    const conceptWords = extractWordSpans(concept).map((w) => w.word);
+    if (conceptWords.length === 0) continue;
+
+    const k = conceptWords.length;
+    // Slide window across text words to find occurrences of the concept word sequence
+    for (let i = 0; i <= textWordSpans.length - k; i++) {
+      let matches = true;
+      for (let m = 0; m < k; m++) {
+        if (textWordSpans[i + m].word !== conceptWords[m]) {
+          matches = false;
+          break;
+        }
+      }
+      if (matches) {
+        candidateSpans.push({
+          start: textWordSpans[i].start,
+          end: textWordSpans[i + k - 1].end,
+        });
+      }
+    }
+  }
+
+  if (candidateSpans.length === 0) {
+    return text;
+  }
+
+  // Sort spans by start asc, end desc
+  candidateSpans.sort((a, b) => a.start - b.start || b.end - a.end);
+
+  // Merge overlapping / adjacent spans
+  const mergedSpans: Array<{ start: number; end: number }> = [];
+  for (const span of candidateSpans) {
+    if (mergedSpans.length === 0) {
+      mergedSpans.push({ ...span });
+    } else {
+      const last = mergedSpans[mergedSpans.length - 1];
+      if (span.start <= last.end) {
+        last.end = Math.max(last.end, span.end);
+      } else {
+        mergedSpans.push({ ...span });
+      }
+    }
+  }
+
+  // Render character slices
+  const nodes: React.ReactNode[] = [];
+  let cursor = 0;
+
+  mergedSpans.forEach((span, idx) => {
+    if (span.start > cursor) {
+      nodes.push(
+        <span key={`text-${cursor}`}>
+          {text.slice(cursor, span.start)}
+        </span>
+      );
+    }
+    nodes.push(
+      <mark
+        key={`mark-${span.start}-${idx}`}
+        className="bg-status-error/30 text-transparent border-b-2 border-status-error border-dotted rounded-xs inline-block"
+      >
+        {text.slice(span.start, span.end)}
+      </mark>
+    );
+    cursor = span.end;
+  });
+
+  if (cursor < text.length) {
+    nodes.push(
+      <span key={`text-${cursor}`}>
+        {text.slice(cursor)}
+      </span>
+    );
+  }
+
+  return nodes;
+}
+
+/**
+ * Resolves unsupported concepts for red highlight display.
+ * Uses the active model's structured interpretation response.
+ */
+function getEffectiveUnmappedWords(
+  text: string,
+  result: TextToSignResult | null
+): string[] {
+  if (!result || result.input_text.trim() !== text.trim()) return [];
+  return result.unsupported_concepts || result.unmapped_words || [];
+}
+
+/**
+ * Appends new transcribed text to existing text, stripping overlapping words caused
+ * by the ~0.5s audio overlap buffer.
+ */
+function appendDeduplicated(existingText: string, incomingText: string): string {
+  const existingTrimmed = existingText.trim();
+  const incomingTrimmed = incomingText.trim();
+  if (!existingTrimmed) return incomingTrimmed;
+  if (!incomingTrimmed) return existingTrimmed;
+
+  const existingWords = existingTrimmed.split(/\s+/);
+  const incomingWords = incomingTrimmed.split(/\s+/);
+
+  const maxOverlap = Math.min(4, existingWords.length, incomingWords.length);
+  let overlapFound = 0;
+
+  for (let k = maxOverlap; k >= 1; k--) {
+    const existingTail = existingWords.slice(-k).map(cleanWordForComparison);
+    const incomingHead = incomingWords.slice(0, k).map(cleanWordForComparison);
+
+    let allMatch = true;
+    for (let i = 0; i < k; i++) {
+      if (!existingTail[i] || !incomingHead[i] || existingTail[i] !== incomingHead[i]) {
+        allMatch = false;
+        break;
+      }
+    }
+    if (allMatch) {
+      overlapFound = k;
+      break;
+    }
+  }
+
+  if (overlapFound > 0) {
+    const remainingIncomingWords = incomingWords.slice(overlapFound);
+    if (remainingIncomingWords.length === 0) {
+      return existingTrimmed;
+    }
+    return `${existingTrimmed} ${remainingIncomingWords.join(" ")}`;
+  }
+
+  return `${existingTrimmed} ${incomingTrimmed}`;
 }
 
 function getRandomGlossSample(glosses: string[]): string[] {
@@ -39,136 +320,398 @@ function getRandomGlossSample(glosses: string[]): string[] {
 export default function TextToSignPage() {
   const [inputText, setInputText] = useState("");
   const [exampleSample, setExampleSample] = useState<string[]>([]);
-  const [loadingExampleGlosses, setLoadingExampleGlosses] = useState(true);
-  const [exampleGlossesError, setExampleGlossesError] = useState(false);
   const [result, setResult] = useState<TextToSignResult | null>(null);
   const [activeSignIndex, setActiveSignIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [playingSeq, setPlayingSeq] = useState(false);
-  /*
-   * Increments on every Play/Restart click. "Restart Sequence" must work while
-   * the sequence is already playing, but that click would otherwise not change
-   * any state — and a React effect that re-runs on identical state does not
-   * exist. The nonce is a real state change the playback effect can key on,
-   * and it is baked into the simulation key so the landmark playhead resets.
-   */
   const [seqNonce, setSeqNonce] = useState(0);
   const [viewResetToken, setViewResetToken] = useState(0);
-  // Off by default: the dictionary mapper is deterministic and always available,
-  // while the LLM planner needs a configured provider and may drop words. The
-  // user opts into that trade, and a failure falls back rather than erroring.
-  const [useLlm, setUseLlm] = useState(false);
+  const [useLlm, setUseLlm] = useState(true);
 
-  // STT language selection. "auto" lets Whisper detect; an explicit choice is
-  // sent to the engine verbatim so a Bengali pick never comes back as English
-  // because detection guessed wrong.
+  // Fetch active vocabulary for dynamic samples
+  useEffect(() => {
+    axios
+      .get<{ glosses: string[] }>(`${API_BASE}/api/text-to-sign/vocabulary`)
+      .then((res) => {
+        const glosses = res.data?.glosses || [];
+        if (glosses.length > 0) {
+          setExampleSample(getRandomGlossSample(glosses));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // STT language selection: "auto" | "bn" | "en"
   const [sttLanguage, setSttLanguage] = useState<"auto" | "bn" | "en">("auto");
+  const sttLanguageRef = useRef<"auto" | "bn" | "en">("auto");
+  useEffect(() => {
+    sttLanguageRef.current = sttLanguage;
+  }, [sttLanguage]);
 
-  // Voice recording & STT state
-  const [isRecording, setIsRecording] = useState(false);
-  const [sttLoading, setSttLoading] = useState(false);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
+  // Voice recording & Continuous Streaming STT state
+  const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>("idle");
+  const isRecording = voiceStatus === "recording";
+  const [inFlightCount, setInFlightCount] = useState(0);
+  const [recordingDuration, setRecordingDuration] = useState(5);
+  const [sliceProgress, setSliceProgress] = useState(0); // 0 to 100%
+  const [sliceRemainingSec, setSliceRemainingSec] = useState(5);
+  const [failedSlices, setFailedSlices] = useState<FailedSlice[]>([]);
+
+  // State refs for safe async pipeline isolation
+  const isRecordingRef = useRef(false);
+  const isStoppingRef = useRef(false);
+  const sessionIdRef = useRef<string>("");
+  const sliceSeqRef = useRef<number>(0);
+  const nextCommitSeqRef = useRef<number>(0);
+  const apiCallNonceRef = useRef<number>(0);
+  const resultsMapRef = useRef<
+    Map<number, { text: string; status: "ok" | "failed"; blob?: Blob }>
+  >(new Map());
+  const pendingInFlightRef = useRef<number>(0);
+  const failedSlicesRef = useRef<FailedSlice[]>([]);
+  const recordingDurationRef = useRef<number>(5);
+
   const streamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const processorNodeRef = useRef<ScriptProcessorNode | null>(null);
+  const silentGainRef = useRef<GainNode | null>(null);
+  const pcmBufferRef = useRef<Float32Array[]>([]);
+  const capturedSampleRateRef = useRef<number>(44100);
 
-  const startVoiceRecording = async () => {
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const finalizingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const sliceElapsedMsRef = useRef<number>(0);
+  const consecutiveSilentSlicesRef = useRef<number>(0);
+  const stopVoiceRecordingRef = useRef<() => void>(() => {});
+
+  useEffect(() => {
+    recordingDurationRef.current = recordingDuration;
+  }, [recordingDuration]);
+
+  useEffect(() => {
+    failedSlicesRef.current = failedSlices;
+  }, [failedSlices]);
+
+  const effectiveUnmappedWords = useMemo(() => {
+    return getEffectiveUnmappedWords(inputText, result);
+  }, [inputText, result]);
+
+  // In-order commit processor: appends successful transcriptions in strict chronological sequence
+  const commitInOrder = useCallback((sessionId: string) => {
+    if (sessionIdRef.current !== sessionId) return;
+
+    while (resultsMapRef.current.has(nextCommitSeqRef.current)) {
+      const item = resultsMapRef.current.get(nextCommitSeqRef.current);
+      nextCommitSeqRef.current += 1;
+
+      if (item && item.status === "ok" && item.text) {
+        setInputText((prev) => appendDeduplicated(prev, item.text));
+      }
+    }
+  }, []);
+
+  const checkFinalizationComplete = useCallback(
+    (sessionId: string) => {
+      if (sessionIdRef.current !== sessionId) return;
+
+      if (isStoppingRef.current && pendingInFlightRef.current === 0) {
+        isStoppingRef.current = false;
+        const hasFailures = failedSlicesRef.current.length > 0;
+        setVoiceStatus(hasFailures ? "warning" : "complete");
+
+        if (finalizingTimeoutRef.current) clearTimeout(finalizingTimeoutRef.current);
+        finalizingTimeoutRef.current = setTimeout(() => {
+          if (sessionIdRef.current === sessionId) {
+            setVoiceStatus("idle");
+          }
+        }, 2500);
+      }
+    },
+    []
+  );
+
+  // Send an individual audio slice with timeout, bounded retries, and strict sequence tracking
+  const sendSliceWithRetries = useCallback(
+    async (
+      blob: Blob,
+      seq: number,
+      sessionId: string,
+      lang: string,
+      retryCount = 0
+    ): Promise<void> => {
+      if (sessionIdRef.current !== sessionId) return;
+
+      const formData = new FormData();
+      formData.append("file", blob, `slice_${seq}.wav`);
+      formData.append("language", lang);
+
+      try {
+        const resp = await axios.post<{
+          text: string;
+          language?: string;
+          language_probability?: number;
+        }>(`${API_BASE}/api/stt`, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+          timeout: 30000,
+        });
+
+        if (sessionIdRef.current !== sessionId) return;
+
+        const recognized = (resp.data.text || "").trim();
+        resultsMapRef.current.set(seq, { text: recognized, status: "ok" });
+        commitInOrder(sessionId);
+      } catch (err: unknown) {
+        if (sessionIdRef.current !== sessionId) return;
+
+        if (retryCount < 2) {
+          // Bounded retry (attempt 1 or 2) after short delay
+          await new Promise((resolve) => setTimeout(resolve, 600));
+          if (sessionIdRef.current !== sessionId) return;
+          return sendSliceWithRetries(blob, seq, sessionId, lang, retryCount + 1);
+        } else {
+          // All retries exhausted: mark as failed to unblock subsequent slice commits
+          resultsMapRef.current.set(seq, { text: "", status: "failed", blob });
+          setFailedSlices((prev) => [...prev, { seq, blob, lang }]);
+          commitInOrder(sessionId);
+        }
+      } finally {
+        pendingInFlightRef.current = Math.max(0, pendingInFlightRef.current - 1);
+        setInFlightCount(pendingInFlightRef.current);
+        checkFinalizationComplete(sessionId);
+      }
+    },
+    [commitInOrder, checkFinalizationComplete]
+  );
+
+  // Extracts current PCM buffer into a standalone 16kHz WAV slice and dispatches it
+  const extractAndDispatchSlice = useCallback(
+    (isFinal = false) => {
+      const chunks = pcmBufferRef.current;
+      if (!chunks || chunks.length === 0) return;
+
+      const totalSamples = chunks.reduce((acc, c) => acc + c.length, 0);
+      // Minimum ~0.15s of audio to avoid empty slices
+      if (totalSamples < 2400) return;
+
+      const merged = new Float32Array(totalSamples);
+      let offset = 0;
+      for (const c of chunks) {
+        merged.set(c, offset);
+        offset += c.length;
+      }
+
+      const inputRate = capturedSampleRateRef.current || 44100;
+
+      if (isFinal) {
+        pcmBufferRef.current = [];
+      } else {
+        // Retain last ~0.5s in buffer for smooth audio overlap across splits
+        const overlapSamples = Math.floor(0.5 * inputRate);
+        if (merged.length > overlapSamples) {
+          pcmBufferRef.current = [merged.slice(merged.length - overlapSamples)];
+        } else {
+          pcmBufferRef.current = [];
+        }
+      }
+
+      const downsampled = downsampleBuffer(merged, inputRate, 16000);
+
+      // Voice Activity / Silence detection:
+      // If the audio slice has no audible energy (RMS < 0.005), do NOT dispatch to STT!
+      // This stops running Whisper inference on background noise and eliminates CPU burn.
+      const rms = calculateRMS(downsampled);
+      if (rms < 0.005) {
+        if (!isFinal) {
+          consecutiveSilentSlicesRef.current += 1;
+          // If microphone was left on with continuous silence for 4 splits (~20s), automatically stop
+          if (consecutiveSilentSlicesRef.current >= 4 && isRecordingRef.current) {
+            toast.info("Microphone stopped automatically due to inactivity.");
+            stopVoiceRecordingRef.current?.();
+          }
+        }
+        return;
+      }
+      consecutiveSilentSlicesRef.current = 0;
+
+      const wavBlob = encodeWAV(downsampled, 16000);
+
+      if (wavBlob.size >= 400) {
+        const seq = sliceSeqRef.current++;
+        pendingInFlightRef.current += 1;
+        setInFlightCount(pendingInFlightRef.current);
+        sendSliceWithRetries(
+          wavBlob,
+          seq,
+          sessionIdRef.current,
+          sttLanguageRef.current
+        );
+      }
+    },
+    [sendSliceWithRetries]
+  );
+
+  const stopVoiceRecording = useCallback(() => {
+    if (!isRecordingRef.current) return;
+    isRecordingRef.current = false;
+
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+
+    // Stop audio processor and release microphone stream
+    try {
+      if (processorNodeRef.current) {
+        processorNodeRef.current.disconnect();
+        processorNodeRef.current = null;
+      }
+      if (sourceNodeRef.current) {
+        sourceNodeRef.current.disconnect();
+        sourceNodeRef.current = null;
+      }
+      if (silentGainRef.current) {
+        silentGainRef.current.disconnect();
+        silentGainRef.current = null;
+      }
+      if (audioContextRef.current && audioContextRef.current.state !== "closed") {
+        audioContextRef.current.close().catch(() => {});
+        audioContextRef.current = null;
+      }
+    } catch (err) {
+      console.warn("AudioContext cleanup note:", err);
+    }
+
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    streamRef.current = null;
+
+    setSliceProgress(0);
+
+    // Flush and submit final partial slice
+    extractAndDispatchSlice(true);
+
+    if (pendingInFlightRef.current > 0) {
+      isStoppingRef.current = true;
+      setVoiceStatus("finalizing");
+    } else {
+      isStoppingRef.current = false;
+      const hasFailures = failedSlicesRef.current.length > 0;
+      setVoiceStatus(hasFailures ? "warning" : "complete");
+
+      if (finalizingTimeoutRef.current) clearTimeout(finalizingTimeoutRef.current);
+      finalizingTimeoutRef.current = setTimeout(() => {
+        setVoiceStatus("idle");
+      }, 2000);
+    }
+  }, [extractAndDispatchSlice]);
+
+  useEffect(() => {
+    stopVoiceRecordingRef.current = stopVoiceRecording;
+  }, [stopVoiceRecording]);
+
+  const startVoiceRecording = useCallback(async () => {
+    if (isRecordingRef.current || voiceStatus === "finalizing") return;
+
+    if (finalizingTimeoutRef.current) {
+      clearTimeout(finalizingTimeoutRef.current);
+      finalizingTimeoutRef.current = null;
+    }
+
     try {
       if (!navigator?.mediaDevices?.getUserMedia) {
         toast.error("Microphone is not supported in this browser.");
         return;
       }
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Initialize new session with unique ID
+      const sessionId = `sess_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+      sessionIdRef.current = sessionId;
+      sliceSeqRef.current = 0;
+      nextCommitSeqRef.current = 0;
+      resultsMapRef.current.clear();
+      pendingInFlightRef.current = 0;
+      setInFlightCount(0);
+      isStoppingRef.current = false;
+      setFailedSlices([]);
+      pcmBufferRef.current = [];
+      sliceElapsedMsRef.current = 0;
+      consecutiveSilentSlicesRef.current = 0;
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
       streamRef.current = stream;
-      audioChunksRef.current = [];
 
-      const mimeType = [
-        "audio/webm;codecs=opus",
-        "audio/webm",
-        "audio/ogg;codecs=opus",
-        "audio/mp4",
-        "",
-      ].find((t) => !t || MediaRecorder.isTypeSupported(t));
+      const AudioContextClass =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const ctx = new AudioContextClass();
+      if (ctx.state === "suspended") {
+        await ctx.resume();
+      }
+      audioContextRef.current = ctx;
+      capturedSampleRateRef.current = ctx.sampleRate;
 
-      const recorder = mimeType
-        ? new MediaRecorder(stream, { mimeType })
-        : new MediaRecorder(stream);
+      const sourceNode = ctx.createMediaStreamSource(stream);
+      sourceNodeRef.current = sourceNode;
 
-      recorder.ondataavailable = (event: BlobEvent) => {
-        if (event.data && event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-        }
+      // 4096 buffer size delivers ~92ms callbacks at 44.1kHz without dropping samples
+      const processor = ctx.createScriptProcessor(4096, 1, 1);
+      processor.onaudioprocess = (e: AudioProcessingEvent) => {
+        if (!isRecordingRef.current) return;
+        const channelData = e.inputBuffer.getChannelData(0);
+        pcmBufferRef.current.push(new Float32Array(channelData));
       };
+      processorNodeRef.current = processor;
 
-      recorder.onstop = async () => {
-        const streamTracks = streamRef.current?.getTracks();
-        streamTracks?.forEach((track) => track.stop());
-        streamRef.current = null;
+      // Route through a zero-gain node so onaudioprocess continues without echo to speakers
+      const silentGain = ctx.createGain();
+      silentGain.gain.value = 0;
+      silentGainRef.current = silentGain;
 
-        if (audioChunksRef.current.length === 0) {
-          toast.error("No audio recorded.");
-          setIsRecording(false);
-          return;
+      sourceNode.connect(processor);
+      processor.connect(silentGain);
+      silentGain.connect(ctx.destination);
+
+      isRecordingRef.current = true;
+      setVoiceStatus("recording");
+      setSliceProgress(0);
+      setSliceRemainingSec(recordingDurationRef.current);
+
+      if (timerRef.current) clearInterval(timerRef.current);
+
+      // Smooth 100ms interval ticker for visual progress animation and precise slice triggers
+      timerRef.current = setInterval(() => {
+        if (!isRecordingRef.current) return;
+
+        sliceElapsedMsRef.current += 100;
+        const totalDurationMs = recordingDurationRef.current * 1000;
+
+        const progress = Math.min(100, (sliceElapsedMsRef.current / totalDurationMs) * 100);
+        const remaining = Math.max(0, (totalDurationMs - sliceElapsedMsRef.current) / 1000);
+        setSliceProgress(progress);
+        setSliceRemainingSec(remaining);
+
+        // When split threshold reached: extract slice, retain 0.5s overlap, dispatch STT, keep recording!
+        if (sliceElapsedMsRef.current >= totalDurationMs) {
+          extractAndDispatchSlice(false);
+          sliceElapsedMsRef.current = 0;
+          setSliceProgress(0);
+          setSliceRemainingSec(recordingDurationRef.current);
         }
-
-        const blobType = recorder.mimeType || "audio/webm";
-        const audioBlob = new Blob(audioChunksRef.current, { type: blobType });
-
-        if (audioBlob.size < 200) {
-          toast.error("Audio recording was too short.");
-          setIsRecording(false);
-          return;
-        }
-
-        const ext = blobType.includes("ogg")
-          ? "ogg"
-          : blobType.includes("mp4")
-          ? "mp4"
-          : "webm";
-        const formData = new FormData();
-        formData.append("file", audioBlob, `voice.${ext}`);
-        formData.append("language", sttLanguage);
-
-        setSttLoading(true);
-        try {
-          const resp = await axios.post<{
-            text: string;
-            language?: string;
-            language_probability?: number;
-          }>(`${API_BASE}/api/stt`, formData, {
-            headers: { "Content-Type": "multipart/form-data" },
-            timeout: 60000,
-          });
-
-          const recognized = (resp.data.text || "").trim();
-          if (recognized) {
-            setInputText(recognized);
-            toast.success("Speech transcribed successfully");
-          } else {
-            toast.info("No speech detected. Please try again.");
-          }
-        } catch (err: unknown) {
-          if (axios.isAxiosError(err)) {
-            if (err.response?.status === 400) {
-              toast.error("Empty audio recording received.");
-            } else if (err.code === "ECONNABORTED") {
-              toast.error("Transcription timed out. Please try a shorter sentence.");
-            } else {
-              toast.error("Backend STT service unavailable. Please check the server.");
-            }
-          } else {
-            toast.error("Failed to transcribe audio.");
-          }
-        } finally {
-          setSttLoading(false);
-        }
-      };
-
-      mediaRecorderRef.current = recorder;
-      recorder.start(250);
-      setIsRecording(true);
+      }, 100);
     } catch (err: unknown) {
-      setIsRecording(false);
+      isRecordingRef.current = false;
+      setVoiceStatus("idle");
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
       const name = (err as { name?: string })?.name;
       if (name === "NotAllowedError" || name === "PermissionDeniedError") {
         toast.error("Microphone permission denied. Please allow microphone access.");
@@ -178,20 +721,38 @@ export default function TextToSignPage() {
         toast.error("Could not access microphone.");
       }
     }
-  };
+  }, [voiceStatus, extractAndDispatchSlice]);
 
-  const stopVoiceRecording = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.stop();
-    }
-    setIsRecording(false);
-  };
+  const retryAllFailedSlices = useCallback(() => {
+    if (failedSlices.length === 0 || voiceStatus === "finalizing") return;
+    const slicesToRetry = [...failedSlices];
+    setFailedSlices([]);
+    const sessionId = sessionIdRef.current;
+
+    slicesToRetry.forEach((item) => {
+      pendingInFlightRef.current += 1;
+      setInFlightCount(pendingInFlightRef.current);
+      sendSliceWithRetries(item.blob, item.seq, sessionId, item.lang);
+    });
+  }, [failedSlices, voiceStatus, sendSliceWithRetries]);
 
   useEffect(() => {
     return () => {
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-        mediaRecorderRef.current.stop();
+      sessionIdRef.current = ""; // invalidate any pending session
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
       }
+      if (finalizingTimeoutRef.current) {
+        clearTimeout(finalizingTimeoutRef.current);
+        finalizingTimeoutRef.current = null;
+      }
+      try {
+        processorNodeRef.current?.disconnect();
+        sourceNodeRef.current?.disconnect();
+        silentGainRef.current?.disconnect();
+        audioContextRef.current?.close().catch(() => {});
+      } catch {}
       streamRef.current?.getTracks().forEach((track) => track.stop());
     };
   }, []);
@@ -202,15 +763,12 @@ export default function TextToSignPage() {
     axios
       .get<{ glosses: string[] }>(`${API_BASE}/api/text-to-sign/vocabulary`)
       .then(({ data }) => {
-        if (!cancelled) {
+        if (!cancelled && data.glosses?.length) {
           setExampleSample(getRandomGlossSample(data.glosses));
         }
       })
       .catch(() => {
-        if (!cancelled) setExampleGlossesError(true);
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingExampleGlosses(false);
+        // Fallback sample remains available
       });
 
     return () => {
@@ -221,15 +779,29 @@ export default function TextToSignPage() {
   const handleSegmentChange = useCallback((index: number) => {
     setActiveSignIndex(index);
   }, []);
+
   const handleSequenceComplete = useCallback(() => {
     setPlayingSeq(false);
   }, []);
 
-  const handleGenerate = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGenerateAndPlay = async () => {
+    const text = inputText.trim();
 
-    if (!inputText.trim()) return;
+    // If textarea is empty, guide the user to type or click the microphone
+    if (!text) {
+      toast.info("Please enter Bengali text to generate sign sequence");
+      return;
+    }
 
+    // If already generated for the exact same text, replay sequence directly
+    if (result && result.input_text === text) {
+      setActiveSignIndex(0);
+      setSeqNonce((n) => n + 1);
+      setPlayingSeq(true);
+      return;
+    }
+
+    const callNonce = ++apiCallNonceRef.current;
     setIsLoading(true);
     setPlayingSeq(false);
 
@@ -237,354 +809,388 @@ export default function TextToSignPage() {
       try {
         const r = await axios.post<TextToSignResult>(
           `${API_BASE}/api/text-to-sign/llm`,
-          { text: inputText }
+          { text }
         );
-
+        if (callNonce !== apiCallNonceRef.current) return;
         setResult(r.data);
-        setActiveSignIndex(0);
-        setIsLoading(false);
-        toast.success("LLM gloss sequence generated");
-        return;
-      } catch {
-        // 503 means the provider is unconfigured or unreachable. That is a
-        // routing decision, not an error the user can act on, so it degrades to
-        // the dictionary silently-ish (an info toast) and carries on.
-        toast.info("LLM unavailable — falling back to dictionary mapping");
+        if (r.data.gloss_sequence && r.data.gloss_sequence.length > 0) {
+          setActiveSignIndex(0);
+          setSeqNonce((n) => n + 1);
+          setPlayingSeq(true);
+        } else {
+          toast.info("No matching signs found in active model");
+        }
+      } catch (err: any) {
+        if (callNonce !== apiCallNonceRef.current) return;
+        const detail = err.response?.data?.detail || "LLM unavailable";
+        toast.error(`LLM error: ${detail}`);
+      } finally {
+        if (callNonce === apiCallNonceRef.current) {
+          setIsLoading(false);
+        }
       }
+      return;
     }
 
     try {
       const res = await axios.post<TextToSignResult>(
         `${API_BASE}/api/text-to-sign`,
-        {
-          text: inputText,
-        }
+        { text }
       );
-
+      if (callNonce !== apiCallNonceRef.current) return;
       setResult(res.data);
-      setActiveSignIndex(0);
-
-      toast.success("Sign sequence generated");
+      if (res.data.gloss_sequence && res.data.gloss_sequence.length > 0) {
+        setActiveSignIndex(0);
+        setSeqNonce((n) => n + 1);
+        setPlayingSeq(true);
+      } else {
+        toast.info("No matching signs found in active model");
+      }
     } catch {
+      if (callNonce !== apiCallNonceRef.current) return;
       toast.error("Backend not responding. Start FastAPI server first.");
     } finally {
-      setIsLoading(false);
+      if (callNonce === apiCallNonceRef.current) {
+        setIsLoading(false);
+      }
     }
   };
 
-  const hasSigns = Boolean(result?.gloss_sequence.length);
-
   return (
-    <PageContainer className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 lg:py-7">
-      {/* HEADER */}
-      <header className="border-b border-border/70 pb-5">
-        <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.2em] text-accent-secondary">
-              <span className="w-1.5 h-1.5 rounded-full bg-accent-secondary animate-pulse" />
-              Reverse Synthesis Pipeline
+    <PageContainer className="w-full max-w-[1600px] px-3 sm:px-6 lg:px-8 py-4 lg:py-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[30%_70%] gap-4 lg:gap-6 items-stretch">
+        {/* LEFT PANEL: INPUT & CONTROLS */}
+        <section className="flex flex-col justify-between rounded-2xl border border-border/80 bg-surface/50 p-4 sm:p-5 backdrop-blur-sm gap-3.5 h-full">
+          {/* Top row: Label + Guide + Language Switcher + Clear */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5">
+              <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-text-muted select-none">
+                Input Text
+              </span>
             </div>
 
-            <h1 className="mt-2 text-2xl sm:text-3xl font-bold tracking-tight text-text-primary">
-              Bengali Text{" "}
-              <span className="text-accent-secondary">→</span>{" "}
-              Sign Playback
-            </h1>
-
-            <p className="mt-1 text-xs sm:text-sm text-text-secondary">
-              Convert text into the active model&apos;s vocabulary and replay its
-              bundled landmark sequences.
-            </p>
-          </div>
-
-          {result && (
-            <div className="flex items-center gap-2 shrink-0">
-              <div className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2">
-                <span className="text-[9px] font-mono text-text-muted">
-                  GLOSSES
-                </span>
-
-                <span className="text-sm font-bold font-mono text-text-primary tabular-nums">
-                  {result.gloss_sequence.length}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2">
-                <span className="text-[9px] font-mono text-text-muted">
-                  MATCHED
-                </span>
-
-                <span className="text-sm font-bold font-mono text-accent-primary tabular-nums">
-                  {result.gloss_sequence.length}
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
-      </header>
-
-      {/* INPUT */}
-      <section className="mt-5 rounded-xl border border-border bg-surface/60 p-4 sm:p-5">
-        <div className="flex items-center justify-between mb-2.5 gap-3">
-          <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-text-secondary shrink-0">
-            Bengali Input
-          </span>
-
-          {/*
-           * Speech language for the mic button. This is a user decision, not
-           * a detection result: Whisper's auto-detect confuses Bengali and
-           * English often enough that the manual override is what makes the
-           * voice path trustworthy, and "auto" remains the default so the
-           * default behaviour does not silently change for anyone relying on
-           * detection.
-           */}
-          <div
-            className="flex items-center gap-0.5 p-0.5 rounded-lg bg-background border border-border shrink-0"
-            role="group"
-            aria-label="Speech language"
-          >
-            {([
-              { key: "auto", label: "Auto" },
-              { key: "bn", label: "বাংলা" },
-              { key: "en", label: "English" },
-            ] as const).map((opt) => (
-              <button
-                key={opt.key}
-                type="button"
-                onClick={() => setSttLanguage(opt.key)}
-                aria-pressed={sttLanguage === opt.key}
-                className={`px-2.5 h-7 rounded-md text-[10px] font-mono font-bold uppercase tracking-wide transition-colors ${
-                  sttLanguage === opt.key
-                    ? "bg-accent-secondary/20 text-accent-secondary"
-                    : "text-text-muted hover:text-text-secondary"
-                }`}
+            <div className="flex items-center gap-2">
+              <div
+                className="flex items-center gap-0.5 p-0.5 rounded-lg bg-surface/80 border border-border/80 shrink-0"
+                role="group"
+                aria-label="Input Language"
               >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-
-          {inputText && (
-            <button
-              type="button"
-              onClick={() => setInputText("")}
-              className="text-[10px] font-mono text-text-muted hover:text-text-primary transition-colors"
-            >
-              Clear
-            </button>
-          )}
-        </div>
-
-        <form
-          onSubmit={handleGenerate}
-          className="flex flex-col sm:flex-row gap-2.5"
-        >
-          <input
-            type="text"
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            placeholder="বাংলা বাক্য লিখুন"
-            className="min-w-0 flex-1 h-12 px-4 rounded-lg bg-background border border-border text-text-primary font-bengali text-base placeholder:text-text-muted/60 focus:outline-none focus:ring-2 focus:ring-accent-secondary/30 focus:border-accent-secondary transition-all"
-          />
-
-          <button
-            type="button"
-            onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
-            disabled={sttLoading}
-            title={
-              isRecording
-                ? "Click to stop recording and transcribe"
-                : sttLoading
-                ? "Transcribing speech..."
-                : "Record speech (Bengali or English)"
-            }
-            className={`h-12 px-4 rounded-lg border flex items-center gap-2 shrink-0 transition-colors disabled:opacity-40 ${
-              isRecording
-                ? "bg-status-error/15 border-status-error text-status-error animate-pulse"
-                : sttLoading
-                ? "bg-accent-secondary/15 border-accent-secondary text-accent-secondary"
-                : "bg-surface border-border text-text-secondary hover:text-text-primary"
-            }`}
-          >
-            {sttLoading ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : isRecording ? (
-              <MicOff size={16} />
-            ) : (
-              <Mic size={16} />
-            )}
-            <span className="text-[10px] font-mono">
-              {sttLoading ? "TRANSCRIBING..." : isRecording ? "LISTENING..." : "VOICE"}
-            </span>
-          </button>
-
-          <label className="h-12 px-3 flex items-center gap-2 rounded-lg border border-border bg-surface text-[10px] font-mono text-text-secondary shrink-0 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={useLlm}
-              onChange={(e) => setUseLlm(e.target.checked)}
-              className="accent-[var(--accent-secondary)]"
-            />
-            LLM GLOSS BREAKING
-          </label>
-
-          <button
-            type="submit"
-            disabled={isLoading || !inputText.trim()}
-            className="h-12 px-6 rounded-lg bg-accent-secondary text-white font-semibold text-[11px] font-mono uppercase tracking-wider hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 shrink-0"
-          >
-            {isLoading ? (
-              <>
-                <Loader2 size={14} className="animate-spin" />
-                Processing
-              </>
-            ) : (
-              <>
-                <Sparkles size={14} />
-                Generate
-              </>
-            )}
-          </button>
-        </form>
-      </section>
-
-      {/* RESULT */}
-      {result && (
-        <div className="mt-4 grid grid-cols-1 lg:grid-cols-[minmax(16rem,0.72fr)_minmax(0,1.55fr)] gap-4 items-start">
-          {/* LEFT COLUMN */}
-          <div className="min-w-0 space-y-3">
-            {/* GLOSS SEQUENCE */}
-            <section className="rounded-xl border border-border bg-surface/60 p-3 sm:p-4">
-              <div className="flex items-center justify-between gap-3 mb-2">
-                <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-text-secondary">
-                  Sign Gloss Sequence
-                </span>
-
-                <span className="text-[9px] font-mono text-text-muted">
-                  VOCAB{" "}
-                  <span className="text-text-secondary">
-                    {result.available_signs}
-                  </span>
-                </span>
+                {([
+                  { key: "auto", label: "AUTO" },
+                  { key: "bn", label: "বাংলা" },
+                  { key: "en", label: "ENGLISH" },
+                ] as const).map((opt) => (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    onClick={() => setSttLanguage(opt.key)}
+                    aria-pressed={sttLanguage === opt.key}
+                    className={`px-2.5 py-1 rounded text-[10px] font-mono font-bold uppercase tracking-wider transition-colors ${
+                      sttLanguage === opt.key
+                        ? "bg-accent-secondary text-white shadow-sm"
+                        : "text-text-muted hover:text-text-secondary"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
               </div>
 
-              <div className="rounded-lg border border-border/80 bg-background/50 p-2.5 min-h-[60px]">
-                {result.gloss_sequence.length > 0 ? (
-                  <div className="flex flex-wrap items-center gap-1.5">
-                  {result.gloss_sequence.map((gloss, idx) => (
-                    <React.Fragment key={idx}>
-                      <span
-                        className={`px-2.5 py-1 rounded-md border font-mono text-[10px] font-bold transition-all ${
-                          activeSignIndex === idx
-                            ? "bg-accent-secondary text-white border-accent-secondary"
-                            : "bg-accent-primary/10 border-accent-primary/40 text-accent-primary"
-                        }`}
-                      >
-                        {gloss}
-                      </span>
-
-                      {idx < result.gloss_sequence.length - 1 && (
-                        <ArrowRight
-                          size={12}
-                          className="text-text-muted/50 shrink-0"
-                        />
-                      )}
-                    </React.Fragment>
-                  ))}
-                  </div>
-                ) : (
-                  <p className="text-xs font-mono text-text-muted">
-                    No words in this input map to the active model vocabulary.
-                  </p>
-                )}
-              </div>
-
-              {result.unmapped_words.length > 0 && (
-                <p className="mt-3 text-[10px] font-mono text-status-unknown">
-                  Not in this model&apos;s vocabulary: {result.unmapped_words.join(", ")}
-                </p>
-              )}
-
-              <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-[9px] font-mono text-text-muted">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-accent-primary" />
-                  Active-model sign
-                </span>
-              </div>
-
-              {hasSigns && (
+              {inputText && (
                 <button
                   type="button"
                   onClick={() => {
-                    setActiveSignIndex(0);
-                    setSeqNonce((n) => n + 1);
-                    setPlayingSeq(true);
+                    setInputText("");
+                    setResult(null);
                   }}
-                  className="w-full mt-3 h-9 rounded-lg bg-accent-primary text-black font-mono text-[10px] uppercase font-bold flex items-center justify-center gap-2 hover:brightness-110 transition-all"
+                  className="text-[10px] font-mono text-text-muted hover:text-text-primary transition-colors ml-1"
                 >
-                  <Play size={13} />
-                  {playingSeq ? "Restart Sequence" : "Play Full Sequence"}
+                  Clear
                 </button>
               )}
-            </section>
-
-            {/* CURRENT INPUT */}
-            <section className="rounded-xl border border-border bg-surface/60 p-3 sm:p-4">
-              <div className="text-[10px] font-mono uppercase tracking-[0.18em] text-text-secondary mb-2">
-                Input
-              </div>
-
-              <div className="rounded-lg border border-border bg-background px-3 py-2.5 font-bengali text-sm text-text-primary break-words">
-                {result.input_text}
-              </div>
-            </section>
+            </div>
           </div>
 
-          {/* RIGHT COLUMN */}
-          <section className="min-w-0 rounded-xl border border-border bg-surface/60 p-3 sm:p-4">
+          {/* Multiline Textarea with inline unmapped word highlighting and locked height */}
+          <div className="relative w-full flex-1 min-h-[340px] lg:min-h-[420px] rounded-xl bg-background/50 border border-border/80 focus-within:ring-1 focus-within:ring-accent-secondary/50 focus-within:border-accent-secondary/60 transition-all flex flex-col overflow-hidden">
+            <div className="relative flex-1 w-full h-full min-h-[280px]">
+              {/* Highlight backdrop overlay (mirrors textarea font, padding, word wrap) */}
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 p-4 font-bengali text-base whitespace-pre-wrap break-words overflow-hidden select-none leading-relaxed text-transparent"
+              >
+                {renderHighlightedText(inputText, effectiveUnmappedWords)}
+              </div>
+
+              {/* Editable Textarea */}
+              <textarea
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault();
+                    handleGenerateAndPlay();
+                  }
+                }}
+                placeholder="বাংলা বাক্য লিখুন"
+                className="relative z-10 w-full h-full p-4 bg-transparent text-text-primary font-bengali text-base placeholder:text-text-muted/50 focus:outline-none resize-none leading-relaxed"
+              />
+            </div>
+          </div>
+
+          {/* Guide text placed at bottom of text-input area, above voice controls */}
+          <div className="flex items-center justify-between px-1 text-[11px] font-mono text-text-muted select-none">
+            <span className={effectiveUnmappedWords.length > 0 ? "text-status-error/90 flex items-center gap-1" : ""}>
+              {effectiveUnmappedWords.length > 0 && <AlertTriangle size={12} className="text-status-error" />}
+              Red text = no matching sign
+            </span>
+          </div>
+
+          {/* Continuous Voice Splitter Control */}
+          <div
+            className={`w-full rounded-xl border p-2.5 sm:p-3 flex flex-col gap-2 transition-all ${
+              isRecording
+                ? "bg-status-error/15 border-status-error/40 text-status-error shadow-sm"
+                : voiceStatus === "finalizing"
+                ? "bg-accent-secondary/10 border-accent-secondary/30"
+                : voiceStatus === "complete"
+                ? "bg-status-success/10 border-status-success/30"
+                : voiceStatus === "warning"
+                ? "bg-status-warning/10 border-status-warning/30"
+                : "bg-surface/50 border-border/70"
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3 min-w-0">
+                <button
+                  type="button"
+                  disabled={voiceStatus === "finalizing"}
+                  onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
+                  title={
+                    voiceStatus === "finalizing"
+                      ? "Finalizing transcription..."
+                      : isRecording
+                      ? "Stop recording"
+                      : "Record voice (continuous stream)"
+                  }
+                  className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
+                    isRecording
+                      ? "bg-status-error text-white shadow-md animate-pulse"
+                      : voiceStatus === "finalizing"
+                      ? "bg-accent-secondary text-white shadow-sm"
+                      : "bg-accent-secondary/20 text-accent-secondary hover:bg-accent-secondary/30"
+                  }`}
+                >
+                  {voiceStatus === "finalizing" ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : isRecording ? (
+                    <Square size={13} fill="currentColor" />
+                  ) : (
+                    <Mic size={16} />
+                  )}
+                </button>
+
+                <div className="flex flex-col min-w-0">
+                  <span
+                    className={`text-xs font-mono font-bold tracking-wider leading-tight flex items-center gap-2 ${
+                      isRecording
+                        ? "text-status-error"
+                        : voiceStatus === "finalizing"
+                        ? "text-accent-secondary"
+                        : voiceStatus === "complete"
+                        ? "text-status-success"
+                        : voiceStatus === "warning"
+                        ? "text-status-warning"
+                        : "text-text-primary"
+                    }`}
+                  >
+                    {isRecording && "LISTENING"}
+                    {voiceStatus === "finalizing" && (
+                      <span className="flex items-center gap-1.5">
+                        <Loader2 size={12} className="animate-spin" />
+                        FINALIZING TRANSCRIPTION
+                      </span>
+                    )}
+                    {voiceStatus === "complete" && (
+                      <span className="flex items-center gap-1 text-status-success">
+                        <Check size={12} />
+                        TRANSCRIPTION COMPLETE
+                      </span>
+                    )}
+                    {voiceStatus === "warning" && (
+                      <span className="flex items-center gap-1 text-status-warning">
+                        <AlertTriangle size={12} />
+                        PARTIAL SPEECH NOT DETECTED
+                      </span>
+                    )}
+                    {voiceStatus === "idle" && "VOICE"}
+                    {isRecording && inFlightCount > 0 && (
+                      <span className="flex items-center gap-1 text-[9px] font-normal text-accent-secondary">
+                        <Loader2 size={10} className="animate-spin" />
+                        transcribing split...
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-[10px] font-mono text-text-muted leading-tight mt-0.5">
+                    {isRecording
+                      ? `Splitting every ${recordingDuration}s • Next split in ${sliceRemainingSec.toFixed(1)}s`
+                      : voiceStatus === "finalizing"
+                      ? "Transcribing remaining audio..."
+                      : `Split every ${recordingDuration}s`}
+                  </span>
+                </div>
+              </div>
+
+              {/* Stepper Duration */}
+              <div className="flex items-center gap-1.5 shrink-0 bg-surface rounded-lg p-0.5 border border-border">
+                <button
+                  type="button"
+                  disabled={isRecording || voiceStatus === "finalizing" || recordingDuration <= 2}
+                  onClick={() => setRecordingDuration((d) => Math.max(2, d - 1))}
+                  className="w-6 h-6 rounded flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-elevated disabled:opacity-30 disabled:cursor-not-allowed transition-colors font-mono text-xs"
+                  aria-label="Decrease recording duration"
+                >
+                  -
+                </button>
+                <span className="font-mono text-xs tabular-nums font-semibold px-1 text-text-secondary">
+                  {recordingDuration}
+                </span>
+                <button
+                  type="button"
+                  disabled={isRecording || voiceStatus === "finalizing" || recordingDuration >= 30}
+                  onClick={() => setRecordingDuration((d) => Math.min(30, d + 1))}
+                  className="w-6 h-6 rounded flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-elevated disabled:opacity-30 disabled:cursor-not-allowed transition-colors font-mono text-xs"
+                  aria-label="Increase recording duration"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+
+            {/* Timing Animation Progress Bar (Shows speaker when slice ends to finish long words) */}
+            {isRecording && (
+              <div className="w-full bg-border/40 h-1.5 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-status-error transition-all duration-100 ease-linear rounded-full"
+                  style={{ width: `${sliceProgress}%` }}
+                />
+              </div>
+            )}
+
+            {/* Recoverable Failed Slices Notice */}
+            {failedSlices.length > 0 && voiceStatus !== "recording" && (
+              <div className="flex items-center justify-between mt-1 pt-1.5 border-t border-border/60 text-xs">
+                <span className="flex items-center gap-1.5 text-status-warning font-mono text-[11px]">
+                  <AlertTriangle size={12} />
+                  {failedSlices.length} segment{failedSlices.length > 1 ? "s" : ""} unconfirmed
+                </span>
+                <button
+                  type="button"
+                  onClick={retryAllFailedSlices}
+                  disabled={voiceStatus === "finalizing"}
+                  className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-accent-secondary/15 hover:bg-accent-secondary/25 text-accent-secondary transition-colors"
+                >
+                  <RotateCcw size={10} />
+                  Retry Failed
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Bottom row: LLM toggle + Main Play Action */}
+          <div className="flex items-center justify-between pt-1">
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={useLlm}
+                onClick={() => setUseLlm((v) => !v)}
+                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border border-border transition-colors duration-200 ease-in-out focus:outline-none ${
+                  useLlm ? "bg-accent-secondary" : "bg-surface-elevated"
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out my-auto ${
+                    useLlm ? "translate-x-4 ml-0.5" : "translate-x-0.5 bg-text-muted"
+                  }`}
+                />
+              </button>
+              <span className="text-[11px] font-mono font-medium text-text-secondary select-none tracking-wider">
+                LLM
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleGenerateAndPlay}
+              disabled={isLoading}
+              title={
+                inputText.trim()
+                  ? "Generate and play sign sequence"
+                  : isRecording
+                  ? "Stop recording"
+                  : "Record speech"
+              }
+              className="w-11 h-11 rounded-xl bg-accent-secondary hover:brightness-110 active:scale-95 text-white flex items-center justify-center transition-all shadow-md disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+            >
+              {isLoading ? (
+                <Loader2 size={18} className="animate-spin" />
+              ) : isRecording ? (
+                <Square size={16} fill="currentColor" />
+              ) : (
+                <Play size={18} fill="currentColor" className="ml-0.5" />
+              )}
+            </button>
+          </div>
+        </section>
+
+        {/* RIGHT PANEL: SIGN PLAYBACK */}
+        <section className="flex flex-col rounded-2xl border border-border/80 bg-surface/50 p-4 sm:p-5 backdrop-blur-sm min-h-[500px] h-full justify-center">
+          {result && result.gloss_sequence.length > 0 ? (
             <ContinuousSignSimulation
               glosses={result.gloss_sequence}
               playing={playingSeq}
               restartToken={seqNonce}
               viewResetToken={viewResetToken}
-              onResetView={() => setViewResetToken((token) => token + 1)}
+              onResetView={() => setViewResetToken((t) => t + 1)}
               onSegmentChange={handleSegmentChange}
               onComplete={handleSequenceComplete}
             />
-          </section>
-        </div>
-      )}
+          ) : (
+            <div className="flex flex-col h-full space-y-2 justify-between">
+              <div className="flex items-center justify-between gap-3 px-1 mb-1">
+                <div className="inline-flex items-center px-2 py-0.5 rounded border border-border/80 bg-surface text-[10px] font-mono font-bold text-text-muted uppercase tracking-wider">
+                  0 SIGNS
+                </div>
+              </div>
 
-      {/* EMPTY STATE */}
-      {!result && !isLoading && (
-        <section className="mt-5 rounded-xl border border-dashed border-border bg-surface/30 p-10 sm:p-14 text-center">
-          <div className="w-12 h-12 mx-auto rounded-xl bg-surface-elevated border border-border flex items-center justify-center">
-            <ArrowRight size={22} className="text-text-muted" />
-          </div>
+              <div className="aspect-[16/10] w-full rounded-xl border border-dashed border-border/70 bg-background/30 flex flex-col items-center justify-center text-center p-6 shadow-inner">
+                <div className="w-12 h-12 rounded-xl bg-surface-elevated border border-border flex items-center justify-center text-text-muted mb-4 shadow-sm">
+                  <ArrowRight size={20} />
+                </div>
 
-          <div className="mt-4 text-xs font-mono text-text-secondary">
-            Enter a Bengali sentence to generate the sign sequence
-          </div>
+                <div className="text-xs font-mono text-text-secondary tracking-wide mb-4">
+                  Enter a Bengali sentence to generate the sign sequence
+                </div>
 
-          {loadingExampleGlosses ? (
-            <p className="mt-4 text-xs font-mono text-text-muted">
-              Loading active-model examples...
-            </p>
-          ) : exampleGlossesError ? (
-            <p className="mt-4 text-xs font-mono text-status-unknown">
-              Could not load active-model examples.
-            </p>
-          ) : exampleSample.length >= 2 ? (
-            <button
-              type="button"
-              onClick={() => setInputText(exampleSample.join(" "))}
-              className="mt-4 text-xs font-mono px-4 py-2 rounded-lg bg-surface-elevated border border-border text-text-muted hover:text-accent-secondary hover:border-accent-secondary/50 transition-colors"
-            >
-              Try: {exampleSample.join(" ")}
-            </button>
-          ) : null}
+                {exampleSample.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInputText(exampleSample.join(" "));
+                    }}
+                    className="px-4 py-2 rounded-lg border border-accent-secondary/50 bg-surface-elevated text-accent-secondary font-mono text-xs hover:border-accent-secondary hover:bg-accent-secondary/10 transition-all shadow-sm max-w-full truncate"
+                  >
+                    Try: {exampleSample.join(" ")}
+                  </button>
+                )}
+              </div>
+
+              <div className="h-6" aria-hidden="true" />
+            </div>
+          )}
         </section>
-      )}
+      </div>
     </PageContainer>
   );
 }

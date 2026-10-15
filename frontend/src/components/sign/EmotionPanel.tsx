@@ -52,11 +52,10 @@ export function EmotionPanel({ emotion, compact = false, offline = false }: Prop
       <div className="rounded-xl border border-border/80 bg-surface/60 p-4">
         <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wider text-text-muted">
           <HelpCircle size={13} />
-          Affect
+          Emotion 
         </div>
         <p className="text-[11px] text-text-muted mt-2 leading-relaxed">
-          Waiting for a face in frame. Emotions are read from the cropped face region
-          using a ViT classifier.
+          Waiting for a face in frame.
         </p>
       </div>
     );

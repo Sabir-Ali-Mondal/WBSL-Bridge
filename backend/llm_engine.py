@@ -65,7 +65,13 @@ def get_ai_config() -> dict:
 
 
 def get_ai_client(timeout: float | None = None):
-    from openai import OpenAI
+    try:
+        from openai import OpenAI
+    except ImportError as e:
+        raise RuntimeError(
+            "The 'openai' package is required for get_ai_client(). "
+            "Please install it using 'pip install openai'."
+        ) from e
 
     cfg = get_ai_config()
     client = OpenAI(
@@ -495,108 +501,83 @@ def generate_bengali_with_uncertainty(
     gloss_text = " + ".join(parts)
     result = generate_bengali(gloss_text)
 
-    if result["status"] == "success" and has_uncertain:
-        if "সম্ভবত" not in result["bengali_text"]:
-            result["bengali_text"] = result["bengali_text"].replace(
-                "পান", "সম্ভবত পান", 1
-            )
-
     result["has_uncertainty"] = has_uncertain
+    if has_uncertain:
+        result["uncertainty_level"] = "tentative"
     result["gloss_used"] = gloss_text
     return result
 
 
-GLOSS_BREAK_SYSTEM = """You are a WBSL gloss planner.
+GLOSS_BREAK_SYSTEM = """You are a sign language gloss planner. Your task is to interpret an utterance and map its intended meaning to a sequence of available sign language glosses.
 
-RULES:
-1. Output ONLY a JSON array of tokens from AVAILABLE.
-2. NEVER invent a token.
-3. STT INPUT INTERPRETATION: Treat the input as raw speech-to-text output. The speaker will primarily speak Bengali or English. Bengali speech may sometimes be transcribed into Hindi, Devanagari, Roman, Telugu, or another script. Interpret the text using phonetic meaning and context before breaking it into WBSL glosses. Do not assume the script itself represents the spoken language.
-4. NEVER use WHAT_IS_YOUR_NAME unless the input is literally asking "what is your name?"
-5. For names or unknown short words (6 letters or fewer), fingerspell them letter by letter.
-6. If a word has no matching gloss, omit it. Do NOT guess.
-7. Preserve statement vs question. Do NOT turn a statement into a question.
+CRITICAL INSTRUCTIONS:
+1. CONTEXTUAL UNDERSTANDING:
+   - The input is often raw speech-to-text (STT) transcription in Bengali, English, transliterated/phonetic text, or another script.
+   - Interpret the input based on phonetic meaning, intent, and conversational context without assuming the script identifies the spoken language.
+   - Discern statements, questions, negation, and tense contextually from the overall meaning.
 
-STT INTERPRETATION EXAMPLE:
+2. SIGN SELECTION:
+   - Select signs ONLY from the dynamic list provided in AVAILABLE.
+   - NEVER invent, alter, or assume tokens that are not listed in AVAILABLE.
+   - Order the selected signs to convey the intended meaning accurately.
+   - If the active vocabulary includes individual letter or digit signs, you may use them for fingerspelling proper nouns or unknown terms only if those specific letter signs exist in AVAILABLE.
 
-Input: "आमी आज स्कूल जाबो"
-Interpret as Bengali phonetics: "আমি আজ স্কুল যাব"
-Then break the intended meaning into the appropriate WBSL glosses using AVAILABLE.
+3. DISTINGUISHING UNSUPPORTED CONCEPTS:
+   - List in "unsupported_concepts" only concepts or content words whose core meaning CANNOT be conveyed by any of the selected signs in AVAILABLE.
+   - Do NOT list function words, grammatical particles, copulas, or auxiliary words as unsupported if their semantic role is already covered by the selected signs or sign language grammar.
+   - Do NOT list words whose meaning is already encapsulated by one of the selected signs.
 
-EXAMPLES:
-
-Input: "Hello, my name is Ravi."
-Available has: HELLO, I, R, A, V, I, WHAT_IS_YOUR_NAME
-WRONG: ["HELLO", "WHAT_IS_YOUR_NAME"]
-CORRECT: ["HELLO", "I", "R", "A", "V", "I"]
-Reason: "my name is" is a statement. WHAT_IS_YOUR_NAME is a question. Use I + fingerspell.
-
-Input: "What is your name?"
-Available has: WHAT_IS_YOUR_NAME, HELLO
-CORRECT: ["WHAT_IS_YOUR_NAME"]
-
-Input: "Drink tea"
-Available has: DRINK, TEA, POUR
-CORRECT: ["DRINK", "TEA"]
-WRONG: ["POUR", "TEA"]
-
-Input: "I am very busy today."
-Available has: BUSY, I
-CORRECT: ["I", "BUSY"]
-
-Input: "Come soon."
-Available has: COME
-CORRECT: ["COME"]
-
-Output ONLY the JSON array. No explanation."""
+4. RESPONSE FORMAT:
+   - Output ONLY a valid JSON object with EXACTLY these two keys:
+     {
+       "gloss_sequence": ["<LABEL_FROM_AVAILABLE>", ...],
+       "unsupported_concepts": ["<concept_name>", ...]
+     }
+   - Output no markdown quotes, explanation, or commentary outside the JSON object."""
 
 
-def _is_question(text: str) -> bool:
-    stripped = text.strip().lower()
-    question_words = (
-        "what", "who", "where", "when", "why", "how",
-        "do ", "does ", "did ", "is ", "are ", "was ", "were ",
-        "can ", "could ", "will ", "would ", "should ",
-        "am i", "have ", "has ",
-    )
-    if "?" in text:
-        return True
-    return any(stripped.startswith(w) for w in question_words)
+def _post_validate(seq: list[str], allowed: set[str]) -> list[str]:
+    """Validate glosses strictly against the active model's vocabulary.
 
-
-def _post_validate(seq: list[str], original_text: str, allowed: set[str]) -> list[str]:
-    seq = [g for g in seq if g in allowed or (len(g) == 1 and g.isalnum())]
-
-    if not _is_question(original_text) and "WHAT_IS_YOUR_NAME" in seq:
-        seq = [g for g in seq if g != "WHAT_IS_YOUR_NAME"]
-        if "I" in allowed and "I" not in seq:
-            seq.insert(0, "I")
-
-    if not seq:
-        words = re.findall(r"[a-zA-Z]+", original_text)
-        for word in words:
-            w_upper = word.upper()
-            if w_upper in allowed:
-                seq.append(w_upper)
-            elif len(word) <= 6:
-                letters = [ch.upper() for ch in word if ch.upper() in allowed]
-                seq.extend(letters)
-
-    return seq
+    Preserves original label casing and sequence order.
+    Never fabricates, substitutes, or injects glosses.
+    """
+    if not seq or not allowed:
+        return []
+    allowed_map = {lbl.upper(): lbl for lbl in allowed}
+    validated = []
+    for g in seq:
+        norm = str(g).strip().upper()
+        if norm in allowed_map:
+            validated.append(allowed_map[norm])
+    return validated
 
 
 def break_into_glosses(text: str, vocab: list[str]) -> dict:
+    """Plan a signable gloss sequence using the LLM against the active vocabulary.
+
+    Returns a structured dictionary:
+    - gloss_sequence: ordered list of verified available model labels
+    - unsupported_concepts: concepts not covered by available signs
+    - status: 'success' | 'partial' | 'unresolved' | 'error'
+    """
     cfg = get_ai_config()
     if not cfg["configured"]:
-        return {"status": "llm_not_configured", "gloss_sequence": None}
+        return {
+            "status": "error",
+            "gloss_sequence": [],
+            "unsupported_concepts": [],
+            "error": "LLM not configured",
+        }
 
-    vocab_str = ", ".join(sorted(vocab))
+    vocab_list = sorted(list(vocab))
+    vocab_str = ", ".join(vocab_list)
 
     user_msg = (
-        f"AVAILABLE: {vocab_str}\n\n"
-        f"SENTENCE: {text}\n\n"
-        f"Reminder: fingerspell unknown names letter by letter. "
-        f"Do NOT use WHAT_IS_YOUR_NAME for statements."
+        f"AVAILABLE: [{vocab_str}]\n\n"
+        f"UTTERANCE: {text}\n\n"
+        "Interpret the utterance contextually, select signs strictly from AVAILABLE, "
+        "and return the required JSON object."
     )
 
     payload = {
@@ -621,30 +602,50 @@ def break_into_glosses(text: str, vocab: list[str]) -> dict:
         resp.raise_for_status()
         content = resp.json()["choices"][0]["message"]["content"].strip()
 
-        s, e = content.find("["), content.rfind("]")
-        if s == -1 or e == -1:
-            return {"status": "parse_error", "gloss_sequence": None}
+        s = content.find("{")
+        e = content.rfind("}")
+        if s == -1 or e == -1 or e < s:
+            return {
+                "status": "error",
+                "gloss_sequence": [],
+                "unsupported_concepts": [],
+                "error": "Failed to parse JSON response from LLM",
+                "raw_response": content,
+            }
 
-        raw_array = content[s:e + 1].strip()
-        allowed = set(vocab)
-        raw_items = []
+        data = json.loads(content[s : e + 1].strip())
 
-        try:
-            parsed = json.loads(raw_array)
-            if isinstance(parsed, list):
-                raw_items = [str(g) for g in parsed]
-        except Exception:
-            raw_items = re.findall(r"[A-Za-z0-9_]+", raw_array)
+        raw_gloss_seq = data.get("gloss_sequence", [])
+        if not isinstance(raw_gloss_seq, list):
+            raw_gloss_seq = []
 
-        seq = [
-            g.upper()
-            for g in raw_items
-            if g.upper() in allowed or (len(g) == 1 and g.isalnum())
+        raw_unsupported = data.get("unsupported_concepts", [])
+        if not isinstance(raw_unsupported, list):
+            raw_unsupported = []
+        unsupported_concepts = [
+            str(u).strip() for u in raw_unsupported if str(u).strip()
         ]
 
-        seq = _post_validate(seq, text, allowed)
+        allowed = set(vocab)
+        valid_gloss_sequence = _post_validate(
+            [str(g) for g in raw_gloss_seq], allowed
+        )
 
-        return {"status": "success", "gloss_sequence": seq}
+        if valid_gloss_sequence:
+            status = "partial" if unsupported_concepts else "success"
+        else:
+            status = "unresolved"
+
+        return {
+            "status": status,
+            "gloss_sequence": valid_gloss_sequence,
+            "unsupported_concepts": unsupported_concepts,
+        }
 
     except Exception as exc:
-        return {"status": "error", "gloss_sequence": None, "error": str(exc)}
+        return {
+            "status": "error",
+            "gloss_sequence": [],
+            "unsupported_concepts": [],
+            "error": str(exc),
+        }

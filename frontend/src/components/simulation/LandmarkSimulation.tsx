@@ -1,4 +1,5 @@
 "use client";
+import "@/lib/threeSetup";
 import React, {
   Component,
   useCallback,
@@ -1853,7 +1854,7 @@ const Skeleton3DViewer = React.memo(function Skeleton3DViewer({ onFail, ...scene
       <ViewerBoundary onError={onFail}>
         <Canvas
           dpr={[1, 2]}
-          shadows
+          shadows="percentage"
           gl={{
             antialias: true,
             alpha: true,
@@ -1863,6 +1864,7 @@ const Skeleton3DViewer = React.memo(function Skeleton3DViewer({ onFail, ...scene
           camera={{ fov: FOV, near: 0.05, far: 200, position: [0, 0, 6] }}
           onCreated={({ gl }) => {
             gl.toneMappingExposure = 1.05;
+            gl.shadowMap.type = THREE.PCFShadowMap;
             gl.domElement.addEventListener("webglcontextlost", onFail, { once: true });
           }}
         >

@@ -10,11 +10,13 @@ Run:
     & ".venv\\Scripts\\python.exe" -m uvicorn backend.main:app --reload --port 8200
 """
 
+import difflib
 import json
 import os
 import re
 import tempfile
 import time
+import unicodedata
 import uuid
 from pathlib import Path
 
@@ -60,13 +62,6 @@ MODEL_PATH = MODELS_DIR / "sign_mlp.onnx"          # legacy default (may not exi
 CLASSES_PATH = MODELS_DIR / "sign_classes.json"    # legacy default (may not exist)
 TTS_DIR = ROOT / "backend" / "tts_output"
 TTS_DIR.mkdir(exist_ok=True)
-
-GLOSS_MAP_PATH = ROOT / "backend" / "data" / "gloss_map.json"
-if GLOSS_MAP_PATH.exists():
-    with open(GLOSS_MAP_PATH, "r", encoding="utf-8") as f:
-        WORD_MAP = json.load(f)
-else:
-    WORD_MAP = {}
 
 # ─────────────────────────────────────────────
 # COMMUNITY DATASET STORAGE (manifest + npy)
@@ -482,33 +477,6 @@ def resample_feature_width(seq: np.ndarray, width: int) -> np.ndarray:
 # ─────────────────────────────────────────────
 # FASTAPI APP
 # ─────────────────────────────────────────────
-# A WORD_MAP value may be either a single gloss string or a LIST of glosses
-# (e.g. pronouns fingerspelled as letters: "তুমি" -> ["Y", "O", "U"]).
-# Everything downstream expects a flat list of gloss strings, so normalise once.
-def _as_glosses(value):
-    if isinstance(value, (list, tuple)):
-        return [str(g) for g in value]
-    return [str(value)]
-
-
-_only_key = {}
-for _k, _v in WORD_MAP.items():
-    _as_glosses(_v)  # keep normalisation in one place
-    if isinstance(_v, str):
-        _only_key.setdefault(_v, _k)
-
-# label -> Bengali meaning (only unambiguous, single-gloss entries)
-WORD_BENGALI = _only_key
-
-_bengali_map = {
-    "A": "এ", "B": "বি", "C": "সি", "D": "ডি", "E": "ই",
-    "F": "এফ", "G": "জি", "H": "এইচ", "I": "আই", "J": "জে",
-    "K": "কে", "L": "এল", "M": "এম", "N": "এন", "O": "ও",
-    "P": "পি", "Q": "কিউ", "R": "আর", "S": "এস", "T": "টি",
-    "U": "ইউ", "V": "ভি", "W": "ডব্লু", "X": "এক্স", "Y": "ওয়াই", "Z": "জেড",
-    "1": "এক", "2": "দুই", "3": "তিন", "4": "চার", "5": "পাঁচ",
-    "6": "ছয়", "7": "সাত", "8": "আট", "9": "নয়", "0": "শূন্য",
-}
 
 # ─────────────────────────────────────────────
 # IN-MEMORY STATE
@@ -553,8 +521,8 @@ def _build_catalog():
         {
             "id": str(i),
             "label": c,
-            "bengali_meaning": _bengali_map.get(c, WORD_BENGALI.get(c, "")),
-            "category": "ISL Alphabet" if c in _bengali_map else "ISL Word",
+            "bengali_meaning": c.replace("_", " ").title(),
+            "category": "Alphabet" if len(c) == 1 and c.isalpha() else "Word",
             "type": "word",
             "has_landmarks": True,
             **sample_counts.get(c, {
@@ -1421,69 +1389,177 @@ def text_to_sign_vocabulary():
     return {"glosses": glosses, "available_signs": len(glosses)}
 
 
+def _clean_token_boundary(t: str) -> str:
+    """Strip leading and trailing punctuation (ASCII & Unicode) while keeping word content and marks."""
+    s = t.strip()
+    while s and unicodedata.category(s[0])[0] in ("P", "S"):
+        s = s[1:].strip()
+    while s and unicodedata.category(s[-1])[0] in ("P", "S"):
+        s = s[:-1].strip()
+    return s
+
+
+def _normalize_label(s: str) -> str:
+    """Normalize whitespace, underscores, and hyphens to single spaces."""
+    return re.sub(r"[\s_-]+", " ", s).lower().strip()
+
+
+def _match_offline_vocabulary(text: str, available_classes: list[str]) -> dict:
+    """Matches input text against the active model's vocabulary without hardcoded maps.
+
+    Applies exact matching, generic normalization, and ambiguity-checked fuzzy matching.
+    Preserves token boundaries and handles surrounding punctuation.
+    """
+    if not available_classes:
+        return {
+            "gloss_sequence": [],
+            "unsupported_concepts": [text.strip()] if text.strip() else [],
+            "status": "unresolved",
+        }
+
+    # Build normalized lookups from active model labels
+    norm_to_label = {}
+    label_word_counts = {}
+    for lbl in available_classes:
+        norm = _normalize_label(lbl)
+        if not norm:
+            continue
+        norm_to_label[norm] = lbl
+        label_word_counts[norm] = len(norm.split())
+        condensed = norm.replace(" ", "")
+        if condensed not in norm_to_label:
+            norm_to_label[condensed] = lbl
+
+    raw_tokens = text.split()
+    if not raw_tokens:
+        return {
+            "gloss_sequence": [],
+            "unsupported_concepts": [],
+            "status": "unresolved",
+        }
+
+    # Extract cleaned and normalized representation for each token
+    tokens_info = []
+    for raw_t in raw_tokens:
+        clean_t = _clean_token_boundary(raw_t)
+        norm_t = _normalize_label(clean_t) if clean_t else _normalize_label(raw_t)
+        tokens_info.append({"raw": raw_t, "clean": clean_t, "norm": norm_t})
+
+    meaningful_tokens = [t for t in tokens_info if t["norm"]]
+    if not meaningful_tokens:
+        return {
+            "gloss_sequence": [],
+            "unsupported_concepts": [],
+            "status": "unresolved",
+        }
+
+    max_n = max(label_word_counts.values(), default=1)
+    gloss_sequence = []
+    unsupported_concepts = []
+    i = 0
+
+    while i < len(meaningful_tokens):
+        matched_label = None
+        consumed = 1
+
+        # 1. Try exact multi-word phrase match first (longest phrase first)
+        for n in range(min(max_n, len(meaningful_tokens) - i), 1, -1):
+            phrase = " ".join(t["norm"] for t in meaningful_tokens[i : i + n])
+            if phrase in norm_to_label:
+                matched_label = norm_to_label[phrase]
+                consumed = n
+                break
+
+        # 2. Try fuzzy multi-word phrase match with ambiguity checking
+        if matched_label is None and (len(meaningful_tokens) - i) >= 2:
+            multi_word_targets = [
+                norm for norm, count in label_word_counts.items() if count > 1
+            ]
+            if multi_word_targets:
+                for n in range(min(max_n, len(meaningful_tokens) - i), 1, -1):
+                    phrase = " ".join(t["norm"] for t in meaningful_tokens[i : i + n])
+                    scored = []
+                    for target in multi_word_targets:
+                        ratio = difflib.SequenceMatcher(None, phrase, target).ratio()
+                        if ratio >= 0.88:
+                            scored.append((ratio, target))
+                    if scored:
+                        scored.sort(key=lambda x: x[0], reverse=True)
+                        best_ratio, best_target = scored[0]
+                        # Ambiguity check: top score must be distinct from runner-up
+                        if len(scored) == 1 or (best_ratio - scored[1][0] >= 0.08):
+                            matched_label = norm_to_label[best_target]
+                            consumed = n
+                            break
+
+        # 3. Try single-word exact match
+        if matched_label is None:
+            w_norm = meaningful_tokens[i]["norm"]
+            if w_norm in norm_to_label:
+                matched_label = norm_to_label[w_norm]
+            # 4. Try single-word fuzzy match (for words with length >= 4)
+            elif len(w_norm) >= 4:
+                single_targets = [
+                    norm for norm, count in label_word_counts.items() if count == 1
+                ]
+                scored = []
+                for target in single_targets:
+                    if len(target) >= 4:
+                        ratio = difflib.SequenceMatcher(None, w_norm, target).ratio()
+                        if ratio >= 0.85:
+                            scored.append((ratio, target))
+                if scored:
+                    scored.sort(key=lambda x: x[0], reverse=True)
+                    best_ratio, best_target = scored[0]
+                    if len(scored) == 1 or (best_ratio - scored[1][0] >= 0.10):
+                        matched_label = norm_to_label[best_target]
+
+        if matched_label:
+            gloss_sequence.append(matched_label)
+        else:
+            concept_name = meaningful_tokens[i]["clean"] or meaningful_tokens[i]["raw"]
+            if concept_name:
+                unsupported_concepts.append(concept_name)
+
+        i += consumed
+
+    status = (
+        "success"
+        if (gloss_sequence and not unsupported_concepts)
+        else ("partial" if gloss_sequence else "unresolved")
+    )
+
+    return {
+        "gloss_sequence": gloss_sequence,
+        "unsupported_concepts": unsupported_concepts,
+        "status": status,
+    }
+
+
 @app.post("/api/text-to-sign")
 def text_to_sign(payload: TextToSignRequest):
-    vocabulary = set(_available_model_classes())
+    vocabulary = _available_model_classes()
     if not vocabulary:
         raise HTTPException(
             status_code=503,
             detail="The active model has no bundled landmark sequences.",
         )
-    raw = (payload.text.lower()
-           .replace("।", " ").replace("?", " ")
-           .replace(",", " ").replace("!", " "))
-    tokens = raw.split()
-    max_n = max((len(k.split()) for k in WORD_MAP), default=1)
-    gloss_sequence = []
-    unmapped_words = []
-    i = 0
-    while i < len(tokens):
-        hit = None
-        consumed = 1
-        # longest phrase match first ("good morning", "তোমার নাম কি")
-        for n in range(min(max_n, len(tokens) - i), 1, -1):
-            phrase = " ".join(tokens[i:i + n])
-            if phrase in WORD_MAP:
-                hit = WORD_MAP[phrase]
-                consumed = n
-                break
-        if hit is None:
-            w = tokens[i]
-            if w in WORD_MAP:
-                hit = WORD_MAP[w]
-            elif w.upper() in vocabulary:
-                hit = w.upper()
-            else:
-                unmapped_words.append(w)
-        mapped = [g.upper() for g in _as_glosses(hit) if g.upper() in vocabulary]
-        gloss_sequence.extend(mapped)
-        if hit is not None and not mapped:
-            unmapped_words.append(" ".join(tokens[i:i + consumed]))
-        i += consumed
-
+    result = _match_offline_vocabulary(payload.text, vocabulary)
     return {
         "input_text": payload.text,
-        "gloss_sequence": gloss_sequence,
+        "gloss_sequence": result["gloss_sequence"],
+        "unsupported_concepts": result["unsupported_concepts"],
+        "unmapped_words": result["unsupported_concepts"],
+        "status": result["status"],
         "available_signs": len(vocabulary),
-        "unmapped_words": unmapped_words,
+        "engine": "nlp",
     }
 
 
 @app.post("/api/text-to-sign/llm")
 def text_to_sign_llm(payload: TextToSignRequest):
-    """Plan a signable gloss sequence with the LLM instead of the phrase table.
-
-    The dictionary route above is deterministic and free but cannot generalise:
-    words outside WORD_MAP and the active model's classes are reported as
-    unmapped. This route asks the model to express the sentence using only the
-    active model's replayable vocabulary.
-
-    503 rather than an empty 200 when the model is unconfigured or unreachable:
-    the caller falls back to the dictionary, and "the LLM is unavailable" is a
-    different situation from "this sentence has no signs", which the caller must
-    be able to tell apart.
-    """
-    vocab = sorted(_available_model_classes())
+    """Plan a signable gloss sequence with the LLM using the active model's vocabulary."""
+    vocab = _available_model_classes()
     if not vocab:
         raise HTTPException(
             status_code=503,
@@ -1491,24 +1567,17 @@ def text_to_sign_llm(payload: TextToSignRequest):
         )
     res = break_into_glosses(payload.text, vocab)
 
-    if not res["gloss_sequence"]:
-        raise HTTPException(status_code=503, detail=res.get("status", "llm_unavailable"))
-
-    gloss_sequence = [
-        gloss.upper() for gloss in res["gloss_sequence"]
-        if gloss.upper() in set(vocab)
-    ]
-    if not gloss_sequence:
-        raise HTTPException(
-            status_code=503,
-            detail="The language model did not return signs from the active vocabulary.",
-        )
+    if res.get("status") == "error":
+        error_detail = res.get("error", "llm_error")
+        raise HTTPException(status_code=503, detail=f"LLM error: {error_detail}")
 
     return {
         "input_text": payload.text,
-        "gloss_sequence": gloss_sequence,
+        "gloss_sequence": res.get("gloss_sequence", []),
+        "unsupported_concepts": res.get("unsupported_concepts", []),
+        "unmapped_words": res.get("unsupported_concepts", []),
+        "status": res.get("status", "unresolved"),
         "available_signs": len(vocab),
-        "unmapped_words": [],
         "engine": "llm",
     }
 
