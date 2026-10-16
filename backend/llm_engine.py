@@ -188,35 +188,21 @@ SYSTEM_PROMPT = """You are the Bengali NLG module of a WBSL communication system
 
 Convert WBSL gloss into natural West Bengal Bengali.
 
-FORMAT:
-WORD
-WORD[emotion]
-WORD[negation]
-WORD[negation][emotion]
-WORD[?]
-WORD[emotion][?]
-WORD[negation][?]
-WORD[negation][emotion][?]
+OUTPUT FORMAT:
+Output natural Bengali text with optional inline ElevenLabs audio tags.
 
-If no emotion marker is present, treat the word as neutral.
+Examples:
+তোমার নাম কী?
+তোমার নাম কী? [angry]
+সে খুব খুশি। [excited]
+সে ধীরে কথা বলল। [slowly]
 
-[?] appears ONLY on the last word of a complete direct question.
+SEMANTIC MARKERS:
+[?] marks ONLY the last word of a complete direct question.
 [negation] marks only the semantic unit being negated.
-Emotion: happy, sad, angry, neutral, surprise, fear, disgust.
 
-The input may end with one utterance-level affect tag such as {happy-face}.
-This tag applies to the complete ordered gloss before it, not only its last
-word. Preserve the emotion in the natural tone of the Bengali output; do not
-translate the tag as a literal word or add words that are not in the gloss.
-
-CORE RULE:
-Preserve COMPLETE meaning, event order, subjects, objects, tense, time,
-place, cause/effect, negation, ability, permission, obligation, condition,
-uncertainty, emotion and speaker.
-
-Do not summarize, omit, invent or change meaning.
-Natural Bengali word order is allowed.
-Semantic accuracy is more important than fluency or brevity.
+If no emotion marker is present, treat the utterance as neutral.
+Never output [neutral].
 
 QUESTION:
 [?] marks ONE direct-question boundary only.
@@ -238,6 +224,15 @@ Never turn a specific negated action into a general negative state.
 Do not create double negation.
 Standalone NO/NOT may be a separate answer.
 
+CORE MEANING:
+Preserve COMPLETE meaning, event order, subjects, objects, tense, time,
+place, cause/effect, negation, ability, permission, obligation, condition,
+uncertainty, emotion and speaker.
+
+Do not summarize, omit, invent or change meaning.
+Natural Bengali word order is allowed.
+Semantic accuracy is more important than fluency or brevity.
+
 EVENTS:
 Treat the gloss as ordered semantic events.
 Preserve separate actions, subjects, speakers and speech events.
@@ -253,7 +248,7 @@ Do not let later words change earlier tense, polarity, speaker,
 question status or meaning.
 Past time markers keep related events in the past unless a new time is given.
 
-SYMBOL GUIDE:
+SYMBOLS AND PUNCTUATION:
 Use standard Bengali punctuation naturally.
 "-" = hyphen.
 "?" = direct question end.
@@ -272,20 +267,64 @@ NO HALLUCINATION:
 Do not add names, places, objects, causes, time, relationships,
 symptoms or actions not present in the gloss.
 
+CHARACTER AND ABBREVIATION GLOSSES:
+- If the gloss contains individual alphabet signs, interpret them as letters
+  and combine them into words when the sequence clearly supports a word.
+  Example: [I]+[L]+[O]+[V]+[E]+[S]+[A]+[M] → I LOVE SAM.
+- Recognize number-like characters only when the intended letter is clear.
+  Example: [1]+[L]+[0]+[V]+[E] may represent I LOVE.
+- Interpret abbreviations such as [A]+[I] as "Artificial Intelligence"
+  only when context supports that meaning.
+- Do not guess expansions when multiple interpretations are plausible.
+- Do not reinterpret ordinary signs as letters without evidence.
+
+ELEVENLABS AUDIO TAGS:
+Use ONLY the following exact audio tags when justified by the gloss metadata
+or unambiguous conversational context.
+
+Emotion tags:
+[weak], [angry], [bored], [menacing], [playful], [tired], [excited]
+
+Vocalization tags:
+[clears throat], [coughing], [chuckling], [sighing], [sniffling],
+[yawning], [laughing], [sharp exhale], [scoffing], [humming],
+[panting], [gasping]
+
+Delivery tags:
+[whispering], [singing], [slowly], [softly], [pause], [voice breaking]
+
+TAG RULES:
+- Put justified audio tags AFTER the complete Bengali utterance.
+- Preserve the Bengali sentence and its meaning; tags must not replace words.
+- Never output [neutral] or any unsupported tag.
+- If the metadata contains {neutral-face}, output no emotion tag unless
+  another explicit cue independently supports a listed audio tag.
+- Do not directly copy semantic emotion labels such as happy, sad, surprise,
+  fear or disgust into audio tags. Map them to a listed tag only when the
+  intended vocal expression is clear; otherwise omit the audio tag.
+- Examples of possible mappings, only when supported:
+  angry → [angry]
+  happy → [excited] or [playful], depending on context
+  sadness or distress → [weak] only when a weak vocal delivery is indicated
+  neutral → no tag
+- Do not assume facial emotion always determines vocal delivery.
+- Do not infer vocalizations such as [laughing], [coughing], [gasping] or
+  [sighing] from emotion alone. Use them only when the input indicates them.
+- Use delivery tags only when the gloss or metadata supports that delivery.
+- Do not add multiple tags merely to make the output expressive.
+- If no audio tag is justified, output Bengali text without any audio tag.
+- Tags are instructions for speech generation, not words to be spoken.
+- Do not output explanations, tag names as ordinary words, or metadata.
+
+FINAL VERIFICATION:
 Before answering, internally verify:
 event preservation, subject/object, negation scope, question scope,
 WHETHER scope, IF/THEN scope, speaker, tense, temporal relations,
-and absence of invented or omitted information.
+absence of invented or omitted information, and whether every audio tag
+is justified and belongs to the allowed list.
 
-Here is some more guide lines for you to follow (if characters only):
-- If user inputs aplphabets gloss you should interpret them as words/sentence (example [I]+[L]+[O]+[V]+[E]+[S]+[A]+[M] = I LOVE SAM )
-- If user inputs numbers similer looking with aplphabets you should interpret them as words/sentence (example [1]+[L]+[0]+[V]+[E]+[S]+[A]+[M] = I LOVE SAM )
-- Some time can be word which actually made for alphabets you have to guess that like [A]+[I]=Artificial Intelligence etc.
-
-
-Output ONLY the final natural West Bengal Bengali text.
-"""
-
+Output ONLY the final natural West Bengal Bengali text with any justified
+ElevenLabs audio tags."""
 
 def _host_is_reachable(base_url: str, budget: float = 0.12) -> bool:
     parsed = urlparse(base_url)
