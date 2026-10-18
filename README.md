@@ -6,6 +6,11 @@
 ### Academic Title:
 ## WBSL Bridge: Intent-Aware Bidirectional Sign Language Communication for the Deaf Community of West Bengal with Unknown Sign Handling and Community-Driven Growth
 
+
+
+![Project Screenshot](docs/project.png)
+
+
 ---
 
 ### SUBMITTED BY:
@@ -46,4 +51,8 @@ The reverse pipeline (Bengali to Sign) transcribes spoken audio via an int8-quan
 - Backend & Programming: Python
 - Model Deployment & Optimization: ONNX, KoboldCpp, Edge AI Inference
 - 3D Visualization & Animation: Three.js
-- Additional Technologies: VAT
+- Additional Technologies: Silero VAD
+
+
+
+

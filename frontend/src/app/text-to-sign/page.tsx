@@ -1337,16 +1337,16 @@ export default function TextToSignPage() {
                       </span>
                     )}
                   </span>
-                  <span className="text-[10px] font-mono text-text-muted leading-tight mt-0.5">
+                  <span className="text-[8px] font-mono text-text-muted leading-tight mt-0.5">
                     {isRecording
                       ? sttEngine === "elevenlabs"
-                        ? `ElevenLabs Scribe (Cloud) • Next slice in ${sliceRemainingSec.toFixed(1)}s`
-                        : `Silero VAD continuous capture • Segmenting every ${recordingDuration}s`
+                        ? `Next slice in ${sliceRemainingSec.toFixed(1)}s`
+                        : `Segmenting every ${recordingDuration}s`
                       : voiceStatus === "finalizing"
                       ? "Transcribing remaining audio..."
                       : sttEngine === "elevenlabs"
-                      ? "ElevenLabs Scribe (Premium Mode)"
-                      : "Silero VAD active · Continuous silence segmentation"}
+                      ? "ElevenLabs Scribe"
+                      : "Silero VAD"}
                   </span>
                 </div>
               </div>
