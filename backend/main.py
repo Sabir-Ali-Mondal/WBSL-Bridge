@@ -10,9 +10,18 @@ Run:
     & ".venv\\Scripts\\python.exe" -m uvicorn backend.main:app --reload --port 8200
 """
 
+import os
+import sys
+import logging
+
+# Suppress noisy C++/native logging from TensorFlow Lite, MediaPipe, and Abseil
+os.environ["GLOG_minloglevel"] = "2"
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+os.environ["ABSL_MIN_LOG_LEVEL"] = "2"
+logging.getLogger("absl").setLevel(logging.ERROR)
+
 import difflib
 import json
-import os
 import re
 import tempfile
 import time
@@ -1600,26 +1609,28 @@ def needs_data():
 
 
 # ─────────────────────────────────────────────
-# TTS
+# TTS (Independent Free & ElevenLabs Premium)
 # ─────────────────────────────────────────────
 @app.post("/api/tts/generate")
 def generate_tts(payload: dict):
     text = payload.get("text", "")
     voice_id = str(payload.get("voice", "1"))
+    engine = str(payload.get("engine", "free")).strip().lower()
     if not text:
-        return {"text": "", "audio_url": None, "engine": "none", "duration_ms": 0, "status": "no_text"}
+        return {"text": "", "audio_url": None, "engine": engine, "duration_ms": 0, "status": "no_text"}
     try:
         from backend.tts_engine import speak
-        result = speak(text, voice_id=voice_id)
+        result = speak(text, voice_id=voice_id, engine=engine)
         result["text"] = text
         return result
     except Exception as e:
         return {
             "text": text,
             "audio_url": None,
-            "engine": "none",
+            "engine": engine,
             "duration_ms": 0,
             "status": f"tts_error: {str(e)}",
+            "error": str(e),
         }
 
 
@@ -1634,40 +1645,94 @@ def serve_tts_audio(filename: str):
 
 @app.get("/api/tts/voices")
 def list_tts_voices():
-    from backend.tts_engine import VOICES
+    from backend.tts_engine import VOICES_FREE, VOICES_ELEVENLABS, is_elevenlabs_configured
+    voices_list = []
+    for k, v in VOICES_FREE.items():
+        voices_list.append({
+            "id": k,
+            "label": v[0],
+            "engine": "free",
+            "tier": "free",
+            "engine_voice": v[1],
+        })
+    for k, v in VOICES_ELEVENLABS.items():
+        voices_list.append({
+            "id": k,
+            "label": v[0],
+            "engine": "elevenlabs",
+            "tier": "premium",
+            "engine_voice": v[1],
+        })
     return {
-        "voices": [
-            {"id": k, "label": v[0], "engine_voice": v[1]}
-            for k, v in VOICES.items()
-        ]
+        "voices": voices_list,
+        "elevenlabs_configured": is_elevenlabs_configured(),
     }
 
 
 # ─────────────────────────────────────────────
-# SPEECH TO TEXT (faster-whisper)
+# SPEECH TO TEXT (Local faster-whisper + ElevenLabs Scribe)
 # ─────────────────────────────────────────────
-# Model handle and language policy live in backend/stt_engine.py; this route is
-# only the HTTP shell. ``language`` is the user's explicit choice from the UI
-# ("bengali" / "english" / "auto") -- a deliberate pick is a fact the engine
-# must obey, not re-decide, so it is forwarded verbatim.
-from backend.stt_engine import transcribe_bytes  # noqa: E402
+from backend.stt_engine import transcribe_bytes, is_elevenlabs_configured  # noqa: E402
+
+
+@app.get("/api/stt/status")
+def get_stt_status():
+    return {
+        "default_engine": "local",
+        "engines": ["local", "elevenlabs"],
+        "elevenlabs_configured": is_elevenlabs_configured(),
+        "vad_modes": ["silero_vad"],
+        "default_vad_mode": "silero_vad",
+    }
 
 
 @app.post("/api/stt")
 async def speech_to_text(
     file: UploadFile = File(...),
     language: str = Form(default=""),
+    engine: str = Form(default="local"),
+    vad_mode: str = Form(default="silero_vad"),
+    silence_threshold: float = Form(default=0.5),
+    min_silence_ms: int = Form(default=500),
+    speech_pad_ms: int = Form(default=400),
+    max_segment_s: float = Form(default=15.0),
+    is_final: bool = Form(default=False),
+    previous_context: str = Form(default=""),
 ):
     try:
         data = await file.read()
         if not data:
             raise HTTPException(status_code=400, detail="Empty audio recording")
-        return transcribe_bytes(data, file.filename or "rec.webm", language)
+
+        vad_config = {
+            "threshold": silence_threshold,
+            "min_silence_duration_ms": min_silence_ms,
+            "speech_pad_ms": speech_pad_ms,
+            "max_speech_duration_s": max_segment_s,
+        }
+
+        return transcribe_bytes(
+            data=data,
+            filename=file.filename or "rec.webm",
+            language=language,
+            engine=engine,
+            vad_mode=vad_mode,
+            vad_config=vad_config,
+            is_final=is_final,
+            previous_context=previous_context,
+        )
     except HTTPException:
         raise
+    except ValueError as val_err:
+        print(f"[STT Error] {val_err}")
+        raise HTTPException(status_code=400, detail=str(val_err)) from val_err
     except Exception as exc:
         print(f"[STT Error] {exc}")
-        raise HTTPException(status_code=500, detail="Speech-to-text transcription failed") from exc
+        raise HTTPException(
+            status_code=500,
+            detail=f"Speech-to-text transcription failed: {exc}",
+        ) from exc
+
 
 
 # ─────────────────────────────────────────────

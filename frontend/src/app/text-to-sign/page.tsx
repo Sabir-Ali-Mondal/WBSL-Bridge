@@ -7,10 +7,14 @@ import {
   AlertTriangle,
   ArrowRight,
   Check,
+  Cpu,
   Loader2,
   Mic,
   Play,
   RotateCcw,
+  ShieldAlert,
+  Sliders,
+  Sparkles,
   Square,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -321,7 +325,7 @@ export default function TextToSignPage() {
   const [inputText, setInputText] = useState("");
   const [exampleSample, setExampleSample] = useState<string[]>([]);
   const [result, setResult] = useState<TextToSignResult | null>(null);
-  const [activeSignIndex, setActiveSignIndex] = useState(0);
+  const [, setActiveSignIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [playingSeq, setPlayingSeq] = useState(false);
   const [seqNonce, setSeqNonce] = useState(0);
@@ -348,11 +352,56 @@ export default function TextToSignPage() {
     sttLanguageRef.current = sttLanguage;
   }, [sttLanguage]);
 
+  // Independent STT Engine: "local" (default) | "elevenlabs"
+  const [sttEngine, setSttEngine] = useState<"local" | "elevenlabs">("local");
+  const sttEngineRef = useRef<"local" | "elevenlabs">("local");
+  useEffect(() => {
+    sttEngineRef.current = sttEngine;
+  }, [sttEngine]);
+
+  // VAD Segmentation Mode: Silero VAD is the sole continuous segmentation mechanism
+  const vadModeRef = useRef<"silero_vad">("silero_vad");
+
+  // Configurable Silero VAD parameters
+  const [silenceThreshold, setSilenceThreshold] = useState<number>(0.5);
+  const silenceThresholdRef = useRef<number>(0.5);
+  useEffect(() => {
+    silenceThresholdRef.current = silenceThreshold;
+  }, [silenceThreshold]);
+
+  const [minSilenceMs, setMinSilenceMs] = useState<number>(500);
+  const minSilenceMsRef = useRef<number>(500);
+  useEffect(() => {
+    minSilenceMsRef.current = minSilenceMs;
+  }, [minSilenceMs]);
+
+  const [speechPadMs, setSpeechPadMs] = useState<number>(400);
+  const speechPadMsRef = useRef<number>(400);
+  useEffect(() => {
+    speechPadMsRef.current = speechPadMs;
+  }, [speechPadMs]);
+
+  const [maxSegmentS, setMaxSegmentS] = useState<number>(15.0);
+  const maxSegmentSRef = useRef<number>(15.0);
+  useEffect(() => {
+    maxSegmentSRef.current = maxSegmentS;
+  }, [maxSegmentS]);
+
+  // UI state for premium confirmation modal & VAD settings panel
+  const [showPremiumModal, setShowPremiumModal] = useState(false);
+  const [showVadSettings, setShowVadSettings] = useState(false);
+
+  // Keep inputText accessible to callbacks for boundary deduplication
+  const inputTextRef = useRef("");
+  useEffect(() => {
+    inputTextRef.current = inputText;
+  }, [inputText]);
+
   // Voice recording & Continuous Streaming STT state
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus>("idle");
   const isRecording = voiceStatus === "recording";
   const [inFlightCount, setInFlightCount] = useState(0);
-  const [recordingDuration, setRecordingDuration] = useState(5);
+  const recordingDuration = 5;
   const [sliceProgress, setSliceProgress] = useState(0); // 0 to 100%
   const [sliceRemainingSec, setSliceRemainingSec] = useState(5);
   const [failedSlices, setFailedSlices] = useState<FailedSlice[]>([]);
@@ -431,6 +480,10 @@ export default function TextToSignPage() {
     []
   );
 
+  const sendSliceWithRetriesRef = useRef<
+    ((blob: Blob, seq: number, sessionId: string, lang: string, retryCount?: number, isFinal?: boolean) => Promise<void>) | null
+  >(null);
+
   // Send an individual audio slice with timeout, bounded retries, and strict sequence tracking
   const sendSliceWithRetries = useCallback(
     async (
@@ -438,19 +491,30 @@ export default function TextToSignPage() {
       seq: number,
       sessionId: string,
       lang: string,
-      retryCount = 0
+      retryCount = 0,
+      isFinal = false
     ): Promise<void> => {
       if (sessionIdRef.current !== sessionId) return;
 
       const formData = new FormData();
       formData.append("file", blob, `slice_${seq}.wav`);
       formData.append("language", lang);
+      formData.append("engine", sttEngineRef.current);
+      formData.append("vad_mode", vadModeRef.current);
+      formData.append("silence_threshold", String(silenceThresholdRef.current));
+      formData.append("min_silence_ms", String(minSilenceMsRef.current));
+      formData.append("speech_pad_ms", String(speechPadMsRef.current));
+      formData.append("max_segment_s", String(maxSegmentSRef.current));
+      formData.append("is_final", String(isFinal));
+      formData.append("previous_context", inputTextRef.current);
 
       try {
         const resp = await axios.post<{
           text: string;
           language?: string;
           language_probability?: number;
+          engine?: string;
+          status?: string;
         }>(`${API_BASE}/api/stt`, formData, {
           headers: { "Content-Type": "multipart/form-data" },
           timeout: 30000,
@@ -464,11 +528,24 @@ export default function TextToSignPage() {
       } catch (err: unknown) {
         if (sessionIdRef.current !== sessionId) return;
 
+        const errorMsg = axios.isAxiosError(err)
+          ? err.response?.data?.detail || err.message
+          : "STT processing failed";
+
+        // CRITICAL: When ElevenLabs fails, do NOT automatically fall back to another provider
+        if (sttEngineRef.current === "elevenlabs") {
+          toast.error(`ElevenLabs STT Error: ${errorMsg}`);
+          resultsMapRef.current.set(seq, { text: "", status: "failed", blob });
+          setFailedSlices((prev) => [...prev, { seq, blob, lang }]);
+          commitInOrder(sessionId);
+          return;
+        }
+
         if (retryCount < 2) {
           // Bounded retry (attempt 1 or 2) after short delay
           await new Promise((resolve) => setTimeout(resolve, 600));
           if (sessionIdRef.current !== sessionId) return;
-          return sendSliceWithRetries(blob, seq, sessionId, lang, retryCount + 1);
+          return sendSliceWithRetriesRef.current?.(blob, seq, sessionId, lang, retryCount + 1, isFinal);
         } else {
           // All retries exhausted: mark as failed to unblock subsequent slice commits
           resultsMapRef.current.set(seq, { text: "", status: "failed", blob });
@@ -484,6 +561,10 @@ export default function TextToSignPage() {
     [commitInOrder, checkFinalizationComplete]
   );
 
+  useEffect(() => {
+    sendSliceWithRetriesRef.current = sendSliceWithRetries;
+  }, [sendSliceWithRetries]);
+
   // Extracts current PCM buffer into a standalone 16kHz WAV slice and dispatches it
   const extractAndDispatchSlice = useCallback(
     (isFinal = false) => {
@@ -491,8 +572,19 @@ export default function TextToSignPage() {
       if (!chunks || chunks.length === 0) return;
 
       const totalSamples = chunks.reduce((acc, c) => acc + c.length, 0);
-      // Minimum ~0.15s of audio to avoid empty slices
-      if (totalSamples < 2400) return;
+      const inputRate = capturedSampleRateRef.current || 44100;
+
+      // Minimum duration guards:
+      // ElevenLabs Scribe API strictly rejects audio shorter than 0.6s (400 audio_too_short).
+      // Local faster-whisper requires at least 0.25s of audio to perform meaningful transcription.
+      const minDurationSec = sttEngineRef.current === "elevenlabs" ? 0.65 : 0.25;
+      const minInputSamples = Math.ceil(minDurationSec * inputRate);
+      if (totalSamples < minInputSamples) {
+        if (isFinal) {
+          pcmBufferRef.current = [];
+        }
+        return;
+      }
 
       const merged = new Float32Array(totalSamples);
       let offset = 0;
@@ -501,34 +593,26 @@ export default function TextToSignPage() {
         offset += c.length;
       }
 
-      const inputRate = capturedSampleRateRef.current || 44100;
-
-      if (isFinal) {
-        pcmBufferRef.current = [];
-      } else {
-        // Retain last ~0.5s in buffer for smooth audio overlap across splits
-        const overlapSamples = Math.floor(0.5 * inputRate);
-        if (merged.length > overlapSamples) {
-          pcmBufferRef.current = [merged.slice(merged.length - overlapSamples)];
-        } else {
-          pcmBufferRef.current = [];
-        }
-      }
+      // Continuous Silero VAD cuts on natural pauses; reset buffer cleanly for next slice
+      pcmBufferRef.current = [];
 
       const downsampled = downsampleBuffer(merged, inputRate, 16000);
 
-      // Voice Activity / Silence detection:
-      // If the audio slice has no audible energy (RMS < 0.005), do NOT dispatch to STT!
-      // This stops running Whisper inference on background noise and eliminates CPU burn.
+      // Verify downsampled samples directly (9600 samples = 0.6s at 16kHz)
+      const minDownsampledSamples = sttEngineRef.current === "elevenlabs" ? 9600 : 4000;
+      if (downsampled.length < minDownsampledSamples) {
+        return;
+      }
+
+      // Energy check: in fixed chunk mode, skip dead silence to save CPU.
+      // In Silero VAD mode, backend Silero neural VAD evaluates activity directly.
       const rms = calculateRMS(downsampled);
-      if (rms < 0.005) {
-        if (!isFinal) {
-          consecutiveSilentSlicesRef.current += 1;
-          // If microphone was left on with continuous silence for 4 splits (~20s), automatically stop
-          if (consecutiveSilentSlicesRef.current >= 4 && isRecordingRef.current) {
-            toast.info("Microphone stopped automatically due to inactivity.");
-            stopVoiceRecordingRef.current?.();
-          }
+      if (rms < 0.003 && !isFinal) {
+        consecutiveSilentSlicesRef.current += 1;
+        // If microphone was left on with continuous silence for 4 splits (~20s), automatically stop
+        if (consecutiveSilentSlicesRef.current >= 4 && isRecordingRef.current) {
+          toast.info("Microphone stopped automatically due to inactivity.");
+          stopVoiceRecordingRef.current?.();
         }
         return;
       }
@@ -544,7 +628,9 @@ export default function TextToSignPage() {
           wavBlob,
           seq,
           sessionIdRef.current,
-          sttLanguageRef.current
+          sttLanguageRef.current,
+          0,
+          isFinal
         );
       }
     },
@@ -820,9 +906,11 @@ export default function TextToSignPage() {
         } else {
           toast.info("No matching signs found in active model");
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (callNonce !== apiCallNonceRef.current) return;
-        const detail = err.response?.data?.detail || "LLM unavailable";
+        const detail = axios.isAxiosError(err)
+          ? err.response?.data?.detail
+          : "LLM unavailable";
         toast.error(`LLM error: ${detail}`);
       } finally {
         if (callNonce === apiCallNonceRef.current) {
@@ -861,55 +949,273 @@ export default function TextToSignPage() {
       <div className="grid grid-cols-1 lg:grid-cols-[30%_70%] gap-4 lg:gap-6 items-stretch">
         {/* LEFT PANEL: INPUT & CONTROLS */}
         <section className="flex flex-col justify-between rounded-2xl border border-border/80 bg-surface/50 p-4 sm:p-5 backdrop-blur-sm gap-3.5 h-full">
-          {/* Top row: Label + Guide + Language Switcher + Clear */}
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2.5">
-              <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-text-muted select-none">
-                Input Text
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <div
-                className="flex items-center gap-0.5 p-0.5 rounded-lg bg-surface/80 border border-border/80 shrink-0"
-                role="group"
-                aria-label="Input Language"
-              >
-                {([
-                  { key: "auto", label: "AUTO" },
-                  { key: "bn", label: "বাংলা" },
-                  { key: "en", label: "ENGLISH" },
-                ] as const).map((opt) => (
+          {/* Top row: Label + STT Engine Selector + VAD Mode + Language Switcher + Clear */}
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                {/* STT Engine Selector */}
+                <div
+                  className="flex items-center gap-0.5 p-0.5 rounded-lg bg-surface/80 border border-border/80"
+                  role="group"
+                  aria-label="STT Engine"
+                >
                   <button
-                    key={opt.key}
                     type="button"
-                    onClick={() => setSttLanguage(opt.key)}
-                    aria-pressed={sttLanguage === opt.key}
-                    className={`px-2.5 py-1 rounded text-[10px] font-mono font-bold uppercase tracking-wider transition-colors ${
-                      sttLanguage === opt.key
-                        ? "bg-accent-secondary text-white shadow-sm"
+                    onClick={() => setSttEngine("local")}
+                    aria-pressed={sttEngine === "local"}
+                    className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider transition-colors flex items-center gap-1 ${
+                      sttEngine === "local"
+                        ? "bg-accent-primary/20 text-accent-primary border border-accent-primary/40 shadow-sm"
                         : "text-text-muted hover:text-text-secondary"
                     }`}
+                    title="Local faster-whisper on CPU (Free, Offline, No cloud calls)"
                   >
-                    {opt.label}
+                    <Cpu size={10} />
+                    Local
                   </button>
-                ))}
-              </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (sttEngine !== "elevenlabs") {
+                        setShowPremiumModal(true);
+                      }
+                    }}
+                    aria-pressed={sttEngine === "elevenlabs"}
+                    className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider transition-colors flex items-center gap-1 ${
+                      sttEngine === "elevenlabs"
+                        ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm"
+                        : "text-text-muted hover:text-text-secondary"
+                    }`}
+                    title="ElevenLabs Scribe v1/v2 (Premium Cloud STT)"
+                  >
+                    <Sparkles size={10} />
+                    ElevenLabs
+                  </button>
+                </div>
 
-              {inputText && (
+                {/* Silero VAD Indicator & Configuration (for local capture) */}
+                {sttEngine === "local" && (
+                  <div
+                    className="hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-lg bg-surface/80 border border-border/80"
+                    role="group"
+                    aria-label="VAD Configuration"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setShowVadSettings((v) => !v)}
+                      aria-label="VAD Configuration"
+                      className={`p-1 rounded text-text-muted hover:text-text-primary transition-colors ${
+                        showVadSettings ? "bg-surface-elevated text-accent-secondary" : ""
+                      }`}
+                      title="Configure Silero VAD thresholds & padding"
+                    >
+                      <Sliders size={11} />
+                    </button>
+                  </div>
+                )}
+              </div>
+              <br/>
+              <div className="flex items-center gap-2">
+                {/* Language Selector */}
+                <div
+                  className="flex items-center gap-0.5 p-0.5 rounded-lg bg-surface/80 border border-border/80 shrink-0"
+                  role="group"
+                  aria-label="Input Language"
+                >
+                  {([
+                    { key: "auto", label: "AUTO" },
+                    { key: "bn", label: "বাংলা" },
+                    { key: "en", label: "ENGLISH" },
+                  ] as const).map((opt) => (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => setSttLanguage(opt.key)}
+                      aria-pressed={sttLanguage === opt.key}
+                      className={`px-2.5 py-1 rounded text-[10px] font-mono font-bold uppercase tracking-wider transition-colors ${
+                        sttLanguage === opt.key
+                          ? "bg-accent-secondary text-white shadow-sm"
+                          : "text-text-muted hover:text-text-secondary"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+
+                {inputText && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setInputText("");
+                      setResult(null);
+                    }}
+                    className="text-[10px] font-mono text-text-muted hover:text-text-primary transition-colors ml-1"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Premium ElevenLabs Mode Notice */}
+            {sttEngine === "elevenlabs" && (
+              <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[10px] font-mono text-amber-300">
+                <span className="flex items-center gap-1.5">
+                  <Sparkles size={12} className="text-amber-400" />
+                  ElevenLabs Scribe active
+                </span>
                 <button
                   type="button"
-                  onClick={() => {
-                    setInputText("");
-                    setResult(null);
-                  }}
-                  className="text-[10px] font-mono text-text-muted hover:text-text-primary transition-colors ml-1"
+                  onClick={() => setSttEngine("local")}
+                  className="text-[9px] underline hover:text-white"
                 >
-                  Clear
+                  Exit
                 </button>
-              )}
-            </div>
+              </div>
+            )}
+
+            {/* Expandable VAD Settings Panel */}
+            {showVadSettings && sttEngine === "local" && (
+              <div className="p-3 rounded-xl bg-surface border border-border/80 flex flex-col gap-2.5 text-xs font-mono">
+                <div className="flex items-center justify-between pb-1 border-b border-border/50">
+                  <span className="font-bold text-[11px] text-text-primary flex items-center gap-1.5">
+                    <Sliders size={12} className="text-accent-secondary" />
+                    Silero VAD Parameters
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSilenceThreshold(0.5);
+                      setMinSilenceMs(500);
+                      setSpeechPadMs(400);
+                      setMaxSegmentS(15.0);
+                      toast.info("VAD parameters reset to defaults.");
+                    }}
+                    className="text-[9px] text-text-muted hover:text-text-primary underline"
+                  >
+                    Reset Defaults
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px]">
+                  <div className="flex flex-col gap-1">
+                    <div className="flex justify-between text-text-secondary">
+                      <span>Silence Threshold:</span>
+                      <span className="text-accent-secondary font-bold">{silenceThreshold}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="0.9"
+                      step="0.05"
+                      value={silenceThreshold}
+                      onChange={(e) => setSilenceThreshold(parseFloat(e.target.value))}
+                      className="w-full h-1 bg-surface-elevated rounded accent-accent-secondary cursor-pointer"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <div className="flex justify-between text-text-secondary">
+                      <span>Min Silence (ms):</span>
+                      <span className="text-accent-secondary font-bold">{minSilenceMs}ms</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="200"
+                      max="2000"
+                      step="50"
+                      value={minSilenceMs}
+                      onChange={(e) => setMinSilenceMs(parseInt(e.target.value, 10))}
+                      className="w-full h-1 bg-surface-elevated rounded accent-accent-secondary cursor-pointer"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <div className="flex justify-between text-text-secondary">
+                      <span>Speech Padding (ms):</span>
+                      <span className="text-accent-secondary font-bold">{speechPadMs}ms</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="100"
+                      max="800"
+                      step="50"
+                      value={speechPadMs}
+                      onChange={(e) => setSpeechPadMs(parseInt(e.target.value, 10))}
+                      className="w-full h-1 bg-surface-elevated rounded accent-accent-secondary cursor-pointer"
+                    />
+                  </div>
+
+                  <div className="flex flex-col gap-1">
+                    <div className="flex justify-between text-text-secondary">
+                      <span>Max Segment (s):</span>
+                      <span className="text-accent-secondary font-bold">{maxSegmentS}s</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="5"
+                      max="30"
+                      step="1"
+                      value={maxSegmentS}
+                      onChange={(e) => setMaxSegmentS(parseFloat(e.target.value))}
+                      className="w-full h-1 bg-surface-elevated rounded accent-accent-secondary cursor-pointer"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
+
+{/* Premium Warning Modal */}
+{showPremiumModal && (
+  <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div className="bg-surface border border-amber-500/40 rounded-2xl max-w-md w-full p-5 shadow-2xl flex flex-col gap-4">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+          <ShieldAlert size={20} />
+        </div>
+        <div>
+          <h3 className="font-mono font-bold text-sm text-text-primary">
+            Switch to ElevenLabs STT?
+          </h3>
+          <span className="text-[10px] font-mono text-amber-400">
+            Cloud-based multilingual transcription
+          </span>
+        </div>
+      </div>
+
+      <div className="text-xs text-text-secondary leading-relaxed bg-surface-elevated p-3 rounded-xl border border-border/60 flex flex-col gap-2">
+        <p>• Audio will be sent to ElevenLabs cloud servers.</p>
+        <p>• API usage charges and quotas apply.</p>
+        <p className="font-semibold text-amber-300">
+          • No automatic fallback: missing credentials or quota limits will cause transcription to fail.
+        </p>
+      </div>
+
+      <div className="flex items-center justify-end gap-2.5 pt-1">
+        <button
+          type="button"
+          onClick={() => setShowPremiumModal(false)}
+          className="px-3 py-1.5 rounded-lg border border-border text-xs font-mono text-text-secondary hover:text-text-primary hover:bg-surface-elevated transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setSttEngine("elevenlabs");
+            setShowPremiumModal(false);
+            toast.success("Switched to ElevenLabs Scribe STT mode.");
+          }}
+          className="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-mono font-bold text-xs transition-colors shadow-md"
+        >
+          Enable ElevenLabs
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
           {/* Multiline Textarea with inline unmapped word highlighting and locked height */}
           <div className="relative w-full flex-1 min-h-[340px] lg:min-h-[420px] rounded-xl bg-background/50 border border-border/80 focus-within:ring-1 focus-within:ring-accent-secondary/50 focus-within:border-accent-secondary/60 transition-all flex flex-col overflow-hidden">
@@ -1033,37 +1339,24 @@ export default function TextToSignPage() {
                   </span>
                   <span className="text-[10px] font-mono text-text-muted leading-tight mt-0.5">
                     {isRecording
-                      ? `Splitting every ${recordingDuration}s • Next split in ${sliceRemainingSec.toFixed(1)}s`
+                      ? sttEngine === "elevenlabs"
+                        ? `ElevenLabs Scribe (Cloud) • Next slice in ${sliceRemainingSec.toFixed(1)}s`
+                        : `Silero VAD continuous capture • Segmenting every ${recordingDuration}s`
                       : voiceStatus === "finalizing"
                       ? "Transcribing remaining audio..."
-                      : `Split every ${recordingDuration}s`}
+                      : sttEngine === "elevenlabs"
+                      ? "ElevenLabs Scribe (Premium Mode)"
+                      : "Silero VAD active · Continuous silence segmentation"}
                   </span>
                 </div>
               </div>
 
-              {/* Stepper Duration */}
+              {/* VAD Status Indicator */}
               <div className="flex items-center gap-1.5 shrink-0 bg-surface rounded-lg p-0.5 border border-border">
-                <button
-                  type="button"
-                  disabled={isRecording || voiceStatus === "finalizing" || recordingDuration <= 2}
-                  onClick={() => setRecordingDuration((d) => Math.max(2, d - 1))}
-                  className="w-6 h-6 rounded flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-elevated disabled:opacity-30 disabled:cursor-not-allowed transition-colors font-mono text-xs"
-                  aria-label="Decrease recording duration"
-                >
-                  -
-                </button>
-                <span className="font-mono text-xs tabular-nums font-semibold px-1 text-text-secondary">
-                  {recordingDuration}
+                <span className="font-mono text-[10px] text-accent-secondary px-2 py-1 font-semibold flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent-secondary animate-pulse" />
+                  Silero VAD
                 </span>
-                <button
-                  type="button"
-                  disabled={isRecording || voiceStatus === "finalizing" || recordingDuration >= 30}
-                  onClick={() => setRecordingDuration((d) => Math.min(30, d + 1))}
-                  className="w-6 h-6 rounded flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-surface-elevated disabled:opacity-30 disabled:cursor-not-allowed transition-colors font-mono text-xs"
-                  aria-label="Increase recording duration"
-                >
-                  +
-                </button>
               </div>
             </div>
 

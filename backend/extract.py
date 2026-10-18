@@ -22,6 +22,67 @@ costs real time per frame, so it is built lazily -- a project that only ever
 serves 126-dim models never pays for it.
 """
 
+import contextlib
+import ctypes
+import os
+import sys
+import time
+import logging
+
+os.environ["GLOG_minloglevel"] = "2"
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
+os.environ["ABSL_MIN_LOG_LEVEL"] = "2"
+logging.getLogger("absl").setLevel(logging.ERROR)
+
+
+@contextlib.contextmanager
+def _suppress_c_stderr():
+    """
+    Temporarily redirect native C runtime stderr to NUL during MediaPipe graph initialization.
+    Silences unpreventable C++ logs from TensorFlow Lite delegate creation and Abseil
+    inference feedback manager without affecting Python loggers or normal terminal output.
+    """
+    old_fd = None
+    stderr_file = None
+    ucrt = None
+    try:
+        if sys.platform == "win32":
+            ucrt = ctypes.CDLL("ucrtbase.dll")
+            iob_func = getattr(ucrt, "__acrt_iob_func")
+            iob_func.restype = ctypes.c_void_p
+            iob_func.argtypes = [ctypes.c_uint]
+            stderr_file = iob_func(2)
+            old_fd = os.dup(2)
+
+            ucrt.freopen.restype = ctypes.c_void_p
+            ucrt.freopen.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_void_p]
+            ucrt.freopen(b"NUL", b"w", stderr_file)
+        else:
+            old_fd = os.dup(2)
+            devnull = os.open(os.devnull, os.O_WRONLY)
+            os.dup2(devnull, 2)
+            os.close(devnull)
+    except Exception:
+        pass
+
+    try:
+        yield
+    finally:
+        try:
+            if sys.platform == "win32" and ucrt and stderr_file and old_fd is not None:
+                ucrt.fflush.argtypes = [ctypes.c_void_p]
+                ucrt.fflush(stderr_file)
+                time.sleep(0.15)
+                ucrt.fflush(stderr_file)
+                os.dup2(old_fd, 2)
+                os.close(old_fd)
+            elif old_fd is not None:
+                os.dup2(old_fd, 2)
+                os.close(old_fd)
+        except Exception:
+            pass
+
+
 import numpy as np
 import mediapipe as mp
 
@@ -33,10 +94,11 @@ HANDS_DIM = 126
 HOLISTIC_DIM = HANDS_DIM + POSE_DIM
 
 # Initialize ONCE at module load (not per request)
-_hands = mp.solutions.hands.Hands(
-    max_num_hands=2,
-    min_detection_confidence=0.6
-)
+with _suppress_c_stderr():
+    _hands = mp.solutions.hands.Hands(
+        max_num_hands=2,
+        min_detection_confidence=0.6,
+    )
 
 # Built on first use only (see module docstring).
 _holistic = None
@@ -50,10 +112,11 @@ def _get_holistic():
     """
     global _holistic
     if _holistic is None:
-        _holistic = mp.solutions.holistic.Holistic(
-            static_image_mode=False,
-            min_detection_confidence=0.5,
-        )
+        with _suppress_c_stderr():
+            _holistic = mp.solutions.holistic.Holistic(
+                static_image_mode=False,
+                min_detection_confidence=0.5,
+            )
     return _holistic
 
 

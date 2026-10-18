@@ -17,13 +17,16 @@ import mediapipe as mp
 import numpy as np
 import onnxruntime as ort
 
+from backend.extract import _suppress_c_stderr
+
 # Initialize MediaPipe FaceMesh ONCE
-_face_mesh = mp.solutions.face_mesh.FaceMesh(
-    max_num_faces=1,
-    refine_landmarks=True,
-    min_detection_confidence=0.5,
-    min_tracking_confidence=0.5,
-)
+with _suppress_c_stderr():
+    _face_mesh = mp.solutions.face_mesh.FaceMesh(
+        max_num_faces=1,
+        refine_landmarks=True,
+        min_detection_confidence=0.5,
+        min_tracking_confidence=0.5,
+    )
 
 # Initialize ViT Emotion Model ONCE
 ROOT = Path(__file__).resolve().parent.parent

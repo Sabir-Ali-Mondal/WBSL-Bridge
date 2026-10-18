@@ -23,6 +23,7 @@ import {
   Plus,
   Activity,
   Sparkles,
+  ShieldAlert,
   Lock,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -225,7 +226,9 @@ export default function SignToTextPage() {
   const [bengaliOutput, setBengaliOutput] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPlayingAudio, setIsPlayingAudio] = useState(false);
-  const [voiceId, setVoiceId] = useState<"1" | "2">("1");
+  const [voiceId, setVoiceId] = useState<string>("1");
+  const [ttsEngine, setTtsEngine] = useState<"free" | "elevenlabs">("free");
+  const [showTtsPremiumModal, setShowTtsPremiumModal] = useState(false);
   const [unifiedActive, setUnifiedActive] = useState(false);
 
   const frameBufferRef = useRef<Blob[]>([]);
@@ -634,15 +637,21 @@ export default function SignToTextPage() {
     setIsPlayingAudio(true);
 
     try {
-      const res = await axios.post(
+      const res = await axios.post<{
+        audio_url: string | null;
+        engine: string;
+        status: string;
+        error?: string;
+      }>(
         `${API_BASE}/api/tts/generate`,
         {
           text,
           voice: voiceId,
+          engine: ttsEngine,
         }
       );
 
-      if (res.data.audio_url) {
+      if (res.data.status === "success" && res.data.audio_url) {
         const audio = new Audio(
           `${API_BASE}${res.data.audio_url}`
         );
@@ -654,14 +663,25 @@ export default function SignToTextPage() {
           setIsPlayingAudio(false);
 
         await audio.play();
-
+        return;
+      } else if (ttsEngine === "elevenlabs") {
+        toast.error(res.data.error || "ElevenLabs TTS failed to generate audio.");
+        setIsPlayingAudio(false);
         return;
       }
-    } catch {
-      // Fall through to browser speech.
+    } catch (err: unknown) {
+      if (ttsEngine === "elevenlabs") {
+        const errorMsg = axios.isAxiosError(err)
+          ? err.response?.data?.detail || err.message
+          : "ElevenLabs TTS request failed";
+        toast.error(`ElevenLabs TTS Error: ${errorMsg}`);
+        setIsPlayingAudio(false);
+        return;
+      }
+      // Free mode: fall through to browser SpeechSynthesis
     }
 
-    if ("speechSynthesis" in window) {
+    if (ttsEngine === "free" && "speechSynthesis" in window) {
       const u =
         new SpeechSynthesisUtterance(text);
 
@@ -1465,34 +1485,167 @@ export default function SignToTextPage() {
 
           {/* Voice Output & Stream Button Card directly below Bengali translation */}
           <div className="bg-background/50 rounded-xl p-3 flex flex-col gap-2.5">
+            {/* TTS Engine Switcher */}
+            <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-border/50">
+              <span className="text-[9px] font-mono uppercase text-text-muted shrink-0">
+                TTS Engine:
+              </span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setTtsEngine("free");
+                    setVoiceId("1");
+                  }}
+                  className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider transition-colors ${
+                    ttsEngine === "free"
+                      ? "bg-accent-primary/20 text-accent-primary border border-accent-primary/40 shadow-sm"
+                      : "text-text-muted hover:text-text-secondary"
+                  }`}
+                >
+                  Free (Edge TTS)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (ttsEngine !== "elevenlabs") {
+                      setShowTtsPremiumModal(true);
+                    }
+                  }}
+                  className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider transition-colors flex items-center gap-1 ${
+                    ttsEngine === "elevenlabs"
+                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm"
+                      : "text-text-muted hover:text-text-secondary"
+                  }`}
+                >
+                  <Sparkles size={10} />
+                  ElevenLabs (Premium)
+                </button>
+              </div>
+            </div>
+
             {/* Voice Model Selector Tabs */}
             <div className="flex items-center gap-2">
               <span className="text-[9px] font-mono uppercase text-text-muted shrink-0">
                 Voice:
               </span>
               <div className="flex-1 grid grid-cols-2 gap-1.5">
-                <button
-                  onClick={() => setVoiceId("1")}
-                  className={`h-8 rounded-lg border text-[9px] font-mono font-semibold transition-all ${
-                    voiceId === "1"
-                      ? "bg-accent-primary/15 border-accent-primary text-accent-primary shadow-sm"
-                      : "bg-surface-elevated border-border text-text-secondary hover:text-text-primary"
-                  }`}
-                >
-                  Female · Nabanita
-                </button>
-                <button
-                  onClick={() => setVoiceId("2")}
-                  className={`h-8 rounded-lg border text-[9px] font-mono font-semibold transition-all ${
-                    voiceId === "2"
-                      ? "bg-accent-secondary/15 border-accent-secondary text-accent-secondary shadow-sm"
-                      : "bg-surface-elevated border-border text-text-secondary hover:text-text-primary"
-                  }`}
-                >
-                  Male · Pradeep
-                </button>
+                {ttsEngine === "free" ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setVoiceId("1")}
+                      className={`h-8 rounded-lg border text-[9px] font-mono font-semibold transition-all ${
+                        voiceId === "1"
+                          ? "bg-accent-primary/15 border-accent-primary text-accent-primary shadow-sm"
+                          : "bg-surface-elevated border-border text-text-secondary hover:text-text-primary"
+                      }`}
+                    >
+                      Female · Nabanita
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setVoiceId("2")}
+                      className={`h-8 rounded-lg border text-[9px] font-mono font-semibold transition-all ${
+                        voiceId === "2"
+                          ? "bg-accent-secondary/15 border-accent-secondary text-accent-secondary shadow-sm"
+                          : "bg-surface-elevated border-border text-text-secondary hover:text-text-primary"
+                      }`}
+                    >
+                      Male · Pradeep
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setVoiceId("eleven_1")}
+                      className={`h-8 rounded-lg border text-[9px] font-mono font-semibold transition-all ${
+                        voiceId === "eleven_1"
+                          ? "bg-amber-500/20 border-amber-500/50 text-amber-300 shadow-sm"
+                          : "bg-surface-elevated border-border text-text-secondary hover:text-text-primary"
+                      }`}
+                    >
+                      Female · Sarah
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setVoiceId("eleven_2")}
+                      className={`h-8 rounded-lg border text-[9px] font-mono font-semibold transition-all ${
+                        voiceId === "eleven_2"
+                          ? "bg-amber-500/20 border-amber-500/50 text-amber-300 shadow-sm"
+                          : "bg-surface-elevated border-border text-text-secondary hover:text-text-primary"
+                      }`}
+                    >
+                      Male · George
+                    </button>
+                  </>
+                )}
               </div>
             </div>
+
+            {/* ElevenLabs Tag Notice */}
+            {ttsEngine === "elevenlabs" && (
+              <div className="text-[9px] font-mono text-amber-300/80 bg-amber-500/10 p-1.5 rounded-lg border border-amber-500/20 flex items-center gap-1">
+                <Sparkles size={11} className="text-amber-400 shrink-0" />
+                <span>Emotion tags preserved: [excited], [sad], [whispers], [happy]</span>
+              </div>
+            )}
+
+            {/* TTS Premium Confirmation Modal */}
+            {showTtsPremiumModal && (
+              <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                <div className="bg-surface border border-amber-500/40 rounded-2xl max-w-md w-full p-5 shadow-2xl flex flex-col gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+                      <ShieldAlert size={20} />
+                    </div>
+                    <div>
+                      <h3 className="font-mono font-bold text-sm text-text-primary">
+                        Switch to ElevenLabs Premium TTS?
+                      </h3>
+                      <span className="text-[10px] font-mono text-amber-400">
+                        Expressive multilingual speech with emotion tag support
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="text-xs text-text-secondary leading-relaxed bg-surface-elevated p-3 rounded-xl border border-border/60 flex flex-col gap-2">
+                    <p>
+                      • Voice synthesis will use ElevenLabs eleven_v3 model via your backend ELEVENLABS_API_KEY.
+                    </p>
+                    <p>
+                      • Cloud API credits will be consumed per character generated.
+                    </p>
+                    <p className="font-semibold text-amber-300">
+                      • No Automatic Fallback: If your API key is invalid or quota runs out, speech synthesis will report an error instead of automatically falling back to Free mode.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => setShowTtsPremiumModal(false)}
+                      className="px-3 py-1.5 rounded-lg border border-border text-xs font-mono text-text-secondary hover:text-text-primary hover:bg-surface-elevated transition-colors"
+                    >
+                      Cancel (Stay Free)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTtsEngine("elevenlabs");
+                        setVoiceId("eleven_1");
+                        setShowTtsPremiumModal(false);
+                        toast.success("Switched to ElevenLabs Premium TTS mode.");
+                      }}
+                      className="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-mono font-bold text-xs transition-colors shadow-md"
+                    >
+                      Enable ElevenLabs
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Stream Bengali Action Button */}
             <button
