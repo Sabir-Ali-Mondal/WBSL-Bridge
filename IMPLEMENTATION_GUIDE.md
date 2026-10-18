@@ -1,14 +1,21 @@
-1. reduce face data extracting and make so that only the app simulation face works
+## WBSL Bridge — Updated Todo List
 
-2. no face data for training it will make more confusion . no face data for detection whhile use the model 
+1\. Reduce Face Data Extraction: Keep face data extraction only for the simulation requirements, reusing the existing cute face model and ensuring consistent data.
 
-3. face data only will be used for simulation in a minor way as exsiting simulation needs , taht already have cute face only need equal data
+2\. Remove Face Data from Recognition: Do not use facial data for training or sign detection to avoid unnecessary complexity and confusion.
 
-4. then we will extract the data
-5. train teh model with out face [ fingers , pose , hands , arms solder ]
-6. use the model without face tracking need
-7. face data will be only saved and used for simulation
+3\. Update Data Extraction (mannualy not auto): Extract the required non-face data, including fingers, hands, arms, shoulders, and body pose.
 
-now as model type is cahnging so according that we have to change model runner of my app and the way we are detecting ididvidual sign using hand down method  trigger for end and begining while hands down means no sign
+4\. Retrain the Model (mannualy not auto): Train a new model using only hand, finger, arm, shoulder, and body-pose data, without facial landmarks.
 
-need to update simualtion code accroing so that the new face data and body data can be used by it
+5\. Update Model Runner: Modify the app's model runner, input dimensions, preprocessing, and inference pipeline to support the new model architecture.
+
+6\. Update Sign Detection Logic: Use the hands-down position as the sign boundary trigger. Hands down means no active sign; raising the hands begins a sign, and returning them both down ends it.
+
+7\. Update Simulation: Modify the simulation code to use the new body and hand data while retaining facial data only for the existing visual simulation requirements.
+
+8\. Remove NMM Completely: Remove NMM detection, configuration, UI, and related dependencies. Keep it as a planned future feature.
+
+9\. Remove Community Contribution Feature: Completely remove the community contribution interface and its existing contribution pipeline, as the current implementation does not meet requirements. It may be redesigned and reintroduced in the future.
+
+10\. Verify the Complete Pipeline: Test data extraction, model training, inference, sign boundary detection, and simulation to ensure everything works without face tracking in recognition.
