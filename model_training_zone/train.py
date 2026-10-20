@@ -3,10 +3,6 @@ train.py — Step 2:  py train.py
 
 Trains the BiLSTM on the 158-dim features produced by extract.py and exports ONNX
 into the same models/onnx_models/<id>/ folder (the newest one with npy/ and no model yet).
-
-Input contract: (batch, SEQ_T=32, DIM=158) float32 — exactly what extract.py writes
-(32 frames spaced evenly over each video's full length). No extraction math lives here;
-test_model.py builds live rows with the same extract_features() from extract.py.
 """
 
 import json

@@ -6,7 +6,7 @@ Live webcam test of the newest trained model.
 Sign boundary (AUTO, default):
   hands DOWN = no sign | raise hands = sign starts | both hands DOWN again = sign ends -> predict.
 Recorded clips are sampled exactly like training videos: 32 frames over the full clip,
-same extract_features() / fill_sequence() from extract.py.
+158 numbers per frame, built by the same shared code in extract.py.
 Keys: SPACE = manual start/stop, M = toggle auto/manual, Q/ESC = quit.
 """
 
@@ -21,7 +21,7 @@ import numpy as np
 import onnxruntime as ort
 
 from extract import (DIM, MODELS, SEQ_T, SignBoundary, extract_features,
-                     fill_sequence, frame_idxs, model_ids)
+                     frame_idxs, model_ids)
 
 # ───────────── settings (edit here) ─────────────
 MODEL_ID = None          # None = latest folder with a trained model
@@ -69,7 +69,6 @@ def _sample_and_extract(frames, idxs, require_both_hands):
 
 
 def process_frames(frames):
-    """Recorded clip -> (32, 158), sampled over the full clip just like extract.py."""
     n = len(frames)
     if n < 8:
         print(f"Clip too short ({n} frames).")
@@ -77,7 +76,7 @@ def process_frames(frames):
     idxs = frame_idxs(n)
 
     out, good = _sample_and_extract(frames, idxs, True)
-    if good < SEQ_T // 2:                      # rescue pass for low-quality clips
+    if good < SEQ_T // 2:
         out2, good2 = _sample_and_extract(frames, idxs, False)
         if good2 > good:
             out, good = out2, good2
@@ -86,7 +85,14 @@ def process_frames(frames):
         return None
     if good < SEQ_T // 2:
         print(f"Warning: low detection quality ({good}/{SEQ_T} frames valid).")
-    return fill_sequence(out)
+
+    curr = next((f for f in out if f is not None), np.zeros(DIM, np.float32))
+    cleaned = []
+    for o in out:
+        if o is not None:
+            curr = o
+        cleaned.append(curr)
+    return np.array(cleaned, np.float32)
 
 
 def predict(session, input_name, classes, features):
