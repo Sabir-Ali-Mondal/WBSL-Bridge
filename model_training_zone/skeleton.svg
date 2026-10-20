@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1244" height="806" viewBox="0 0 1244 806" font-family="Segoe UI, Arial, sans-serif">
+  <rect width="1244" height="806" fill="#1a1a17"/>
+
+  <!-- skeleton lines -->
+  <g stroke="#8f8f86" stroke-width="2" fill="none">
+    <path d="M468 247 V305"/>
+    <path d="M368 305 H568"/>
+    <path d="M368 305 L248 441 L248 300"/>
+    <path d="M568 305 L688 441 L688 300"/>
+    <path d="M368 305 L398 635 H538 L568 305"/>
+  </g>
+
+  <!-- face outline -->
+  <ellipse cx="468" cy="142" rx="92" ry="105" fill="none" stroke="#d4568a" stroke-width="1.6" stroke-dasharray="6 5"/>
+
+  <!-- face points (19) -->
+  <g fill="#c94f7c" stroke="#e78bab" stroke-width="1">
+    <circle cx="468" cy="38" r="4.5"/><circle cx="468" cy="247" r="4.5"/>
+    <circle cx="376" cy="142" r="4.5"/><circle cx="560" cy="142" r="4.5"/>
+    <circle cx="415" cy="100" r="4.5"/><circle cx="428" cy="94" r="4.5"/><circle cx="445" cy="96" r="4.5"/>
+    <circle cx="491" cy="96" r="4.5"/><circle cx="508" cy="94" r="4.5"/><circle cx="521" cy="100" r="4.5"/>
+    <circle cx="438" cy="126" r="4.5"/><circle cx="438" cy="136" r="4.5"/>
+    <circle cx="498" cy="126" r="4.5"/><circle cx="498" cy="136" r="4.5"/>
+    <circle cx="468" cy="160" r="4.5"/>
+    <circle cx="468" cy="184" r="4.5"/><circle cx="440" cy="196" r="4.5"/>
+    <circle cx="496" cy="196" r="4.5"/><circle cx="468" cy="210" r="4.5"/>
+  </g>
+
+  <!-- left hand (21) -->
+  <g stroke="#26a07b" stroke-width="1.4" fill="none">
+    <path d="M248 300 L235.9 293 L223.8 286 L211.6 279 L199.5 272"/>
+    <path d="M248 300 L242.1 287.3 L236.2 274.6 L230.2 261.9 L224.3 249.3"/>
+    <path d="M248 300 L248 286 L248 272 L248 258 L248 244"/>
+    <path d="M248 300 L253.9 287.3 L259.8 274.6 L265.8 261.9 L271.7 249.3"/>
+    <path d="M248 300 L258.7 291 L269.4 282 L280.2 273 L290.9 264"/>
+  </g>
+  <g fill="#26a07b" stroke="#8fdcc4" stroke-width="1">
+    <circle cx="235.9" cy="293" r="4.5"/><circle cx="223.8" cy="286" r="4.5"/><circle cx="211.6" cy="279" r="4.5"/><circle cx="199.5" cy="272" r="4.5"/>
+    <circle cx="242.1" cy="287.3" r="4.5"/><circle cx="236.2" cy="274.6" r="4.5"/><circle cx="230.2" cy="261.9" r="4.5"/><circle cx="224.3" cy="249.3" r="4.5"/>
+    <circle cx="248" cy="286" r="4.5"/><circle cx="248" cy="272" r="4.5"/><circle cx="248" cy="258" r="4.5"/><circle cx="248" cy="244" r="4.5"/>
+    <circle cx="253.9" cy="287.3" r="4.5"/><circle cx="259.8" cy="274.6" r="4.5"/><circle cx="265.8" cy="261.9" r="4.5"/><circle cx="271.7" cy="249.3" r="4.5"/>
+    <circle cx="258.7" cy="291" r="4.5"/><circle cx="269.4" cy="282" r="4.5"/><circle cx="280.2" cy="273" r="4.5"/><circle cx="290.9" cy="264" r="4.5"/>
+  </g>
+
+  <!-- right hand (21) -->
+  <g stroke="#c05a2e" stroke-width="1.4" fill="none">
+    <path d="M688 300 L700.1 293 L712.2 286 L724.4 279 L736.5 272"/>
+    <path d="M688 300 L693.9 287.3 L699.8 274.6 L705.8 261.9 L711.7 249.3"/>
+    <path d="M688 300 L688 286 L688 272 L688 258 L688 244"/>
+    <path d="M688 300 L682.1 287.3 L676.2 274.6 L670.2 261.9 L664.3 249.3"/>
+    <path d="M688 300 L677.3 291 L666.6 282 L655.8 273 L645.1 264"/>
+  </g>
+  <g fill="#c05a2e" stroke="#e8a184" stroke-width="1">
+    <circle cx="700.1" cy="293" r="4.5"/><circle cx="712.2" cy="286" r="4.5"/><circle cx="724.4" cy="279" r="4.5"/><circle cx="736.5" cy="272" r="4.5"/>
+    <circle cx="693.9" cy="287.3" r="4.5"/><circle cx="699.8" cy="274.6" r="4.5"/><circle cx="705.8" cy="261.9" r="4.5"/><circle cx="711.7" cy="249.3" r="4.5"/>
+    <circle cx="688" cy="286" r="4.5"/><circle cx="688" cy="272" r="4.5"/><circle cx="688" cy="258" r="4.5"/><circle cx="688" cy="244" r="4.5"/>
+    <circle cx="682.1" cy="287.3" r="4.5"/><circle cx="676.2" cy="274.6" r="4.5"/><circle cx="670.2" cy="261.9" r="4.5"/><circle cx="664.3" cy="249.3" r="4.5"/>
+    <circle cx="677.3" cy="291" r="4.5"/><circle cx="666.6" cy="282" r="4.5"/><circle cx="655.8" cy="273" r="4.5"/><circle cx="645.1" cy="264" r="4.5"/>
+  </g>
+
+  <!-- body pose points (8) -->
+  <g fill="#2b7bbf" stroke="#7fb8e8" stroke-width="1.5">
+    <circle cx="368" cy="305" r="8"/><circle cx="568" cy="305" r="8"/>
+    <circle cx="248" cy="441" r="8"/><circle cx="688" cy="441" r="8"/>
+    <circle cx="398" cy="635" r="8"/><circle cx="538" cy="635" r="8"/>
+    <circle cx="248" cy="300" r="7"/><circle cx="688" cy="300" r="7"/>
+  </g>
+  <!-- wrist rings in hand colour -->
+  <circle cx="248" cy="300" r="7" fill="none" stroke="#26a07b" stroke-width="2"/>
+  <circle cx="688" cy="300" r="7" fill="none" stroke="#c05a2e" stroke-width="2"/>
+
+  <!-- leader lines -->
+  <g stroke="#9a9a90" stroke-width="1.2" stroke-dasharray="5 5">
+    <path d="M855 86 L566 100"/>
+    <path d="M140 232 L205 262"/>
+    <path d="M855 240 L748 262"/>
+    <path d="M855 422 L676 441"/>
+  </g>
+
+  <!-- labels -->
+  <text x="863" y="84" fill="#ffffff" font-size="23" font-weight="700">Face, 19 points</text>
+  <text x="863" y="120" fill="#b9b9ae" font-size="19">face.npy, avatar only</text>
+
+  <text x="32" y="188" fill="#ffffff" font-size="23" font-weight="700">Left hand, 21 points</text>
+  <text x="32" y="222" fill="#b9b9ae" font-size="19">hands.npy + features.npy</text>
+
+  <text x="863" y="240" fill="#ffffff" font-size="23" font-weight="700">Right hand, 21 points</text>
+  <text x="863" y="276" fill="#b9b9ae" font-size="19">hands.npy + features.npy</text>
+
+  <text x="863" y="422" fill="#ffffff" font-size="23" font-weight="700">Body pose, 8 points</text>
+  <text x="863" y="458" fill="#b9b9ae" font-size="19">pose.npy + features.npy</text>
+
+  <text x="622" y="768" text-anchor="middle" fill="#c9c9bd" font-size="19" font-weight="600">features.npy, one frame = 126 (hands) + 32 (body pose) = 158 numbers</text>
+</svg>
