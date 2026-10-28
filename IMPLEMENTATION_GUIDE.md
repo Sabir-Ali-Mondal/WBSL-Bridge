@@ -1,14 +1,8 @@
 ## WBSL Bridge — Updated Todo List
 
-1\. Reduce Face Data Extraction: Keep face data extraction only for the simulation requirements, reusing the existing cute face model and ensuring consistent data.
-
-2\. Remove Face Data from Recognition: Do not use facial data for training or sign detection to avoid unnecessary complexity and confusion.
-
-3\. Update Data Extraction (mannualy not auto): Extract the required non-face data, including fingers, hands, arms, shoulders, and body pose.
-
-4\. Retrain the Model (mannualy not auto): Train a new model using only hand, finger, arm, shoulder, and body-pose data, without facial landmarks.
-
-5\. Update Model Runner: Modify the app's model runner, input dimensions, preprocessing, and inference pipeline to support the new model architecture.
+1\.The main model is currently models\llm\gemma-4-E4B-it-Q4_K_M.gguf, but I want to switch to models\llm\NVIDIA-Nemotron-3.5-Bolt-E4B-UD-Q3_K_XL.gguf from now on. It is based on the same E4B model family and has been further improved using NVIDIA's reinforcement learning, making it significantly more accurate.
+and delete the gemma model from here
+and the mmproj file that dont need.
 
 6\. Update Sign Detection Logic: Use the hands-down position as the sign boundary trigger. Hands down means no active sign; raising the hands begins a sign, and returning them both down ends it.
 
