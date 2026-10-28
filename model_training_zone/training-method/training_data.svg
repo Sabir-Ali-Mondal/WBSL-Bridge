@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1244" height="500" viewBox="0 0 1244 500" font-family="Segoe UI, Arial, sans-serif">
+  <rect width="1244" height="500" fill="#1a1a17"/>
+
+  <!-- skeleton lines -->
+  <g stroke="#8f8f86" stroke-width="2" fill="none">
+    <path d="M468 247 V305"/>
+    <path d="M368 305 H568"/>
+    <path d="M368 305 L248 441 L248 300"/>
+    <path d="M568 305 L688 441 L688 300"/>
+  </g>
+
+  <!-- face outline + 3 anchor points -->
+  <ellipse cx="468" cy="142" rx="92" ry="105" fill="none" stroke="#d4568a" stroke-width="1.6" stroke-dasharray="6 5"/>
+  <line x1="468" y1="52" x2="468" y2="240" stroke="#c94f7c" stroke-width="0.8" stroke-dasharray="4 4"/>
+  <g fill="#c94f7c" stroke="#e78bab" stroke-width="1">
+    <circle cx="468" cy="52" r="5"/>
+    <circle cx="468" cy="184" r="5"/>
+    <circle cx="468" cy="240" r="5"/>
+  </g>
+
+  <!-- LEFT HAND – 11 pts, spread -->
+  <path d="M248 300 L230 278 L236 260 L248 256 L260 260 L270 268 Z" fill="#26a07b" opacity="0.15"/>
+  <g stroke="#26a07b" stroke-width="1.2" opacity="0.8" fill="none">
+    <path d="M248 300 L230 278"/>
+    <path d="M248 300 L236 260"/>
+    <path d="M248 300 L248 256"/>
+    <path d="M248 300 L260 260"/>
+    <path d="M248 300 L270 268"/>
+  </g>
+  <g stroke="#26a07b" stroke-width="2.2" fill="none">
+    <path d="M230 278 L214 260"/>
+    <path d="M236 260 L230 225"/>
+    <path d="M248 256 L248 215"/>
+    <path d="M260 260 L264 222"/>
+    <path d="M270 268 L280 240"/>
+  </g>
+  <g fill="#26a07b" stroke="#8fdcc4" stroke-width="1.2">
+    <circle cx="248" cy="300" r="6"/>
+    <circle cx="230" cy="278" r="5"/>  <circle cx="214" cy="260" r="5"/>
+    <circle cx="236" cy="260" r="5"/>  <circle cx="230" cy="225" r="5"/>
+    <circle cx="248" cy="256" r="5"/>  <circle cx="248" cy="215" r="5"/>
+    <circle cx="260" cy="260" r="5"/>  <circle cx="264" cy="222" r="5"/>
+    <circle cx="270" cy="268" r="5"/>  <circle cx="280" cy="240" r="5"/>
+  </g>
+  <circle cx="248" cy="300" r="10" fill="none" stroke="#9a9a90" stroke-width="1.4" stroke-dasharray="3 3"/>
+
+  <!-- RIGHT HAND – 11 pts, spread -->
+  <path d="M688 300 L706 278 L700 260 L688 256 L676 260 L666 268 Z" fill="#c05a2e" opacity="0.15"/>
+  <g stroke="#c05a2e" stroke-width="1.2" opacity="0.8" fill="none">
+    <path d="M688 300 L706 278"/>
+    <path d="M688 300 L700 260"/>
+    <path d="M688 300 L688 256"/>
+    <path d="M688 300 L676 260"/>
+    <path d="M688 300 L666 268"/>
+  </g>
+  <g stroke="#c05a2e" stroke-width="2.2" fill="none">
+    <path d="M706 278 L722 260"/>
+    <path d="M700 260 L706 225"/>
+    <path d="M688 256 L688 215"/>
+    <path d="M676 260 L672 222"/>
+    <path d="M666 268 L656 240"/>
+  </g>
+  <g fill="#c05a2e" stroke="#e8a184" stroke-width="1.2">
+    <circle cx="688" cy="300" r="6"/>
+    <circle cx="706" cy="278" r="5"/>  <circle cx="722" cy="260" r="5"/>
+    <circle cx="700" cy="260" r="5"/>  <circle cx="706" cy="225" r="5"/>
+    <circle cx="688" cy="256" r="5"/>  <circle cx="688" cy="215" r="5"/>
+    <circle cx="676" cy="260" r="5"/>  <circle cx="672" cy="222" r="5"/>
+    <circle cx="666" cy="268" r="5"/>  <circle cx="656" cy="240" r="5"/>
+  </g>
+  <circle cx="688" cy="300" r="10" fill="none" stroke="#9a9a90" stroke-width="1.4" stroke-dasharray="3 3"/>
+
+  <!-- shoulders + elbows -->
+  <g fill="#2b7bbf" stroke="#7fb8e8" stroke-width="1.5">
+    <circle cx="368" cy="305" r="8"/>
+    <circle cx="568" cy="305" r="8"/>
+    <circle cx="248" cy="441" r="8"/>
+    <circle cx="688" cy="441" r="8"/>
+  </g>
+
+  <!-- leader lines -->
+  <g stroke="#9a9a90" stroke-width="1.2" stroke-dasharray="5 5">
+    <path d="M855 90 L556 100"/>
+    <path d="M150 236 L208 256"/>
+    <path d="M170 396 L238 310"/>
+    <path d="M850 250 L730 258"/>
+    <path d="M855 428 L698 441"/>
+  </g>
+
+  <!-- labels -->
+  <text x="863" y="84" fill="#ffffff" font-size="23" font-weight="700">Face, 3 points</text>
+  <text x="863" y="118" fill="#b9b9ae" font-size="18">height anchor for hands</text>
+
+  <text x="32" y="188" fill="#ffffff" font-size="23" font-weight="700">Left hand, 11 pts</text>
+  <text x="32" y="222" fill="#b9b9ae" font-size="18">wrist + (base, tip) × 5</text>
+
+  <text x="32" y="400" fill="#ffffff" font-size="20" font-weight="700">Pose wrist (dashed)</text>
+  <text x="32" y="430" fill="#b9b9ae" font-size="16">in-use check only</text>
+
+  <text x="863" y="240" fill="#ffffff" font-size="23" font-weight="700">Right hand, 11 pts</text>
+  <text x="863" y="274" fill="#b9b9ae" font-size="18">wrist + (base, tip) × 5</text>
+
+  <text x="863" y="422" fill="#ffffff" font-size="23" font-weight="700">Shoulders + Elbows</text>
+  <text x="863" y="456" fill="#b9b9ae" font-size="18">4 pts, shoulder box</text>
+</svg>

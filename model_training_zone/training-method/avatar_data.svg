@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1244" height="700" viewBox="0 0 1244 700" font-family="Segoe UI, Arial, sans-serif">
+  <rect width="1244" height="700" fill="#1a1a17"/>
+
+  <!-- skeleton lines -->
+  <g stroke="#8f8f86" stroke-width="2" fill="none">
+    <path d="M468 247 V305"/>
+    <path d="M368 305 H568"/>
+    <path d="M368 305 L248 441 L248 300"/>
+    <path d="M568 305 L688 441 L688 300"/>
+    <path d="M368 305 L398 635 H538 L568 305"/>
+  </g>
+
+  <!-- face outline + 19 points -->
+  <ellipse cx="468" cy="142" rx="92" ry="105" fill="none" stroke="#d4568a" stroke-width="1.6" stroke-dasharray="6 5"/>
+  <g fill="#c94f7c" stroke="#e78bab" stroke-width="1">
+    <circle cx="468" cy="38" r="4.5"/>   <circle cx="468" cy="247" r="4.5"/>
+    <circle cx="376" cy="142" r="4.5"/>  <circle cx="560" cy="142" r="4.5"/>
+    <circle cx="415" cy="100" r="4.5"/>  <circle cx="428" cy="94" r="4.5"/>  <circle cx="445" cy="96" r="4.5"/>
+    <circle cx="491" cy="96" r="4.5"/>   <circle cx="508" cy="94" r="4.5"/>  <circle cx="521" cy="100" r="4.5"/>
+    <circle cx="438" cy="126" r="4.5"/>  <circle cx="438" cy="136" r="4.5"/>
+    <circle cx="498" cy="126" r="4.5"/>  <circle cx="498" cy="136" r="4.5"/>
+    <circle cx="468" cy="160" r="4.5"/>
+    <circle cx="468" cy="184" r="4.5"/>  <circle cx="440" cy="196" r="4.5"/>
+    <circle cx="496" cy="196" r="4.5"/>  <circle cx="468" cy="210" r="4.5"/>
+  </g>
+
+  <!-- LEFT HAND – 21 pts, spread -->
+  <path d="M248 300 L231 285 L237 261 L249 257 L261 261 L271 271 Z" fill="#26a07b" opacity="0.15"/>
+  <g stroke="#26a07b" stroke-width="1.6" fill="none">
+    <path d="M248 300 L231 285 L219 272 L208 259 L197 246"/>
+    <path d="M248 300 L237 261 L233 242 L229 223 L225 204"/>
+    <path d="M248 300 L249 257 L249 237 L249 217 L249 197"/>
+    <path d="M248 300 L261 261 L265 242 L269 223 L273 204"/>
+    <path d="M248 300 L271 271 L277 256 L283 241 L289 226"/>
+  </g>
+  <g fill="#26a07b" stroke="#8fdcc4" stroke-width="1">
+    <circle cx="231" cy="285" r="4.5"/> <circle cx="219" cy="272" r="4.5"/> <circle cx="208" cy="259" r="4.5"/> <circle cx="197" cy="246" r="4.5"/>
+    <circle cx="237" cy="261" r="4.5"/> <circle cx="233" cy="242" r="4.5"/> <circle cx="229" cy="223" r="4.5"/> <circle cx="225" cy="204" r="4.5"/>
+    <circle cx="249" cy="257" r="4.5"/> <circle cx="249" cy="237" r="4.5"/> <circle cx="249" cy="217" r="4.5"/> <circle cx="249" cy="197" r="4.5"/>
+    <circle cx="261" cy="261" r="4.5"/> <circle cx="265" cy="242" r="4.5"/> <circle cx="269" cy="223" r="4.5"/> <circle cx="273" cy="204" r="4.5"/>
+    <circle cx="271" cy="271" r="4.5"/> <circle cx="277" cy="256" r="4.5"/> <circle cx="283" cy="241" r="4.5"/> <circle cx="289" cy="226" r="4.5"/>
+  </g>
+
+  <!-- RIGHT HAND – 21 pts, spread -->
+  <path d="M688 300 L705 285 L699 261 L687 257 L675 261 L665 271 Z" fill="#c05a2e" opacity="0.15"/>
+  <g stroke="#c05a2e" stroke-width="1.6" fill="none">
+    <path d="M688 300 L705 285 L717 272 L728 259 L739 246"/>
+    <path d="M688 300 L699 261 L703 242 L707 223 L711 204"/>
+    <path d="M688 300 L687 257 L687 237 L687 217 L687 197"/>
+    <path d="M688 300 L675 261 L671 242 L667 223 L663 204"/>
+    <path d="M688 300 L665 271 L659 256 L653 241 L647 226"/>
+  </g>
+  <g fill="#c05a2e" stroke="#e8a184" stroke-width="1">
+    <circle cx="705" cy="285" r="4.5"/> <circle cx="717" cy="272" r="4.5"/> <circle cx="728" cy="259" r="4.5"/> <circle cx="739" cy="246" r="4.5"/>
+    <circle cx="699" cy="261" r="4.5"/> <circle cx="703" cy="242" r="4.5"/> <circle cx="707" cy="223" r="4.5"/> <circle cx="711" cy="204" r="4.5"/>
+    <circle cx="687" cy="257" r="4.5"/> <circle cx="687" cy="237" r="4.5"/> <circle cx="687" cy="217" r="4.5"/> <circle cx="687" cy="197" r="4.5"/>
+    <circle cx="675" cy="261" r="4.5"/> <circle cx="671" cy="242" r="4.5"/> <circle cx="667" cy="223" r="4.5"/> <circle cx="663" cy="204" r="4.5"/>
+    <circle cx="665" cy="271" r="4.5"/> <circle cx="659" cy="256" r="4.5"/> <circle cx="653" cy="241" r="4.5"/> <circle cx="647" cy="226" r="4.5"/>
+  </g>
+
+  <!-- body pose – 8 points -->
+  <g fill="#2b7bbf" stroke="#7fb8e8" stroke-width="1.5">
+    <circle cx="368" cy="305" r="8"/>  <circle cx="568" cy="305" r="8"/>
+    <circle cx="248" cy="441" r="8"/>  <circle cx="688" cy="441" r="8"/>
+    <circle cx="398" cy="635" r="8"/>  <circle cx="538" cy="635" r="8"/>
+    <circle cx="248" cy="300" r="7"/>  <circle cx="688" cy="300" r="7"/>
+  </g>
+  <circle cx="248" cy="300" r="9" fill="none" stroke="#26a07b" stroke-width="2"/>
+  <circle cx="688" cy="300" r="9" fill="none" stroke="#c05a2e" stroke-width="2"/>
+
+  <!-- leader lines -->
+  <g stroke="#9a9a90" stroke-width="1.2" stroke-dasharray="5 5">
+    <path d="M855 90 L556 100"/>
+    <path d="M150 236 L205 258"/>
+    <path d="M850 250 L740 258"/>
+    <path d="M855 428 L698 441"/>
+  </g>
+
+  <!-- labels -->
+  <text x="863" y="84" fill="#ffffff" font-size="23" font-weight="700">Face, 19 points</text>
+  <text x="863" y="118" fill="#b9b9ae" font-size="18">face.npy</text>
+
+  <text x="32" y="188" fill="#ffffff" font-size="23" font-weight="700">Left hand, 21 pts</text>
+  <text x="32" y="222" fill="#b9b9ae" font-size="18">hands.npy</text>
+
+  <text x="863" y="240" fill="#ffffff" font-size="23" font-weight="700">Right hand, 21 pts</text>
+  <text x="863" y="274" fill="#b9b9ae" font-size="18">hands.npy</text>
+
+  <text x="863" y="422" fill="#ffffff" font-size="23" font-weight="700">Body pose, 8 pts</text>
+  <text x="863" y="456" fill="#b9b9ae" font-size="18">pose.npy</text>
+</svg>

@@ -1,181 +1,328 @@
-# WBSL Bridge: Minimum Viable Tests (MVT)
+# WBSL Bridge: Minimal Viable Tests (MVT) Summary
+
+> **DISCLAIMER: EXPERIMENTAL MINIMAL VIABLE TESTS (MVT) ONLY**  
+> All phases, modules, scripts, and benchmarks documented here represent exploratory Proof-of-Concepts (PoCs) and feasibility testbeds developed during the Minimal Viable Test (MVT) phase of WBSL Bridge. **These are experimental prototypes, not the final production system.** Their purpose is to empirically validate architectural hypotheses, uncover hardware/CPU bottlenecks, test edge-case failure modes, establish cross-module data contracts, and establish baselines before production engineering.
+
+---
+
+## Executive Overview
+
+WBSL Bridge is an assistive communication system bridging West Bengal Sign Language (WBSL) and written/spoken Bengali. The MVT phase decomposed the end-to-end pipeline into six discrete engineering investigations:
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                                 MVT ARCHITECTURE MAP                                   │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+
+ [Input Video/Webcam]
+        │
+        ▼
+ ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+ │  Phase 1.1   │ ──► │  Phase 1.2   │ ──► │  Phase 1.3   │
+ │  MediaPipe   │     │   ViT-ONNX   │     │ Geometry NMM │
+ │  Stream PoC  │     │ Emotion PoC  │     │  Rule Engine │
+ └──────────────┘     └──────────────┘     └──────────────┘
+        │
+        ▼
+ ┌────────────────────────────────────────────────────────┐
+ │ Phase 2: Sign Modeling (Fingerspelling & Lexicon)      │
+ │ - 2A: Two-Hand 126-Dim Landmark MLP (Static 35-Class)  │
+ │ - Landmark Augmentation & Invariant Feature Extraction │
+ └──────────────────────────┬─────────────────────────────┘
+                            │
+                            ▼
+ ┌────────────────────────────────────────────────────────┐
+ │ Phase 5: The Honesty Layer (Unknown Sign Pipeline)     │
+ │ - Quality Gate: Tracking integrity & visibility        │
+ │ - OOD Gate: MSP + Mahalanobis + Frame Agreement Ratio  │
+ │ - 3D Movement Analyzer: Deterministic geometry to text │
+ │ - Hybrid Reasoning: Vector similarity + Reference Table│
+ └──────────────────────────┬─────────────────────────────┘
+                            │ (Known Gloss / Candidate)
+                            ▼
+ ┌────────────────────────────────────────────────────────┐
+ │ Phase 3: Natural Language Generation (The Brain)       │
+ │ - Benchmarked 6 Local GGUF LLMs (CPU Inference)        │
+ │ - Selected Gemma-4-E4B (Deployment) & Gemma-4-12B (Ref)│
+ │ - Constrained WBSL Gloss-to-Bengali Prompt Architecture│
+ └──────────────────────────┬─────────────────────────────┘
+                            │ (Bengali Text)
+                            ▼
+ ┌────────────────────────────────────────────────────────┐
+ │ Phase 4: Reverse Communication Path (The Voice)        │
+ │ - 4.3 Dual-Engine TTS: edge-tts + BanglaTTS Fallback   │
+ │ - 4.4 Local STT: faster-whisper CPU INT8 (bn + en)     │
+ └────────────────────────────────────────────────────────┘
+
+ ┌────────────────────────────────────────────────────────┐
+ │ Phase 6: Sign-to-Avatar Movement Reproduction (PoC)    │
+ │ - Pure Browser Monocular Video to 3D Skeletal Avatar   │
+ │ - Next.js + Three.js + MediaPipe Tasks Vision WASM     │
+ │ - Forward Kinematics (FK) Solvers & Motion Retargeting │
+ └────────────────────────────────────────────────────────┘
+```
+
+---
 
 ## Phase 1: Vision & Intent (The Eyes)
-*   **1.1 MediaPipe Stream:** Open webcam, draw 540 landmarks (hand/face/pose), verify 30 FPS. [Done]
-*   **1.2 DeepFace Snapshot:** Capture static frame, run DeepFace.analyze(), verify emotion dict output. [Done - Replaced]
-*   **1.3 ViT-ONNX Emotion:** Export HuggingFace ViT model to ONNX, run live inference via onnxruntime. Replaces DeepFace due to glasses failure and TensorFlow/MediaPipe dependency conflict. [Done]
-*   **1.4 Geometry NMM:** 5 markers (eyebrow raise, eyebrow furrow, head shake, head nod, mouth open) via landmark geometry. Thresholds need community calibration. [Done]
 
-## Phase 2: Static & Temporal Modeling (The Memory)
-*   **2.1 Static ISL Recognition:** Convert ISL image dataset to two-hand 126-dim landmarks, train MLP (99.9% val acc), export sign_mlp.onnx, live webcam inference with majority vote. [Done]
-*   **2.2 Robustness Retraining:** Landmark-space augmentation (mirror, rotate, jitter, hand-dropout) to fix mirror/angle/distance/occlusion confusions. [Pending]
-*   **2.3 Continuous Recorder:** Record two-hands + upper-body + NMM sequences plus original video to .npy on keypress. Script written (phase2b_recorder.py). Terminal input issue identified; web UI replacement planned. [In Progress - Paused]
-*   **2.4 Web-Based Data Collector:** FastAPI backend + HTML/CSS/JS frontend with label input, animated Start/Stop/Save buttons, live MJPEG video feed, real-time status display. Replaces terminal-based recorder. [Planned]
-*   **2.5 Tiny LSTM:** Train PyTorch LSTM on recorded sequences; export to model.onnx. [Pending]
-*   **2.6 ONNX Inference:** Load model.onnx via onnxruntime; verify prediction < 5ms on CPU. [Pending]
+Phase 1 established real-time perception of the signer from RGB webcam frames, separating manual tracking, facial expressions, and linguistic Non-Manual Markers (NMMs).
 
-## Phase 3: LLM Integration (The Brain) [Done]
-*   **3.1 Model Benchmarking:** Tested 6 local GGUF models for Bengali NLG quality. gemma-4-12b-it-Q4_0 selected as reference (best quality, ~13 GB RAM). gemma-4-E4B-it-Q4_K_M selected for deployment (good quality, lower RAM, faster CPU inference). gpt-oss-20b, Qwen3.6-35B, Qwen3.5-9B failed on Bengali quality. gemma-4-26B exceeded memory. [Done]
-*   **3.2 NLG Prompt Engineering:** Finalized constrained prompt covering question scope, negation scope, WHETHER embedding, IF/THEN preservation, event segmentation, speaker binding, temporal consistency, emotion markers, honorifics, and anti-hallucination rules. [Done]
-*   **3.3 Small Test:** Input `YOU + TOMORROW + SCHOOL + GO[negation][?]` produces correct Bengali `তুমি কি আগামীকাল স্কুলে যাবে না?`. Validates question + negation + subject preservation. [Done]
-*   **3.4 Long Semantic Stress Test:** 450-token generation across 50 criteria (events, tense, time, numbers, percentages, direct questions, embedded WHETHER, local negation, CAN/CANNOT/MAY/MUST/SHOULD, IF/THEN/OTHERWISE, BEFORE/AFTER/UNTIL, reported speech, multiple speakers, 7 emotion types, Bengali punctuation, no hallucination). Result: good Bengali fluency, moderate semantic scope accuracy. [Done]
-*   **3.5 Speed Benchmark:** Deployment model (gemma-4-E4B): prompt processing ~37.84 tok/s, generation ~5.76 tok/s, total ~132 sec for long test. [Done]
-*   **3.6 Identified Weakness:** Semantic scope tracking (negation scope, speaker binding, WHETHER scope, IF/THEN scope, event segmentation, tense consistency) is the primary remaining weakness. Bengali fluency and speed are acceptable. Future improvement priority: scope accuracy, not fluency. [Documented]
+### 1.1 MediaPipe Holistic Stream
+- **Objective:** Validate real-time extraction of 540 skeletal landmarks (468 face mesh, 33 body pose, 21 per hand) at 30 FPS on CPU.
+- **Environment & Setup:** Python 3.11 with strictly pinned `mediapipe==0.10.14` (unpinned installation resolves to an unrelated dummy 1.0.1 package on PyPI, breaking `.solutions`).
+- **Outcome:** Validated consistent landmark extraction across hands, face, and upper body with minimal CPU overhead.
 
-## Phase 4: Reverse Path (The Voice) [In Progress]
-*   **4.1 FastAPI Backend:** Create /generate-sign endpoint; input text, output gloss JSON. [Pending]
-*   **4.2 React UI:** Simple input box + button; display returned gloss sequence on screen. [Pending]
-*   **4.3 Bengali TTS (Dual Engine):** Windows SAPI and sherpa-onnx confirmed unusable (no Bengali voice/model). edge-tts selected as PRIMARY (online, bn-BD-NabanitaNeural, ~2.5 sec generation, handles punctuation correctly). BanglaTTS selected as OFFLINE FALLBACK (silero model, ~2.4 sec generation after cache, ignores punctuation; mitigated by text cleaning). Automatic fallback chain coded in tts_engine.py. Timing constants measured: edge-tts ~604 ms/word, BanglaTTS ~453 ms/word. [Done]
-* **4.4 Speech-to-Text (Bengali + English):** Browser/cloud STT avoided due to offline and privacy requirements. `faster-whisper` selected as the local engine with the `small` model, CPU INT8 inference, automatic language detection, and VAD enabled; supports Bengali, English, and mixed speech. Initial `.venv`/`pip` launcher mismatch was resolved by using the correct `tests\.venv\Scripts\python.exe -m pip` environment directly. Integrated through FastAPI `/api/stt` for the existing Voice → Text input flow. [Done]
+### 1.2 ViT-ONNX Emotion Detection (DeepFace Replacement)
+- **Problem with DeepFace:** The initial FER2013-based DeepFace pipeline consistently misclassified signers wearing eyeglasses (shadow artifacts caused persistent "fear" classifications) and introduced severe dependency collisions between TensorFlow 2.13 and MediaPipe/JAX.
+- **Solution:** Replaced DeepFace with a HuggingFace Vision Transformer (`trpakov/vit-face-expression`) exported to ONNX and executed via `onnxruntime` CPUExecutionProvider.
+- **Performance:** Reduced per-frame latency to ~30–50 ms; fully robust to glasses and variable lighting.
+- **Architectural Discovery:** Generic emotion classification (angry, happy, sad, etc.) has limited grammatical utility in sign language. Core sign syntax relies on deliberate, rapid facial movements (NMMs). Consequently, broad emotion detection was demoted to a supplementary contextual layer (tone/affect), prioritizing geometric NMMs for grammar.
 
-## Phase 5: Unknown Sign Handling (The Honesty Layer) [Planned]
-*   **5.1 OOD Gate:** Combine max softmax probability + embedding distance (Mahalanobis) + temporal consistency to decide KNOWN vs UNKNOWN. Recognition model decides, not the LLM. Threshold selected on validation data. [Planned]
-*   **5.2 Movement Analyzer:** Deterministic rule-based engine producing three-tier representation: numerical features, symbolic tags, natural-language paragraph. Generated automatically from landmarks, no manual annotation. [Planned]
-*   **5.3 Hybrid Reasoning:** Similarity search against known-sign database + LLM reasoning + context re-ranking. LLM reasons over evidence, never over raw landmarks. [Planned]
-*   **5.4 Candidate Output:** Local LLM returns top-3 tentative meanings with evidence and uncertainty flag. Output labelled "candidate semantic interpretation", never "predicted meaning". [Planned]
-*   **5.5 Unknown Queue:** Save UNKNOWN signs (landmarks + features) for community labeling and future retraining. [Planned]
-
-## Phase 6: Privacy-Preserving Community Data Verification (The Trust Layer) [Planned]
-*   **6.1 Privacy-First Submission:** Landmarks only; original video discarded on-device before submission. Consent + ownership metadata required. [Planned]
-*   **6.2 Automatic Validation:** Geometric validity, velocity/acceleration, temporal consistency, model consistency, synthetic-data detection. Produces evidence only. [Planned]
-*   **6.3 Similarity Analysis:** Mahalanobis distance vs trusted class centroids; high distance flags review, never auto-reject. [Planned]
-*   **6.4 Simulation/Reconstruction:** Animated skeleton replay from landmarks with full 21-point handshape fidelity. [Planned]
-*   **6.5 Human Verification UI:** Evidence panel showing simulated sign, description, tags, numerical features, model prediction, validation scores. [Planned]
-*   **6.6 Human Decision:** ACCEPT / REJECT / NEEDS REVIEW with 2-of-3 consensus rule for ambiguous cases. [Planned]
-*   **6.7 No Automatic Training:** Only human-approved samples enter the trusted dataset. DPDP Act 2023 compliant. [Planned]
-
-
-
+### 1.3 Geometry-Based Non-Manual Marker (NMM) Engine
+- **Objective:** Detect grammatical markers directly from facial landmark geometry in real time without training heavy neural networks.
+- **Implementation:** Five deterministic geometric markers running in < 5 ms per frame:
+  1. **Eyebrow Raise:** Distance between eyebrow midpoint and eye midpoint normalized by face width (indicates Yes/No questions and conditionals).
+  2. **Eyebrow Furrow:** Brow-eye distance below neutral threshold (indicates WH-questions: who, what, where).
+  3. **Head Shake:** Variance of nose-tip X coordinates over a 15-frame window (indicates negation/denial).
+  4. **Head Nod:** Variance of nose-tip Y coordinates over a 15-frame window (indicates affirmation/agreement).
+  5. **Mouth Open:** Upper-to-lower lip vertical distance normalized by face width (indicates emphasis or magnitude).
+- **WBSL Sociolinguistic Observations:** WBSL signers exhibit distinct regional characteristics compared to standardized Northern ISL:
+  - Strong Bengali mouthing dominance (phonetic lip patterns corresponding to spoken Bangla words, e.g., *Maach*).
+  - Single side head-tilt functioning as a question/rhetorical marker.
+  - Respectful downward gaze shift during elder/formal address.
 
 ---
 
-## Key Architectural Decisions
+## Phase 2: Static & Temporal Sign Modeling (The Memory)
 
-| Decision | Reason |
-|:---|:---|
-| DeepFace replaced by ViT-ONNX | FER2013 model fails with glasses; TensorFlow conflicts with MediaPipe/JAX in same venv |
-| Dual venv eliminated | ViT-ONNX runs in main .venv alongside MediaPipe, PyTorch, ONNX Runtime |
-| Emotion detection is supplementary | Broad emotions have limited grammatical value. Core grammar relies on geometric NMMs |
-| Train on landmarks, not raw images | Signer independence: removes skin color, background, lighting, scale. Matches production pipeline representation |
-| Two-hand extraction, right-wrist reference | Supports two-hand letters (Q, P, B, O). Preserves inter-hand geometry. Fixes one-hand detection failures |
-| Window-based intent packets | Avoids expensive multi-model fusion. Time-aligns gloss + NMM + emotion for the LLM |
-| Web UI for data collection | Terminal input conflicts with OpenCV window focus. FastAPI + HTML provides proper label input, buttons, and live video without Python GUI hacks |
-| gemma-4-E4B for deployment | Best balance of Bengali quality, semantic understanding, RAM usage, and CPU inference speed among 6 tested models |
-| gemma-4-12b as reference | Highest quality benchmark for evaluating future model or prompt improvements |
-| Constrained NLG prompt | Explicit rules for question/negation/WHETHER/IF-THEN scope prevent the most common semantic errors in gloss-to-Bengali conversion |
-| TTS dual engine (edge-tts + BanglaTTS) | Windows has no Bengali SAPI voice. edge-tts gives best quality online; BanglaTTS guarantees audio output offline. Punctuation limitation of BanglaTTS mitigated by text cleaning |
-| Open-set gate before LLM reasoning | Recognition model decides KNOWN/UNKNOWN; LLM only interprets after explicit vocabulary-mismatch detection. Prevents confidently-wrong outputs |
-| Three-tier movement representation | Numerical (statistical grounding) + symbolic (phonological fidelity) + natural language (LLM reasoning + human auditability). Mirrors sign phonology |
-| Hybrid reasoning, not LLM-only | Similarity search + rules + LLM. Anchors LLM output in empirical evidence, reducing hallucination. LLM never sees raw landmarks |
-| Automation provides evidence, not approval | Community data never auto-accepted by score. Human reviewer always makes final ACCEPT/REJECT/REVIEW decision |
-| Privacy-first data submission | Landmarks only, original video discarded on-device. Reduces identifiable data and aligns with DPDP Act 2023 |
-| Python 3.11 enforced | Python 3.14 unsupported by MediaPipe/TensorFlow; dummy package risk on PyPI |
-| mediapipe==0.10.14 pinned | Unpinned pip install resolves to unrelated 1.0.1 package |
+Phase 2 evaluated feature representations for sign classification, testing signer independence, coordinate invariance, and model footprints.
 
-## Environment Map
+### 2.1 Two-Hand Landmark Architecture
+- **Raw Pixels vs. Landmarks:** Training classifiers directly on RGB video frames causes severe overfitting to background, skin tone, clothing, and camera distance. Landmarks isolate skeletal geometry, providing signer independence and cross-session robustness.
+- **126-Dimensional Feature Vector:**
+  - Up to 2 hands tracked via MediaPipe Hands (21 3D landmarks × 3 coordinates × 2 hands = 126 values).
+  - Normalized relative to the **right wrist reference** applied to both hands simultaneously (zeroes global translation while strictly preserving inter-hand spatial geometry for two-handed signs).
+  - Normalized for scale using reference hand size (wrist to middle MCP distance).
+  - Solved one-hand dropout failures on complex two-handed ISL letters (e.g., "Q" detection rose from 137/300 to full capture).
 
-| Venv | Status | Contents |
+### 2.2 Static Classifier MVT (sign_mlp.onnx)
+- **Architecture:** PyTorch MLP (`126 → 256 (ReLU, Dropout 0.3) → 128 (ReLU, Dropout 0.3) → 35 classes`).
+- **Validation Results:** Achieved 99.9% validation accuracy across 35 static ISL classes (letters A–Z and digits 1–9).
+- **Deployment:** Exported to `sign_mlp.onnx` (opset 18); runs in < 2 ms on CPU with rolling majority-vote temporal smoothing.
+- **Role in Final System:** Static MLP handles fingerspelling, personal names, acronyms, and numeric values; dynamic/continuous signs require temporal sequence modeling.
+
+### 2.3 Landmark-Space Augmentation Plan
+Identified four primary live-webcam confusions and designed exact landmark-space augmentations:
+1. **Mirror Confusion (Selfie vs. Observer):** Swap left/right hand feature blocks and invert X coordinates.
+2. **In-Plane Tilt (Head/Camera Angle):** Apply 2D rotation matrices ($\theta \in [-17^\circ, +17^\circ]$) to XY coordinates.
+3. **Camera Distance / Depth Jitter:** Add Gaussian noise ($\sigma = 0.01$) to simulate landmark estimation jitter.
+4. **Occlusion / Hand Dropout:** Randomly zero out 63-dimensional hand blocks (10% probability) to train graceful degradation during single-hand tracking dropouts.
+
+---
+
+## Phase 3: LLM Integration & Bengali NLG (The Brain)
+
+Phase 3 validated local Large Language Models (LLMs) running on CPU to translate raw WBSL gloss sequences into fluent West Bengal Bengali without semantic loss or hallucinations.
+
+### 3.1 Local GGUF Model Benchmarks (CPU Inference)
+
+Six quantized GGUF models were evaluated on CPU (16 GB RAM environment):
+
+| Model | Size / Quant | Bengali NLG Quality | Status | Key Observation |
+|:---|:---|:---|:---|:---|
+| `gemma-4-12b-it-Q4_0.gguf` | 12B / Q4_0 | **Exceptional (97% accuracy)** | **Reference Model** | Gold standard semantic fidelity; requires ~13 GB RAM. |
+| `gemma-4-E4B-it-Q4_K_M.gguf` | ~4B / Q4_K_M | **Very Good** | **Deployment Model** | Balanced RAM footprint, natural phrasing, fast CPU inference. |
+| `gpt-oss-20b-Q4_K_M.gguf` | 20B / Q4_K_M | Poor | Failed | Unnatural Bengali phrasing and grammatical errors. |
+| `Qwen3.6-35B-A3B-UD-IQ2_M.gguf` | 35B / IQ2_M | Poor | Failed | Degraded Bengali syntax under extreme quantization. |
+| `Qwen3.5-9B-UD-IQ3_XXS.gguf` | 9B / IQ3_XXS | Poor | Failed | Severe hallucination and dropped grammatical particles. |
+| `gemma-4-26B-A4B-it-UD-IQ2_M.gguf` | 26B / IQ2_M | N/A | Failed | Exceeded available system RAM limits. |
+
+- **Deployment Selection (`gemma-4-E4B`):** Prompt processing ~37.8 tok/s, generation ~5.8 tok/s on CPU; total response time for complex paragraphs ~130 s (sub-second for single conversational phrases).
+
+### 3.2 Constrained Bengali NLG Prompt
+Engineered a strict system prompt enforcing:
+- **Marker Grammar:** Explicit parsing of `[?]` (question boundary), `[negation]` (local semantic negation), and `[emotion]` tags.
+- **Clause Scope & Binding:** Strict preservation of `IF/THEN/OTHERWISE`, `BEFORE/AFTER/UNTIL`, and embedded `WHETHER` questions ("কি না") without turning preceding statements into questions.
+- **Zero Hallucination:** Explicit prohibition against inventing names, locations, relationships, or symptoms not present in the gloss.
+
+### 3.3 50-Criterion Semantic Stress Test
+- Tested the model on a 450-token gloss sequence spanning 50 complex linguistic phenomena (past/present/future shifts, clock times, percentages, reported speech, multi-speaker binding, negation scoping, conditionals).
+- **Core Linguistic Finding:** Surface fluency in Bengali is consistently high across modern compact models. However, **semantic scope tracking** (preventing a trailing negation from inverting an earlier clause, maintaining speaker-subject binding across conversational turns) is the primary vulnerability. Future improvements must focus on semantic scoping rather than vocabulary generation.
+
+---
+
+## Phase 4: Reverse Path — Audio & Speech (The Voice)
+
+Phase 4 built and validated the reverse communication pathway: converting spoken Bengali/English into text, and converting translated Bengali text into spoken audio.
+
+### 4.3 Bengali Text-to-Speech Dual Engine (`tts_engine.py`)
+- **Problem:** Windows SAPI contains zero native Bengali voices (only English voices like David and Zira). Third-party offline libraries lack punctuation awareness, while cloud APIs fail when offline.
+- **Dual-Engine Architecture:**
+  1. **Primary (Online):** `edge-tts` using `bn-BD-NabanitaNeural`. Produces natural prosody, honors punctuation pauses (comma, danda `।`), generating audio at ~604 ms/word (~2.5 s latency).
+  2. **Fallback (Offline):** `BanglaTTS` (Silero model). Generates fully offline at ~453 ms/word (~2.4 s latency after model caching).
+  3. **Punctuation Mitigation:** Because `BanglaTTS` ignores punctuation marks (reading through continuously), the fallback path sanitizes text (`re.sub(r'[,.|!?;:"\'()—-।]', ' ', text)`) to prevent acoustic artifacts.
+- **Fallback Chain:** Tries `edge-tts` first; automatically shifts to `BanglaTTS` if network connectivity is absent.
+
+### 4.4 Dual-Language Local Speech-to-Text (`faster-whisper`)
+- **Objective:** Provide free, private, offline voice-to-text input on CPU for hearing interlocutors speaking Bengali or English.
+- **Configuration:** `faster-whisper` using the `small` model with CPU INT8 quantization and Voice Activity Detection (VAD) enabled.
+- **Automatic Language Detection:** Initialized with `language=None`, allowing seamless transcription of pure Bengali, English, or mixed Bengali-English speech without manual toggling.
+- **Architecture Integration:** Connects audio captured from the browser MediaRecorder to FastAPI `/api/stt`, passing transcribed text directly into the reverse gloss planner.
+
+---
+
+## Phase 5: Unknown Sign Handling (The Honesty Layer)
+
+Phase 5 addresses the critical flaw of closed-world sign language models: when an unlearned sign or regional dialect variant is presented, standard models output a confident false classification. Phase 5 detects out-of-distribution inputs, analyzes their physical characteristics geometrically, and presents unconfirmed candidate interpretations honestly.
+
+```
+ [Sign Sequence (Landmarks)]
+              │
+              ▼
+    ┌──────────────────┐
+    │   Quality Gate   │ ──(Tracking Failure)──► "Low Quality: Please Re-Sign"
+    └─────────┬────────┘
+              │ (Valid Capture)
+              ▼
+    ┌──────────────────┐
+    │     OOD Gate     │ ──(All Signals Agree)──► [Normal Known Recognition]
+    │  (2-of-3 Rule)   │
+    └─────────┬────────┘
+              │ (Flagged Unknown)
+              ▼
+ ┌────────────────────────────────────────────────────────┐
+ │ 3D Movement Analyzer (Deterministic Rule Engine)       │
+ │ - Dominant hand detection (motion energy ratio)        │
+ │ - Hand configuration descriptor (normalized extension) │
+ │ - Body-relative location zones (head/torso/waist)      │
+ │ - Wrist trajectory straightness & speed percentiles    │
+ │ - Continuous palm normal orientation vector            │
+ │ - Eye-line head tilt & NMM extraction                  │
+ └──────────────────────────┬─────────────────────────────┘
+                            │
+                            ▼
+ ┌────────────────────────────────────────────────────────┐
+ │ Hybrid Reasoning Engine                                │
+ │ - Cosine similarity retrieval against known centroids  │
+ │ - Curated WBSL Phonological Reference Table lookup     │
+ │ - Constrained LLM Hypothesis Generator                 │
+ └──────────────────────────┬─────────────────────────────┘
+                            │
+                            ▼
+ ┌────────────────────────────────────────────────────────┐
+ │ Output Presentation & Unknown Queue                    │
+ │ - UI Amber Warning: "⚠️ Unconfirmed Candidate"         │
+ │ - Signer feedback: Novel sign / Tracking error / User  │
+ │ - Landmark-only data queue (video discarded on-device) │
+ └────────────────────────────────────────────────────────┘
+```
+
+### 5.1 Three-Outcome System
+Replaces naive binary classification with three operational states:
+1. **KNOWN:** Landmark sequence passes quality checks and matches training distribution with high confidence.
+2. **LOW QUALITY / UNCERTAIN:** MediaPipe lost hand/face tracking, severe occlusion occurred, or sequence was too short (< 10 frames). The system requests the user to re-sign rather than guessing.
+3. **UNKNOWN / OOD:** Tracking is clean, but the gesture falls outside the training distribution. Triggers the Unknown Pipeline.
+
+### 5.2 Quality Gate & OOD Gate
+- **Quality Gate:** Verifies hands visible in $\ge 80\%$ of frames, wrist visibility score $> 0.5$, motion displacement above threshold, and tracking dropout $< 20\%$.
+- **OOD Gate (Three-Signal Fusion):**
+  1. *Max Softmax Probability (MSP):* Lowest class confidence threshold (< 0.60 placeholder).
+  2. *Embedding Distance:* Mahalanobis distance to nearest class centroid using regularized covariance (> 95th percentile placeholder).
+  3. *Frame Agreement Ratio:* Proportion of individual frames agreeing with the final majority class (< 0.60 placeholder; replaces invalid standard deviations over categorical class indices).
+  - *Decision Logic:* If **2 of 3 signals** flag out-of-distribution, route to Movement Analyzer.
+
+### 5.3 Deterministic Movement Analyzer (3D Math)
+Extracts structured linguistic descriptions using pure mathematics (zero ML):
+- **Dominant Hand:** Automatically determined by comparing total motion energy (wrist displacement sum) between hands; supports left-dominant signers and two-handed dynamic signs.
+- **Hand Configuration:** Measures 3D Euclidean distances from fingertips to palm center normalized by hand size (wrist to middle MCP); classifies extended, curved, closed, or pinch.
+- **Location Zones:** Normalizes wrist coordinates by body width and distance between shoulders/nose; assigns head, chest, or waist zones.
+- **Movement Trajectory:** Calculates path length vs. net displacement (straightness ratio), repetition count (axis direction reversals), and speed percentiles based on training distribution.
+- **Palm Normal Orientation:** Cross product of wrist-to-index and wrist-to-pinky vectors; outputs continuous normal vector and coarse facing direction.
+- **NMM Head Tilt:** Measures angular deflection of the **eye line** (not shoulder line) relative to horizontal.
+- **Observability Flags:** Features compromised by occlusion or jitter output `"NOT OBSERVABLE"` rather than forced guesses.
+
+### 5.4 Hybrid Reasoning & Constrained LLM
+- **Phonological Neighborhood Retrieval:** Computes cosine similarity between sequence embedding and known class centroids to ground reasoning in known physical relatives.
+- **Curated Reference Table:** The LLM is strictly prohibited from inventing sign language phonological rules. It may only cite rules provided in a curated reference table; if the table is empty, it reports physical descriptions and nearest geometric neighbors only.
+- **Evidence Strength:** Candidates are tagged as *Strong*, *Moderate*, or *Weak* (the word "confident" is banned). If evidence is insufficient, the system outputs `"INSUFFICIENT EVIDENCE"`.
+
+### 5.5 Privacy-Preserving Unknown Queue
+- Captures 146-dim landmarks, movement analysis text, and user feedback.
+- **Strict Privacy Rule:** Raw RGB video is discarded on-device. Only numerical landmarks and derived features enter the queue for community review (compliant with data protection principles).
+
+---
+
+## Phase 6: Sign-to-Avatar Movement Reproduction (The Embodiment Layer)
+
+Phase 6 focuses on reproducing sign gestures through a custom-coded 3D avatar rendered directly in the browser. The current implementation uses Three.js with React Three Fiber (R3F), providing direct control over the avatar's geometry, body movements, and animation logic without server-side rendering.
+
+The previously evaluated GLB-based avatar simulation model is not the current approach because it lacks sufficiently detailed finger movements and sign-specific actions. The custom-coded model provides a more flexible foundation for developing these capabilities.
+
+### 6.1 Architectural Stack
+
+- **Frontend / 3D Framework:** Next.js 14.2+ (App Router), TypeScript, Three.js (`0.169+`), `@react-three/fiber`, and `@react-three/drei`.
+- **Client-Side Processing:** Browser-based processing and animation of hand and body-pose landmark data, without using facial landmarks for sign recognition.
+- **Avatar Model:** A custom-coded 3D humanoid model controlled through application code rather than relying on the existing GLB avatar's rig and predefined animations.
+- **Environment and Appearance:** Custom avatar components, Bengali dhuti styling, and an alpana-inspired stage, with direct control over the model's visual elements.
+
+### 6.2 Custom Avatar Movement Architecture
+
+1. **Landmark-to-Avatar Mapping:** Map hand, wrist, arm, elbow, and shoulder landmark positions to the corresponding avatar components to reproduce sign gestures.
+
+2. **Coordinate Normalisation:** Normalise landmark coordinates against body proportions to reduce the effect of variations in signer distance and camera positioning.
+
+3. **Procedural Body Movement:** Control the avatar's arms, shoulders, torso, and other supported body components through code-defined transformations rather than depending entirely on the GLB model's existing animations.
+
+4. **Finger Articulation:** Develop explicit control over individual fingers, palms, and finger-joint movements to reproduce handshapes accurately. Fine-grained finger articulation remains an important implementation target.
+
+5. **Sign-Specific Action Playback:** Map recognised signs or landmark sequences to corresponding avatar poses and movements. Individual signs must have appropriate hand configurations, movement trajectories, and start/end states.
+
+6. **Motion Smoothing:** Apply suitable interpolation and temporal smoothing to reduce sudden movements and visual jitter while preserving the timing and accuracy of the sign.
+
+### 6.3 Current Status and Remaining Work
+
+- **Current Approach:** A custom-coded Three.js and React Three Fiber avatar simulation is used instead of the GLB-based avatar.
+- **Architectural Advantage:** Direct control over the avatar's geometry and motion makes it easier to customise body components and develop sign-specific movement logic.
+- **GLB Model Limitation:** The existing GLB-based simulation model does not provide the required level of detailed finger articulation and sign-specific actions for the intended application.
+- **Remaining Work:** Improve individual finger movements, implement sign-specific action sequences, connect recognised signs to the corresponding avatar movements, and validate gesture accuracy during playback.
+- **Performance Validation:** Measure rendering performance and animation responsiveness on the target laptop hardware before reporting final FPS or frame-time results.
+- **Production Direction:** Continue developing the custom-coded avatar with controllable hands, fingers, arms, shoulders, and body movements. Use the GLB model only as a reference or alternative unless its limitations are adequately resolved.
+
+---
+
+## Cross-Phase Architectural Decisions
+
+| Decision | Alternative Considered | Justification |
 |:---|:---|:---|
-| .venv | Active - Primary | mediapipe 0.10.14, torch, onnxruntime, onnxscript, transformers, opencv |
-| .venv-deepface | Retired | tensorflow 2.13, deepface (superseded by ViT-ONNX) |
-| .venv-tts | Active - TTS | edge-tts, BanglaTTS, mutagen |
-
-## Research Document Map
-
-| File | Scope |
-|:---|:---|
-| docs/research/research-gap.md | Macro gaps: why the project exists (WBSL distinctness, dataset void, SL2T positioning) |
-| docs/research/unknown-signs.md | Method contribution: open-set detection + movement-grounded semantic interpretation (Phase 5) |
-| docs/research/community-data-verification.md | Privacy + trust: community data verification with human-in-the-loop (Phase 6) |
-
+| **Hand and Body-Pose Landmarks** | Raw-pixel recognition and facial landmarks | Focuses sign recognition on the hands and body movements while reducing dependence on backgrounds, lighting, and facial appearance. Signer independence must be validated through testing. |
+| **NVIDIA Nemotron 3.5 Bolt E4B for Local Deployment** | Gemma-4-E4B and larger cloud-based models | Selected as the intended local LLM for Bengali language processing, with a focus on inference quality, memory usage, and CPU performance. Accuracy and latency should be measured against the same evaluation set. |
+| **Dual-Engine Bengali TTS** | A single offline engine or Windows SAPI | `edge-tts` provides Bengali speech generation when online access is available, while BanglaTTS provides an offline alternative. |
+| **faster-whisper CPU INT8** | Cloud speech APIs and browser-native speech recognition | Supports local speech recognition while reducing dependence on cloud processing and preserving audio privacy. |
+| **Custom-Coded Three.js/R3F Avatar** | Existing GLB-based avatar simulation | Provides direct control over model geometry and movement logic, supporting the development of more detailed finger movements and sign-specific actions. |
+| **Browser-Based Avatar Rendering** | Server-side Blender or Unity rendering | Avoids server-side rendering costs and supports local, interactive avatar playback within the browser. |
+| **Modular Landmark Processing** | Feeding raw video directly into every downstream component | Separates landmark extraction from recognition and avatar animation, making the processing pipeline easier to test and maintain. |
+| **Unknown Sign Handling** | Forcing every input into a known sign class | Allows uncertain or unsupported signs to be identified rather than automatically treating every prediction as correct. |
 
 ---
 
+## Environment & Dependency Map
 
-## Noted for the future:
-word/clause-level fusion of gloss, NMM, and affect streams is technically real but not cheap — it needs three separate models running in parallel (hand/gloss recognizer, facial-landmark/NMM classifier, affect classifier), each with its own training data and timestamps, plus a fusion layer to align their outputs and resolve conflicts when windows don't overlap cleanly. Building and maintaining that pipeline (data collection, model training, alignment tuning, confidence calibration) is a high-budget, multi-team effort — realistic for a well-funded research lab or product team, not a lightweight or solo project. For now, skipping this and treating NMM/emotion as simplified, manually-specified inputs to the NLG layer is the reasonable choice; the fusion architecture is worth revisiting only if/when there's budget for real multi-model video pipelines.
-
----
-
-## Session Log: 29 August 2026 (Static ISL Pipeline)
-
-### Completed This Session
-- Phase 2.1 full pipeline: image-to-landmark conversion (two-hand, 126-dim), MLP training (99.9% val), ONNX export, live webcam inference with majority vote smoothing
-- Identified and fixed one-hand detection failures on two-hand letters (Q: 137->full, P: 254->full)
-- Documented residual confusions: mirror effect, hand position, far/close distance, angle
-- Designed landmark-space augmentation plan (mirror, rotate, jitter, dropout)
-- Built continuous recorder script (phase2b_recorder.py) with 146 features per frame (hands 126 + pose 18 + NMM 2)
-- Identified terminal input vs OpenCV window focus conflict
-- Decided on web UI (FastAPI + HTML) replacement for data collector
-
-### Files Created This Session
-| File | Purpose |
-|:---|:---|
-| phase2a_convert.py | Images to two-hand landmarks |
-| phase2a_train_landmarks.py | MLP training + ONNX export |
-| phase2a_live_infer.py | Live webcam ISL recognition |
-| phase2a_all_in_one.py | Combined convert/train/live with menu |
-| phase2b_recorder.py | Continuous sequence recorder (paused, web UI replacing) |
-| sign_mlp.onnx | Trained static sign classifier |
-| sign_classes.json | 35 class labels |
-| dataset_landmarks/*.npy | 35 files, ~300 samples each, 126-dim |
-
----
-
-## Session Log: 1 September 2026 (TTS Session)
-
-### Completed This Session
-- Confirmed Windows SAPI has no Bengali voice (only English David and Zira)
-- Tested 4 engines in one script: edge-tts (OK), BanglaTTS (OK), SAPI (FAIL), sherpa-onnx (FAIL, no Bengali model)
-- Selected edge-tts as primary TTS (best quality, handles punctuation, ~2.5 sec generation)
-- Selected BanglaTTS as offline fallback (works without internet, ~2.4 sec generation after model cache)
-- Discovered BanglaTTS ignores punctuation (comma, full stop, danda); mitigated with text cleaning in fallback path
-- Measured timing constants on same example text for both engines
-- Built automatic fallback chain (tts_engine.py): edge-tts first, BanglaTTS if no internet
-
-### Files Created This Session
-| File | Purpose |
-|:---|:---|
-| test_tts.py | edge-tts generation + timing metrics |
-| test_banglatts.py | BanglaTTS offline generation + timing metrics |
-| test_all_tts.py | 4-engine comparison test |
-| tts_engine.py | Automatic fallback chain (edge-tts -> BanglaTTS) |
-| bengali.mp3 / tts_edge.mp3 | edge-tts output samples |
-| bengali_offline.wav / tts_banglatts.wav | BanglaTTS output samples |
-
----
-
-## Session Log: 1 September 2026 (Research Session)
-
-### Completed This Session
-- Researched and documented unknown-sign detection and semantic interpretation (Phase 5)
-- Confirmed novelty: open-set gate + three-tier movement representation + hybrid evidence-based reasoning, not LLM-only guessing
-- Verified reference links; corrected conformal prediction (arXiv 0706.3188) and OpenMax (arXiv 1511.06233) IDs
-- Designed privacy-preserving community data verification (Phase 6)
-- Core principle established: automation provides evidence, humans decide; no automatic dataset acceptance
-- Added consent/ownership metadata, DPDP Act compliance, handshape fidelity requirement, reviewer consensus rule, synthetic-data detection
-- Saved both specs to docs/research/
-
-### Files Created This Session
-| File | Purpose |
-|:---|:---|
-| docs/research/unknown-signs.md | Phase 5 spec: open-set detection + semantic interpretation |
-| docs/research/community-data-verification.md | Phase 6 spec: privacy + trust verification |
-
-### Resume Point
-When resuming, start with **2.4 Web-Based Data Collector** (FastAPI + HTML). The backend reuses the exact extract_frame() logic from phase2b_recorder.py. After collecting 2-3 signs (~10 reps each), proceed to 2.5 LSTM training. TTS module (tts_engine.py) is ready to plug into the final pipeline after LLM Bengali output. Phase 5 and Phase 6 are designed and documented but not yet built; they come after the core temporal pipeline (2.4-2.6) works.
-
-## Next Steps (Priority Order)
-
-| Priority | Task | Status |
+| Environment / Runtime | Primary Packages & Tools | Target Components |
 |:---|:---|:---|
-| 1 | 2.4 Web-Based Data Collector (FastAPI + HTML) | Planned - start here |
-| 2 | Collect 2-3 signs, ~10 reps each via web UI | Pending |
-| 3 | 2.5 Tiny LSTM train + ONNX export | Pending |
-| 4 | 2.6 Live LSTM ONNX inference | Pending |
-| 5 | Integration: gloss + NMM + emotion packet -> LLM -> Bengali -> TTS playback | Pending |
-| 6 | 4.1 FastAPI reverse endpoint + 4.2 React UI | Pending |
-| 7 | 5.1-5.5 Unknown sign handling (OOD gate + movement analyzer + hybrid reasoning) | Planned - after core pipeline |
-| 8 | 6.1-6.7 Community data verification (privacy + trust layer) | Planned - after community collection exists |
-| 9 | 2.2 Augmentation retrain (10 min polish) | Pending - do last |
-| 10 | 3.x Scope accuracy improvement | Documented - future work |
+| **`.venv` (Main Python 3.11)** | `mediapipe==0.10.14`, `torch` (CPU), `onnxruntime`, `opencv-python`, `transformers`, `pillow` | Phase 1.1, 1.2, 1.3, Phase 2, Phase 5 |
+| **`.venv-tts` (Audio Python 3.11)** | `edge-tts`, `BanglaTTS`, `mutagen`, `faster-whisper`, `sounddevice` | Phase 4.3 (TTS), Phase 4.4 (STT) |
+| **LLM Execution Engine** | `koboldcpp.exe` / `llama.cpp` (GGUF CPU backend) | Phase 3 (Bengali NLG), Phase 5 (Hypothesis Generator) |
+| **Web / Avatar Runtime** | Next.js 14.2+, React 18, Three.js, `@mediapipe/tasks-vision` (WASM) | Phase 6 (Sign-to-Avatar PoC) |
+
+---
+
+## MVT-to-Production Roadmap
+
+The findings across these six MVTs define the transition to the production system:
+
+1. **Temporal Continuous Sign Collection:** Replace the exploratory Python recorders with a unified web data collector combining MediaPipe Holistic and synchronized temporal annotation.
+2. **BiLSTM / Transformer Sign Model:** Scale the verified 126-dim landmark representation into continuous temporal sequence recognition (expanding from the 35-class static alphabet to everyday WBSL vocabulary).
+3. **Calibrated OOD Thresholds:** Replace placeholder thresholds in the Phase 5 OOD Gate with empirical calibrations derived from held-out regional sign variants.
+4. **Community Phonology Knowledge Base:** Populate the Phase 5 phonology reference table in collaboration with Deaf community members in West Bengal.
+5. **Production Avatar Mesh:** Replace the generic PoC avatar with an anatomically verified, non-gloved sign avatar utilizing multi-pass cropped hand tracking and inverse kinematics.
