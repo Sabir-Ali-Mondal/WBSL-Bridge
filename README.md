@@ -3,7 +3,7 @@
 **Intent-Aware Bidirectional Sign Language Communication for the Deaf Community of West Bengal with Unknown Sign Handling and Community-Driven Growth**
 
 <p align="center">
-  <img src="docs/project.png" alt="WBSL Bridge Project Screenshot" width="900" />
+  <img src="frontend/public/WBSL%20Bridge%20logo.png" alt="WBSL Bridge Logo" width="900" />
 </p>
 
 <p align="center">
