@@ -1,23 +1,25 @@
 # WBSL Bridge — Updated Todo List
 
-**1. Switch LLM Model**
-- Replace Gemma 4 E4B with `NVIDIA-Nemotron-3.5-Bolt-E4B-UD-Q3_K_XL.gguf`.
-- Update model paths and configuration.
-- Delete the old Gemma model and unnecessary `mmproj` file.
 
-**2. Update Sign Detection**
-- Both hands down = no active sign.
-- Hands raised = start sign detection.
-- Both hands down again = end the sign.
+---
+**1.1. Code and train and test model using training method**
+- build model_training_zone\training-method\training_method.md
 
-**3. Update Simulation**
-- Use updated hand, arm, shoulder, and body data.
-- Retain facial data only for visual simulation, not recognition.
+**1.2. Update Sign Detection** as per new model sytem
 
-**4. Remove NMM**
+**1.3. Update Simulation and facemask** as per new data of avatar
+
+---
+
+**2. Remove NMM**
 - Remove NMM detection, configuration, UI, APIs, and dependencies.
 - Keep it as a planned future feature.
 
-**5. Remove Community Contributions**
+**2. Remove Community Contributions**
 - Remove the contribution UI, APIs, and existing backend pipeline.
 - Keep it as a planned future feature.
+
+**3. Switch LLM Model**
+- Replace Gemma 4 E4B with `NVIDIA-Nemotron-3.5-Bolt-E4B-UD-Q3_K_XL.gguf`.
+- Update model paths and configuration.
+- Delete the old Gemma model and unnecessary `mmproj` file.

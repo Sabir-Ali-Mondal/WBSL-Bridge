@@ -5,6 +5,10 @@
 This document describes how the Indian Sign Language recognition model is trained
 and how it is later used for live detection. Avatar data is extracted separately.
 
+Capabilities ported from the previous codebase (extraction pipeline, training
+stabilisers, augmentation, live controls and robustness handling) are adapted to
+the new 98-feature design. The core architecture is unchanged.
+
 ---
 
 ## Skeleton used for training
@@ -63,15 +67,19 @@ A hand not in use is stored as zeros with flag = 0.
 
 ---
 
-## Sign span detection
+## Sign span detection – automatic sign splitting
 
-Frames are read in order.
+The detector runs as a small state machine, identical for dataset videos and live webcam:
 
-- **Start** – a wrist is above the rest line for 3 consecutive frames; 8 frames before it are kept.
-- **End** – both hands are below the rest line for 10 consecutive frames; trailing frames are cut, keeping 2.
-- A video with no valid span is **rejected**.
+| State | Condition | Behaviour |
+|-------|-----------|-----------|
+| **IDLE** | Both hands below the rest line | No active sign, nothing recorded |
+| **SIGN** | A wrist above the rest line for 3 consecutive frames | Recording starts; 8 frames before the trigger are kept |
+| **End → IDLE** | Both hands below the rest line for 10 consecutive frames | Trailing hands-down frames are cut, keeping 2; clip is closed |
 
-The same rule applies to dataset videos and live webcam clips.
+- Hands raised = start sign detection and recording.
+- Both hands down again = end the current sign and return to IDLE.
+- A video / live window with no valid span produces no clip (videos are rejected).
 
 ---
 
@@ -119,8 +127,17 @@ py extract.py
 - Folder name → class name (uppercased, spaces → `_`).
 - Fresh MediaPipe Holistic per video; second hand detector on missed frames.
 - Finds span → selects 64 frames → computes 98 features.
-- Parallel processing with a progress line.
-- Output (new id each run):
+
+### Efficiency
+
+- **Parallel workers** – videos are distributed across CPU worker processes.
+- **Caching** – raw per-frame landmarks are cached keyed by (path, size, mtime);
+  unchanged videos skip re-detection on later runs. Feature building still runs
+  for every id, so each id stays a complete, independent extraction.
+- **Progress line** – percentage done, videos/sec and ETA, updated in place.
+- **Detailed report** – per-video status and rejection reason codes.
+
+### Output (new id each run)
 
 ```
 model_training_zone/dataset_train/features/<id>/
@@ -142,6 +159,7 @@ Reads features from the **newest** id (or `FEATURES_ID` set at the top of the sc
 
 - **BiLSTM** with attention pooling.
 - Hidden size 128, 2 layers, dropout 0.3.
+- **LayerNorm** on LSTM outputs before the attention pooling.
 - Hand flags taken from the two flag columns.
 
 ### Training recipe
@@ -155,18 +173,48 @@ Reads features from the **newest** id (or `FEATURES_ID` set at the top of the sc
 | Max epochs | 15 |
 | Label smoothing | 0.1 |
 | LR schedule | One-cycle |
+| Gradient clipping | max norm 1.0 |
 | Early stop | 10 epochs without improvement |
-| Best epoch | Kept |
+| Best checkpoint | saved on validation accuracy |
+
+### Stability
+
+- LayerNorm + gradient clipping keep early losses from diverging.
+- Best checkpoint is saved each time validation accuracy improves; the best epoch is what gets exported.
+- Early stopping prevents overfitting once validation plateaus.
 
 ### Data split
 
 - 20 % of each gloss's videos held out for validation (minimum 2).
 - Split is **by video**, not by frame.
 
-### Augmentation
+### Augmentation (adapted to the 98-feature layout)
 
-- 4 noisy copies per training video.
-- Gaussian noise σ = 0.01 on position numbers.
+4 augmented copies per training video, applied only to the numeric groups
+(flags and duration are never touched):
+
+- **Gaussian noise** σ = 0.01 on position numbers.
+- **Temporal crop / speed** – trim 0–10 % of frames from either span end before
+  the 64-frame resampling, simulating faster/slower signing.
+- **In-plane rotation** – rotate all shoulder-box x,y vectors by ±8°.
+- **Scale jitter** – multiply position numbers by 0.95–1.05 (camera distance).
+
+### Evaluation
+
+On the held-out validation split:
+
+- **Confusion matrix** (classes × classes).
+- **Per-class precision, recall, F1-score** plus macro averages.
+- Written into `daily_report.json`; confusion matrix also saved as
+  `confusion_matrix.json` in the model folder.
+
+### ONNX verification
+
+After export, the same held-out sequences are run through **PyTorch and ONNX**:
+
+- Max absolute logit difference is computed.
+- Export is accepted only if max diff < 1 × 10⁻³; the value is recorded in
+  `daily_report.json`. A failed check aborts the run before deployment.
 
 ### Output
 
@@ -174,7 +222,8 @@ Reads features from the **newest** id (or `FEATURES_ID` set at the top of the sc
 models/onnx_models/<id>/
 ├── sign_daily_lstm.onnx        input (batch, 64, 98) → logits
 ├── sign_daily_classes.json     gloss names in output order
-├── daily_report.json           best val accuracy, features id used
+├── daily_report.json           best val acc, per-class P/R/F1, ONNX max diff, features id
+├── confusion_matrix.json       validation confusion matrix
 └── avatar/                     (written next by avatar_extract.py)
 ```
 
@@ -209,17 +258,35 @@ py test_model.py
 ```
 
 1. Webcam frames → MediaPipe Holistic.
-2. Sign-span rule detects start / end of a sign.
+2. Sign-span state machine (IDLE → SIGN → end) detects start / end of a sign automatically.
 3. At span end, 64 frames are selected and 98 features computed (same code as training).
 4. If a position cannot be filled → **"Hands not clear, try again"**.
 5. Model returns class probabilities → top 3 shown.
 6. If top probability < 0.5 **or** gap to second < 0.15 → **"Not sure"**.
 
+### Live controls
+
 | Key | Action |
 |-----|--------|
 | SPACE | Start / stop manual recording |
-| M | Toggle auto ↔ manual |
+| M | Toggle auto ↔ manual mode |
 | Q / ESC | Quit |
+
+### On-screen feedback
+
+- **Detection status** – idle / recording / deciding / result.
+- **Recording timer** – seconds since the span started.
+- **Inference latency** – ms per prediction.
+- **Webcam FPS** – live frame rate.
+
+### Runtime robustness
+
+- **Camera failure** – clear on-screen / console error and clean exit.
+- **Missing model files** – startup check lists exactly which file is absent.
+- **Invalid metadata / class json** – refuse to start with an explanatory message.
+- **Incomplete clips** – "Hands not clear, try again", never a crash.
+- **Clean shutdown** – MediaPipe and the camera are closed on every exit path
+  (Q/ESC, window close, or error).
 
 ---
 
@@ -233,6 +300,7 @@ py test_model.py
 ```
 
 ---
+
 
 ## Final directory layout
 
@@ -256,6 +324,7 @@ models/onnx_models/
     ├── sign_daily_lstm.onnx
     ├── sign_daily_classes.json
     ├── daily_report.json
+    ├── confusion_matrix.json
     └── avatar/
         └── <GLOSS>/
             ├── pose.npy
