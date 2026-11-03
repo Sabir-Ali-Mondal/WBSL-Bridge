@@ -14,11 +14,13 @@ BEFORE DOING CODE READ THIS AND CREATE A PLAN FIRST AFTER VISITING ALL FILES  TH
 - Follow the feature extraction, preprocessing, prediction, and inference logic defined by the new training system.
 - Use the existing `test_model.py` system as a reference to ensure the live detection pipeline works consistently with the trained model.
 - Ensure the serving pipeline uses exactly the same feature structure and normalization as the training pipeline.
+- rather sending frames it could send the cropped video automatically using the hand rule used in test_model sytem .
 
 **1.2. Update Simulation and Face Mask**
 
 - Update the simulation and face mask according to the new avatar data structure.
 - Ensure the simulation correctly uses the updated landmark and avatar data.
+- it should not chnge the look or face , only the data uses should be applied as we are crating new type of data model_training_zone\avatar_extract.py in example folder like models\onnx_models\<id>\avatar
 
 **1.3. Integrate future/new Models Outputs into Admin Panels** see training method
 
@@ -40,6 +42,7 @@ BEFORE DOING CODE READ THIS AND CREATE A PLAN FIRST AFTER VISITING ALL FILES  TH
 - Remove all unused NMM-related code and references.
 - No NMM-related implementation or unnecessary code should remain anywhere in the project.
 - Do not retain NMM as an active or partially implemented feature.
+- but dot touch the emotion detection system .
 
 ### 3. Remove Community Contributions Completely
 - Completely remove the Community Contributions UI, APIs, backend pipeline, database operations, and related dependencies.
@@ -54,7 +57,6 @@ BEFORE DOING CODE READ THIS AND CREATE A PLAN FIRST AFTER VISITING ALL FILES  TH
 
 - Replace Gemma 4 E4B with `NVIDIA-Nemotron-3.5-Bolt-E4B-UD-Q3_K_XL.gguf`.
 - Update all model paths, configurations, and related references accordingly.
-- Delete the old Gemma model file and unnecessary `mmproj` file.
 - Ensure the offline LLM configuration uses the new Nemotron model.
 
 ### 5. Add Online/Offline LLM Mode Selection
@@ -114,6 +116,7 @@ AI_TIMEOUT=180
 8. If the selected API is unavailable or incorrectly configured, show a clear error instead of switching modes.
 9. Keep the common AI settings unchanged and applicable to both modes.
 10. Ensure the backend and `start.ps1` follow the same mode-selection logic without configuration conflicts.
+11. everything should be controlled using openai compitable api . so that online or offline model can be changed esyly no change need in backend.
 
 ---
 

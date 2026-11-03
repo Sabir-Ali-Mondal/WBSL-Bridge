@@ -18,9 +18,7 @@ MAX_FILE_SIZE = MAX_FILE_SIZE_MB * 1024 * 1024
 # ============================================================
 #
 # These folders are not scanned at all.
-# Add project-specific large/unnecessary folders here.
 #
-
 SKIP_DIRS = {
     ".git",
     ".svn",
@@ -61,7 +59,18 @@ SKIP_DIRS = {
     "tests",
     "llm",
     "docs",
-    "media_fmp4_backup"
+    "media_fmp4_backup",
+    "onnx_models",
+
+    # Data/output folders
+    "data",
+    "tts_output",
+
+    # WASM binaries folder (large minified JS)
+    "mediapipe-wasm",
+
+    # Emotion model binaries
+    "emotion",
 }
 
 
@@ -77,28 +86,12 @@ SKIP_DIR_PREFIXES = {
 # ============================================================
 # FOLDERS TO SHOW IN TREE BUT NOT EXPAND
 # ============================================================
-#
-# Example:
-#
-#     ├── datasets
-#
-# The folder is visible, but its internal structure is hidden.
-#
 
 COLLAPSE_TREE_DIRS = {
-    "dataset_train",
-    "datasets",
-    "dataset",
-    "data",
-
-    "assets",
-    "asset",
-
     "public",
     "static",
     "media",
-
-    "cache",
+    "models",
 }
 
 
@@ -107,52 +100,50 @@ COLLAPSE_TREE_DIRS = {
 # ============================================================
 
 SKIP_FILES = {
-    "backend\data\sign_media.json",
-    "frontend\src\app\about\page.tsx",
+    # --- Root Level Noise & Docs ---
+    "codebase.md",
     "codebase.py",
+    "HOW_TO_RUN.md",
     "IMPLEMENTATION_GUIDE.md",
     "README.md",
-    "codebase.md",
-    "project-tree.txt",
-    "implementation.md"
-    "frontend\package-lock.json",
-    # Dependency locks
-    "package-lock.json",
-    "yarn.lock",
-    "pnpm-lock.yaml",
-    "bun.lock",
+    "requirements.txt",
+    "requirements-training.txt",
+    "openh264-1.8.0-win64.dll",
+    "Screenshot 2026-10-15 183557.png",
 
-    # Generated
-    "tsconfig.tsbuildinfo",
-    "next-env.d.ts",
+    # --- Backend (Irrelevant to current task) ---
+    "backend\\__init__.py",
+    "backend\\stt_engine.py",
+    "backend\\tts_engine.py",
 
-    # OS
-    ".DS_Store",
-    "Thumbs.db",
+    # --- Frontend Meta/Docs (AI instructions) ---
+    "frontend\\AGENTS.md",
+    "frontend\\CLAUDE.md",
+    "frontend\\README.md",
 
-    # Logs
-    "debug.log",
-    "error.log",
-    "server.log",
-    "server-out.log",
+    # --- Frontend Build Artifacts & Lock Files ---
+    "frontend\\package-lock.json",
+    "frontend\\tsconfig.tsbuildinfo",
+    "frontend\\next-env.d.ts",
 
-    # Secrets
-    ".env",
-    ".env.local",
-    ".env.development",
-    ".env.production",
-    ".env.test",
+    # --- Frontend Logs ---
+    "frontend\\dev.log",
+    "frontend\\dev-framing.log",
 
-    # Credentials
-    "credentials.json",
-    "service-account.json",
-    "secrets.json",
+    # --- Frontend (Irrelevant Static Pages) ---
+    "frontend\\src\\app\\about\\page.tsx",
+    "frontend\\src\\app\\login\\page.tsx",
+    "frontend\\src\\app\\demo\\page.tsx",
+    "frontend\\src\\app\\favicon.ico",
 
-    # Optional AI instructions
-    "AGENTS.md",
-    "CLAUDE.md",
+    # --- Frontend (Irrelevant Layout Components) ---
+    "frontend\\src\\components\\layout\\Footer.tsx",
+    "frontend\\src\\components\\skeletons.tsx",
+
+    # --- Model Training Zone (Large SVGs only) ---
+    "model_training_zone\\training-method\\avatar_data.svg",
+    "model_training_zone\\training-method\\training_data.svg",
 }
-
 
 # ============================================================
 # FILE EXTENSIONS TO EXCLUDE
