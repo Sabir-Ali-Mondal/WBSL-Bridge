@@ -10,7 +10,6 @@ import {
   getJointGeometry,
   hideAll,
   placeBone,
-  placeJoint,
   ZERO_MATRIX,
 } from "./RigUtils";
 
@@ -35,7 +34,6 @@ export interface SampleState {
 }
 
 export type SampleRef = { current: SampleState };
-
 // The face outline curve (points 0, 2, 1, 3) is intentionally not drawn: the
 // glass head's rim is the border now. Points 0-3 are still used to fit the head.
 const FACE_CURVES: { points: number[]; closed: boolean; steps: number }[] = [
@@ -45,59 +43,57 @@ const FACE_CURVES: { points: number[]; closed: boolean; steps: number }[] = [
 ];
 const EYE_CURVE_STEPS = 16;
 const FACE_NOSE_SEGMENTS = 4;
+
+// Sparkle stars inside the eyes: 2 stars per eye (one big, one small),
+// each star is an 8-segment 4-point star.
+const SPARKLE_SEGMENTS = 8;
+const FACE_SPARKLE_SEGMENTS = 4 * SPARKLE_SEGMENTS;
+
 const FACE_SEGMENT_COUNT =
   FACE_CURVES.reduce(
     (total, curve) =>
       total +
       (curve.closed ? curve.points.length : curve.points.length - 1) * curve.steps,
     0,
-  ) + 2 * EYE_CURVE_STEPS + FACE_NOSE_SEGMENTS;
+  ) +
+  2 * EYE_CURVE_STEPS +
+  FACE_SPARKLE_SEGMENTS +
+  FACE_NOSE_SEGMENTS;
 
 // ---------------------------------------------------------------------------
 // Head shell tuning (all easy to tweak)
 // Face outline landmarks: 0 = top (forehead), 1 = bottom (chin),
 // 2 and 3 = the two sides of the face.
 // ---------------------------------------------------------------------------
-const HEAD_FIT_X = 1.1;        // shell width  vs face outline width
-const HEAD_FIT_Y = 1.18;       // shell height vs face outline height
-const HEAD_DEPTH = 0.95;       // shell depth  vs average of width/height
-const HEAD_BACK = 0.6;         // how far the shell sits behind the face (0 = centered on face)
-const HEAD_FOLLOW = 0.45;      // smoothing: 1 = snap to face, lower = smoother
+const HEAD_FIT_X = 1.18;        // shell width  vs face outline width
+const HEAD_FIT_Y = 1.08;        // shell height vs face outline height
+const HEAD_DEPTH = 0.95;        // shell depth  vs average of width/height
+const HEAD_BACK = 0.6;          // how far the shell sits behind the face (0 = centered on face)
+const HEAD_FOLLOW = 0.45;       // smoothing: 1 = snap to face, lower = smoother
 const HEAD_SCALE_FOLLOW = 0.12; // size smoothing (slower than movement) -> no sudden resizing
-const HEAD_MIN_ASPECT = 1.0;   // height/width limits so the head always stays a soft oval
-const HEAD_MAX_ASPECT = 1.25;
-const HEAD_BACK_ALPHA = 0.16;  // frosted haze seen on the back of the head
+const HEAD_MIN_ASPECT = 0.9;    // height/width: slightly wider than tall (robot head)
+const HEAD_MAX_ASPECT = 0.97;
+const HEAD_BACK_ALPHA = 0.16;   // frosted haze seen on the back of the head
 const BACK_FACE_MIN_OPACITY = 0.25; // face lines fade to this when seen from behind
-const HEAD_FILL_ALPHA = 0.1;   // see-through amount in the middle of the head
-const HEAD_RIM_ALPHA = 0.6;    // glow strength on the head border
-const HEAD_RIM_POWER = 2.2;    // higher = thinner rim
+const HEAD_FILL_ALPHA = 0.1;    // see-through amount in the middle of the head
+const HEAD_RIM_ALPHA = 0.6;     // glow strength on the head border
+const HEAD_RIM_POWER = 2.2;     // higher = thinner rim
 
 // ---------------------------------------------------------------------------
-// Cute head structure (procedural). Only the shape of the glass head changes;
-// the face features, materials, colours and animation are untouched.
-// Local axes: x = right, y = up, z = front. y runs -1 (chin) .. +1 (crown).
+// Robot head structure (procedural): a rounded box with a soft dome on top.
+// Only the shape of the glass head changes; the face features, materials,
+// colours and animation are untouched.
+// Local axes: x = right, y = up, z = front. y runs -1 (bottom) .. +1 (top).
 // ---------------------------------------------------------------------------
-const CUTE_HEAD = {
-  overallWidth: 0.97,
-  heightScale: 1.04,
+const ROBOT_HEAD = {
+  // "Boxiness" exponent: 2 = perfect sphere/ellipse, higher = more box-like.
+  topN: 2.5,      // dome on top (lower = rounder dome)
+  sideN: 3.0,     // sides and middle (higher = straighter sides)
+  bottomN: 3.1,   // bottom corners (higher = flatter, wider bottom)
 
-  // Soft, naturally full cheeks
-  cheekCenter: -0.04,
-  cheekSpread: 0.55,
-  cheekWidth: 0.055,
-  cheekForward: 0.025,
-
-  // Smooth rounded forehead
-  foreheadCenter: 0.38,
-  foreheadSpread: 0.55,
-  foreheadWidth: 0.025,
-
-  // Gentle jaw narrowing
-  jawNarrow: 0.15,
-  jawCurve: 1.5,
-
-  // Short, rounded chin
-  chinShorten: 0.07,
+  // Slight narrowing at the very bottom so the head isn't a hard block.
+  jawNarrow: 0.06,
+  jawCurve: 1.8,
 };
 
 // Shared between HeadRig (writes) and FaceRig (reads): which way the face
@@ -119,9 +115,9 @@ function faceVisibility(camera: THREE.Camera): number {
   );
 }
 
-function createCuteHeadGeometry(): THREE.BufferGeometry {
-  const c = CUTE_HEAD;
-  const base = new THREE.SphereGeometry(1, 64, 48);
+function createRobotHeadGeometry(): THREE.BufferGeometry {
+  const c = ROBOT_HEAD;
+  const base = new THREE.SphereGeometry(1, 72, 56);
   base.deleteAttribute("normal");
   base.deleteAttribute("uv");
   const pos = base.getAttribute("position") as THREE.BufferAttribute;
@@ -130,21 +126,27 @@ function createCuteHeadGeometry(): THREE.BufferGeometry {
     const y = pos.getY(i);
     const z = pos.getZ(i);
 
-    const cheek = Math.exp(-(((y - c.cheekCenter) / c.cheekSpread) ** 2));
-    const forehead = Math.exp(-(((y - c.foreheadCenter) / c.foreheadSpread) ** 2));
-    // 0 at the widest point (y >= 0), rising smoothly to 1 at the chin.
-    const jaw = Math.pow(THREE.MathUtils.smoothstep(-y, 0, 1), c.jawCurve);
+    // Exponent blends from bottomN (low) -> sideN (middle) -> topN (high).
+    const lowToMid = THREE.MathUtils.smoothstep(y, -0.7, 0.0);
+    const midToTop = THREE.MathUtils.smoothstep(y, 0.2, 0.8);
+    let n = THREE.MathUtils.lerp(c.bottomN, c.sideN, lowToMid);
+    n = THREE.MathUtils.lerp(n, c.topN, midToTop);
 
-    const widthScale =
-      c.overallWidth *
-      (1 + c.cheekWidth * cheek + c.foreheadWidth * forehead - c.jawNarrow * jaw);
+    // Push each sphere direction out to a superellipsoid (rounded box).
+    const sum =
+      Math.pow(Math.abs(x), n) + Math.pow(Math.abs(y), n) + Math.pow(Math.abs(z), n);
+    const r = Math.pow(sum, -1 / n);
+    let nx = x * r;
+    const ny = y * r;
+    let nz = z * r;
 
-    // Shorten the lower face smoothly (y <= 0 only), keeping the chin round.
-    const chin = THREE.MathUtils.smoothstep(-y, 0.3, 1);
-    const ny = y * (1 - c.chinShorten * chin) * c.heightScale;
+    // Gentle narrowing towards the bottom.
+    const jaw = Math.pow(THREE.MathUtils.smoothstep(-ny, 0, 1), c.jawCurve);
+    const taper = 1 - c.jawNarrow * jaw;
+    nx *= taper;
+    nz *= taper;
 
-    const nz = z * (1 + c.cheekForward * cheek);
-    pos.setXYZ(i, x * widthScale, ny, nz);
+    pos.setXYZ(i, nx, ny, nz);
   }
   // Merge the sphere seam so normals (used by the rim glow) stay smooth.
   const merged = mergeVertices(base, 1e-4);
@@ -219,7 +221,7 @@ function writeEyeCurve(
     Math.hypot(
       face[upperIndex * 3] - face[lowerIndex * 3],
       face[upperIndex * 3 + 1] - face[lowerIndex * 3 + 1],
-    ) * 1.15;
+    ) * 1.3;
   for (let segment = 0; segment < EYE_CURVE_STEPS; segment++) {
     for (let endpoint = 0; endpoint < 2; endpoint++) {
       const angle = ((segment + endpoint) / EYE_CURVE_STEPS) * Math.PI * 2;
@@ -229,6 +231,31 @@ function writeEyeCurve(
         (startSegment + segment) * 2 + endpoint,
         centerX + x * halfWidth,
         centerY + y * halfHeight * (0.68 + 0.32 * Math.abs(x)),
+        centerZ,
+      );
+    }
+  }
+}
+
+// 4-point sparkle star made of 8 line segments (outer tips + pinched corners).
+function writeSparkle(
+  positions: THREE.BufferAttribute,
+  startSegment: number,
+  centerX: number,
+  centerY: number,
+  centerZ: number,
+  size: number,
+): void {
+  const inner = size * 0.3;
+  for (let segment = 0; segment < SPARKLE_SEGMENTS; segment++) {
+    for (let endpoint = 0; endpoint < 2; endpoint++) {
+      const k = (segment + endpoint) % SPARKLE_SEGMENTS;
+      const angle = (k / SPARKLE_SEGMENTS) * Math.PI * 2 + Math.PI / 2;
+      const radius = k % 2 === 0 ? size : inner;
+      positions.setXYZ(
+        (startSegment + segment) * 2 + endpoint,
+        centerX + Math.cos(angle) * radius,
+        centerY + Math.sin(angle) * radius,
         centerZ,
       );
     }
@@ -349,7 +376,7 @@ export function HeadRig({ sampleRef }: { sampleRef: SampleRef }) {
     [],
   );
 
-  const headGeo = useMemo(() => createCuteHeadGeometry(), []);
+  const headGeo = useMemo(() => createRobotHeadGeometry(), []);
   useEffect(() => () => headGeo.dispose(), [headGeo]);
   const headMat = useMemo(() => createHeadMaterial(), []);
   const headBackMat = useMemo(() => createHeadBackMaterial(), []);
@@ -418,7 +445,7 @@ export function HeadRig({ sampleRef }: { sampleRef: SampleRef }) {
 
       let radiusX = (width / 2) * HEAD_FIT_X;
       let radiusY = (height / 2) * HEAD_FIT_Y;
-      // Keep the oval proportions stable even if landmarks wobble:
+      // Keep the proportions stable even if landmarks wobble:
       // same overall size, but height/width stays within a safe range.
       const size = Math.sqrt(radiusX * radiusY);
       const aspect = THREE.MathUtils.clamp(
@@ -527,7 +554,6 @@ export function HeadRig({ sampleRef }: { sampleRef: SampleRef }) {
 export function FaceRig({ sampleRef }: { sampleRef: SampleRef }) {
   const linesRef = useRef<THREE.LineSegments>(null);
   const keysRef = useRef<THREE.InstancedMesh>(null);
-  const eyeCenters = useMemo(() => new Float32Array(6), []);
 
   const lineGeo = useMemo(() => {
     const geometry = new THREE.BufferGeometry();
@@ -574,7 +600,8 @@ export function FaceRig({ sampleRef }: { sampleRef: SampleRef }) {
     if (!lines || !keys) return;
     const st = sampleRef.current;
     lines.visible = st.facePresent;
-    keys.visible = st.facePresent;
+    // The old pupil dots are replaced by sparkle stars drawn as lines.
+    keys.visible = false;
     // Soften the face when the head is seen from behind (looks blurred through the frosted back).
     const fade = faceVisibility(camera);
     lineMat.opacity = 0.96 * fade;
@@ -603,24 +630,31 @@ export function FaceRig({ sampleRef }: { sampleRef: SampleRef }) {
       }
     }
     const eyesAvailable = [10, 11, 12, 13].every((index) => st.faceValid[index]);
-    let eyeGap = 0;
-    let leftAperture = 0;
-    let rightAperture = 0;
     if (eyesAvailable) {
       const leftX = (face[10 * 3] + face[11 * 3]) / 2;
       const leftY = (face[10 * 3 + 1] + face[11 * 3 + 1]) / 2;
+      const leftZ = (face[10 * 3 + 2] + face[11 * 3 + 2]) / 2 + 0.014;
       const rightX = (face[12 * 3] + face[13 * 3]) / 2;
       const rightY = (face[12 * 3 + 1] + face[13 * 3 + 1]) / 2;
-      eyeGap = Math.hypot(rightX - leftX, rightY - leftY);
-      const halfWidth = THREE.MathUtils.clamp(eyeGap * 0.27, 0.008, 0.035);
-      leftAperture = Math.hypot(
+      const rightZ = (face[12 * 3 + 2] + face[13 * 3 + 2]) / 2 + 0.014;
+      const eyeGap = Math.hypot(rightX - leftX, rightY - leftY);
+      const halfWidth = THREE.MathUtils.clamp(eyeGap * 0.3, 0.01, 0.042);
+      const leftAperture = Math.hypot(
         face[10 * 3] - face[11 * 3],
         face[10 * 3 + 1] - face[11 * 3 + 1],
       );
-      rightAperture = Math.hypot(
+      const rightAperture = Math.hypot(
         face[12 * 3] - face[13 * 3],
         face[12 * 3 + 1] - face[13 * 3 + 1],
       );
+      // 0 = closed (blink), 1 = fully open. Sparkles shrink with the blink.
+      const leftOpen = eyeGap > 0
+        ? THREE.MathUtils.clamp(leftAperture / (eyeGap * 0.12), 0, 1)
+        : 0;
+      const rightOpen = eyeGap > 0
+        ? THREE.MathUtils.clamp(rightAperture / (eyeGap * 0.12), 0, 1)
+        : 0;
+
       writeEyeCurve(positions, face, segmentOffset, 10, 11, halfWidth);
       writeEyeCurve(
         positions,
@@ -632,14 +666,32 @@ export function FaceRig({ sampleRef }: { sampleRef: SampleRef }) {
       );
       segmentOffset += EYE_CURVE_STEPS * 2;
 
-      eyeCenters.set([
-        leftX,
-        leftY,
-        (face[10 * 3 + 2] + face[11 * 3 + 2]) / 2 + 0.012,
-        rightX,
-        rightY,
-        (face[12 * 3 + 2] + face[13 * 3 + 2]) / 2 + 0.012,
-      ]);
+      // Sparkles: one big star near the middle, one small star lower-left.
+      const sparkleEyes = [
+        { x: leftX, y: leftY, z: leftZ, open: leftOpen },
+        { x: rightX, y: rightY, z: rightZ, open: rightOpen },
+      ];
+      for (const eye of sparkleEyes) {
+        writeSparkle(
+          positions,
+          segmentOffset,
+          eye.x + halfWidth * 0.08,
+          eye.y + halfWidth * 0.1,
+          eye.z,
+          halfWidth * 0.5 * eye.open,
+        );
+        segmentOffset += SPARKLE_SEGMENTS;
+        writeSparkle(
+          positions,
+          segmentOffset,
+          eye.x - halfWidth * 0.45,
+          eye.y - halfWidth * 0.3,
+          eye.z,
+          halfWidth * 0.2 * eye.open,
+        );
+        segmentOffset += SPARKLE_SEGMENTS;
+      }
+
       if (st.faceValid[14]) {
         const noseX = face[14 * 3];
         const noseY = face[14 * 3 + 1];
@@ -664,25 +716,17 @@ export function FaceRig({ sampleRef }: { sampleRef: SampleRef }) {
       }
       segmentOffset += FACE_NOSE_SEGMENTS;
     } else {
-      const emptySegments = EYE_CURVE_STEPS * 2 + FACE_NOSE_SEGMENTS;
+      const emptySegments =
+        EYE_CURVE_STEPS * 2 + FACE_SPARKLE_SEGMENTS + FACE_NOSE_SEGMENTS;
       for (let segment = 0; segment < emptySegments; segment++) {
         positions.setXYZ((segmentOffset + segment) * 2, 0, 0, 0);
         positions.setXYZ((segmentOffset + segment) * 2 + 1, 0, 0, 0);
       }
       segmentOffset += emptySegments;
-      eyeCenters.fill(0);
     }
     positions.needsUpdate = true;
     for (let index = 0; index < 2; index++) {
-      if (eyesAvailable) {
-        const aperture = index === 0 ? leftAperture : rightAperture;
-        const eyeScale = eyeGap > 0
-          ? THREE.MathUtils.clamp(aperture / (eyeGap * 0.12), 0, 1)
-          : 0;
-        placeJoint(keys, index, eyeCenters, index * 3, 0.008 * eyeScale);
-      } else {
-        keys.setMatrixAt(index, ZERO_MATRIX);
-      }
+      keys.setMatrixAt(index, ZERO_MATRIX);
     }
     keys.instanceMatrix.needsUpdate = true;
   });
