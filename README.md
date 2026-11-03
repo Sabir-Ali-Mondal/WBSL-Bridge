@@ -3,7 +3,7 @@
 **Intent-Aware Bidirectional Sign Language Communication for the Deaf Community of West Bengal with Unknown Sign Handling and Community-Driven Growth**
 
 <p align="center">
-  <img src="frontend/public/WBSL%20Bridge%20logo.png" alt="WBSL Bridge Logo" width="900" />
+  <img src="frontend/public/WBSL%20Bridge%20logo.png" alt="WBSL Bridge Logo" width="500" />
 </p>
 
 <p align="center">
@@ -91,4 +91,8 @@ Designed for consumer-grade computers, WBSL Bridge aims to provide accessible co
 
 <p align="center">
   <strong>WBSL Bridge — Bridging Communication Through Technology</strong>
+</p>
+
+<p align="center">
+  <img src="docs\assets\Robot Front View.png" alt="WBSL Bridge Logo" width="500" />
 </p>

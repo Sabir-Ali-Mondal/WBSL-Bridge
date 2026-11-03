@@ -1268,7 +1268,7 @@ Replace the contributions Link with a disabled div:
 ---
 
 ## PHASE 8: FRONTEND SIMULATION UPDATE
-
+docs\assets\Robot Front View.png ,docs\assets\Robot Back View.png it should look like this 
 ### 8.1 UPDATE `frontend/src/lib/pose.ts`
 
 ```typescript
