@@ -311,11 +311,11 @@ export function RoundAlpanaStage({ seq }: { seq: SolvedSequence }) {
   const stage = useMemo(() => {
     const hipCenters: { x: number; y: number; z: number }[] = [];
     for (const { pose } of frames) {
-      if (pose[23 * 4 + 3] < THRESH || pose[24 * 4 + 3] < THRESH) continue;
+      if (pose[6 * 4 + 3] < THRESH || pose[7 * 4 + 3] < THRESH) continue;
       hipCenters.push({
-        x: (pose[23 * 4] + pose[24 * 4]) / 2,
-        y: (pose[23 * 4 + 1] + pose[24 * 4 + 1]) / 2,
-        z: (pose[23 * 4 + 2] + pose[24 * 4 + 2]) / 2,
+        x: (pose[6 * 4] + pose[7 * 4]) / 2,
+        y: (pose[6 * 4 + 1] + pose[7 * 4 + 1]) / 2,
+        z: (pose[6 * 4 + 2] + pose[7 * 4 + 2]) / 2,
       });
     }
     const radius = Math.max((bounds.maxX - bounds.minX) * 0.74, 1.55);

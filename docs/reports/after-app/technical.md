@@ -395,7 +395,7 @@ $$\text{Active Inference} \iff (\text{Motion} \ge 0.004) \land (\text{Spread} \g
 | `/api/system/health` | `GET` | *None* | `SystemHealth` (JSON) | Telemetry status: backend, models, active contracts, and coverage. |
 | `/api/predict/frame` | `POST` | `multipart/form-data` (`file`: JPEG) | `PredictResponse` (JSON) | Single-frame inference for static MLP classifiers (126/258-dim). |
 | `/api/predict/clip` | `POST` | `multipart/form-data` (`files`: JPEGs) | `ClipResponse` (JSON) | Batch prediction across an uploaded array of video frames. |
-| `/api/stream/frame` | `POST` | `session_id`, `file`: JPEG | `StreamResult` (JSON) | **Primary Live Route:** Server-side buffered sliding window inference. |
+| `/api/stream/frame` | `POST` | `session_id` query plus multipart `file` (JPEG), `mode` (`auto`/`manual`), `recording`, and monotonic `capture_time` | `StreamResult` (JSON) | **Primary Live Route:** Time-aware auto sign spans or manual record-and-recognize, using the same 64 × 98 feature contract and confidence rules as `test_model.py`. |
 | `/api/nmm/config` | `GET/POST`| Threshold overrides, `marker_gates` | NMM Configuration (JSON) | Live runtime reconfiguration of NMM thresholds and master toggles. |
 | `/api/nlg/stream` | `POST` | `NLGRequest` (Gloss, NMM, Affect) | `text/event-stream` (SSE) | Real-time token streaming of generated Bengali translations. |
 | `/api/text-to-sign` | `POST` | `TextToSignRequest` (`text`: string) | `TextToSignResult` (JSON) | Maps Bengali text to sequenced gloss tokens and media paths. |

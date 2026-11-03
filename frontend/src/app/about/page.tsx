@@ -52,7 +52,6 @@ export default function AboutPage() {
     },
   ];
 
-  // NMM GATE stage removed — only 5 stages remain
   const pipelineStages = [
     {
       id: "camera",
@@ -111,7 +110,7 @@ export default function AboutPage() {
 
   const currentStatus = [
     { label: "MediaPipe Stream", desc: "Hand + 8-point pose + 19-point face extracted at stable 30 FPS.", status: "DONE" },
-    { label: "Emotion Detection", desc: "ViT-ONNX 7-class classifier (glasses-robust) live. NMM geometry markers removed.", status: "DONE" },
+    { label: "Emotion Detection", desc: "ViT-ONNX 7-class classifier (glasses-robust) provides supplementary affect context.", status: "DONE" },
     { label: "98-dim Feature Extraction", desc: "Shoulder-box coordinate system. 66 handshape + 12 palm + 4 wrist + 4 elbow + 6 wrist-face + 3 head + 2 flags + 1 duration.", status: "DONE" },
     { label: "BiLSTM + Attention Model", desc: "Model 5 (sign_daily_lstm.onnx). Input: (batch, 64, 98). Span-based auto-detection with pre-roll and tail trimming.", status: "DONE" },
     { label: "Bengali NLG & TTS", desc: "AI_MODE env variable. Offline: Nemotron 3.5-B via KoboldCpp. Online: OpenRouter. Dual-engine TTS.", status: "DONE" },
@@ -268,7 +267,7 @@ export default function AboutPage() {
           <h2 className="text-2xl font-bold text-text-primary">System Architecture</h2>
         </div>
 
-        {/* Pipeline Flow — now 5 stages (NMM removed) */}
+        {/* Pipeline Flow */}
         <div className="space-y-1">
           {pipelineStages.map((stage, i) => (
             <React.Fragment key={stage.id}>

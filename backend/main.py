@@ -1,9 +1,8 @@
 """
 backend/main.py
 Complete FastAPI backend for WBSL Bridge.
-Loads the active run from models/onnx_models/ via the registry, serves predictions,
-NMM, TTS, NLG, model-bundled landmark simulations, and community ingestion
-(uploaded video -> landmarks -> .npy + manifest).
+Loads the active 98-dim temporal model and serves sign recognition, avatar
+simulation, TTS, STT, and Bengali NLG.
 
 Run:
     cd "d:\\Download\\Projects\\WBSL Bridge"
@@ -11,8 +10,9 @@ Run:
 """
 
 import os
-import sys
 import logging
+import math
+import time
 
 # Suppress noisy C++/native logging from TensorFlow Lite, MediaPipe, and Abseil
 os.environ["GLOG_minloglevel"] = "2"
@@ -23,10 +23,7 @@ logging.getLogger("absl").setLevel(logging.ERROR)
 import difflib
 import json
 import re
-import tempfile
-import time
 import unicodedata
-import uuid
 from pathlib import Path
 
 import cv2
@@ -38,9 +35,20 @@ from fastapi.responses import FileResponse, Response, StreamingResponse
 from pydantic import BaseModel
 
 # Local imports
-from backend.extract import process_bgr_frame, HANDS_DIM, HOLISTIC_DIM
-from backend.nmm import detect_nmm, reset_nmm_state, emotion_available
-from backend.streaming import get_session, last_vector
+from backend.extract import (
+    N_FEATURES,
+    N_FRAMES,
+    complete_mask_single,
+    frame_features,
+    frame_in_use,
+    process_holistic_frame,
+    select_frames_from_span,
+)
+from backend.emotion_engine import detect_emotion_from_frame, emotion_available
+from backend.streaming import (
+    get_session,
+    update_span_state,
+)
 from backend.llm_engine import (
     generate_bengali,
     generate_bengali_with_uncertainty,
@@ -53,13 +61,7 @@ from backend.llm_engine import (
 # ─────────────────────────────────────────────
 # PATHS
 # ─────────────────────────────────────────────
-# ONNX Runtime refuses any graph input tensor above ``session.max_graph_input_size``
-# (1 GiB by default). ``/api/predict/clip`` packs a whole T-frame clip into ONE
-# tensor: 32 frames x 126 features x 4 bytes is only ~16 KB, so the clip route
-# itself is fine -- but the limit is the kind that only trips on the biggest
-# uploads, producing a 500 that reads as "the model detected nothing". Raise it
-# once, centrally, so no route has to think about it. Declared here because the
-# model registry below loads graphs at import time.
+# Bound ONNX Runtime's graph input memory for the active temporal model.
 _ORT_OPTIONS = ort.SessionOptions()
 _ORT_OPTIONS.add_session_config_entry(
     "session.max_graph_input_size", "4294967296")  # 4 GiB
@@ -67,57 +69,15 @@ _ORT_OPTIONS.add_session_config_entry(
 ROOT = Path(__file__).resolve().parent.parent
 MODELS_DIR = ROOT / "models"
 RUNS_DIR = MODELS_DIR / "onnx_models"
-MODEL_PATH = MODELS_DIR / "sign_mlp.onnx"          # legacy default (may not exist)
-CLASSES_PATH = MODELS_DIR / "sign_classes.json"    # legacy default (may not exist)
 TTS_DIR = ROOT / "backend" / "tts_output"
 TTS_DIR.mkdir(exist_ok=True)
 
 # ─────────────────────────────────────────────
-# COMMUNITY DATASET STORAGE (manifest + npy)
-# ─────────────────────────────────────────────
-DATASET_DIR = ROOT / "backend" / "data" / "community_dataset"
-SAMPLES_DIR = DATASET_DIR / "samples"
-SAMPLES_DIR.mkdir(parents=True, exist_ok=True)
-MANIFEST_PATH = DATASET_DIR / "manifest.jsonl"
-TRAINING_DATA_DIR = ROOT / "model_training_zone" / "dataset"
-
-
-def _load_manifest():
-    items = []
-    if MANIFEST_PATH.exists():
-        for line in MANIFEST_PATH.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if line:
-                try:
-                    items.append(json.loads(line))
-                except json.JSONDecodeError:
-                    continue
-    return items
-
-
-def _write_manifest(items):
-    with open(MANIFEST_PATH, "w", encoding="utf-8") as f:
-        for r in items:
-            f.write(json.dumps(r, ensure_ascii=False) + "\n")
-
-
-# ─────────────────────────────────────────────
 # MODEL REGISTRY (auto-discovery + admin selection)
 # ─────────────────────────────────────────────
-# Every training run writes its artefacts into  models/onnx_models/<run>/
-#   * temporal : LSTM / unified / video runs  -> artefact name says so
-#   * static   : frame classifier, input width probed from the graph
-#   * classes  : <name>_classes.json (sibling), else sign_classes.json
-# Non-.onnx files (e.g. the .gguf LLM) are ignored. The newest run wins at
-# startup. The admin panel can override the choice; the override is stored in
-# models/active_model.json and survives restarts.
-#
-# Each model bundle includes replay sequences for the classes it can emit.
-SEQ_T = 32
+SEQ_T = N_FRAMES
+FEATURE_WIDTH = N_FEATURES
 NON_SIGN_CLASSES = {"NONE", "BACKGROUND"}
-# Feature widths the serving layer can actually feed. Both are produced by
-# backend/extract.py; the graph's declared input width picks between them.
-SERVABLE_WIDTHS = (HANDS_DIM, HOLISTIC_DIM)
 ACTIVE_MODEL_PATH = MODELS_DIR / "active_model.json"
 
 
@@ -174,31 +134,10 @@ def _discover_models():
                     classes = json.loads(classes_file.read_text(encoding="utf-8"))
                 except Exception:
                     classes = []
-            missing_sequences = [
-                label for label in classes
-                if label not in NON_SIGN_CLASSES
-                and not (folder / "npy" / f"{label}.npy").is_file()
-            ]
-            if missing_sequences:
-                print(
-                    f"[WBSL Backend] Skipping {onnx_file}: missing bundled "
-                    f"sequences for {', '.join(missing_sequences[:5])}"
-                )
-                continue
-            # A static classifier is only usable if it takes a frame vector this
-            # layer can produce (126 hands, or 258 hands+pose); temporal runs
-            # ingest a (T, width) sequence. Both are probed, so a run with no
-            # classes or an unloadable graph is dropped rather than silently
-            # winning the "newest" race.
-            #
-            # The probe reads BOTH the rank and the middle axis. Width alone is
-            # ambiguous: a static [N,126] and a temporal [N,32,126] both end in
-            # 126, so a width-only check can never tell them apart (this was the
-            # root cause of a temporal model silently failing on a single frame).
             name = onnx_file.stem
             input_width = None
             input_rank = None
-            frames = 1
+            frames = None
             try:
                 probe = ort.InferenceSession(
                     str(onnx_file), providers=["CPUExecutionProvider"])
@@ -206,47 +145,27 @@ def _discover_models():
                 input_rank = len(shape)
                 input_width = shape[-1] if isinstance(shape[-1], int) else None
                 if input_rank >= 3 and isinstance(shape[-2], int):
-                    frames = shape[-2]          # the declared clip length
+                    frames = shape[-2]
             except Exception as exc:                   # noqa: BLE001
                 print(f"[WBSL Backend] Skipping unloadable graph {onnx_file}: {exc}")
                 continue
-            invalid_sequence = None
-            bundled_width = None
-            for label in classes:
-                if label in NON_SIGN_CLASSES:
-                    continue
-                sequence_path = folder / "npy" / f"{label}.npy"
-                try:
-                    sequence = np.load(sequence_path, mmap_mode="r", allow_pickle=False)
-                except (OSError, ValueError) as exc:
-                    invalid_sequence = f"{label}: {exc}"
-                    break
-                sequence_width = sequence.shape[-1] if sequence.ndim in (2, 3) else None
-                if (
-                    sequence_width not in SERVABLE_WIDTHS
-                    or (input_width is not None and sequence_width != input_width)
-                    or (bundled_width is not None and sequence_width != bundled_width)
-                ):
-                    invalid_sequence = (
-                        f"{label} has shape {sequence.shape}; expected "
-                        f"a 126- or 258-wide landmark sequence matching the graph"
-                    )
-                    break
-                bundled_width = sequence_width
-            if invalid_sequence:
+            if input_rank != 3 or frames != SEQ_T:
                 print(
-                    f"[WBSL Backend] Skipping {onnx_file}: invalid bundled "
-                    f"landmark sequence ({invalid_sequence})"
+                    f"[WBSL Backend] Skipping {onnx_file}: expected rank-3 "
+                    f"input with {SEQ_T} frames, got rank={input_rank}, frames={frames}"
                 )
                 continue
-            if input_width is None:
-                input_width = bundled_width
-            # The graph's own shape is the authority. The filename heuristic is
-            # kept only as a tie-breaker for graphs whose sequence axis is
-            # dynamic (rare here, but a run named *_lstm with a symbolic T is
-            # still temporal, just unpinnable to a frame count).
-            name_says_temporal = any(k in name for k in ("lstm", "unified", "video"))
-            is_temporal = input_rank >= 3 or (input_rank == 2 and name_says_temporal)
+            if input_width != FEATURE_WIDTH:
+                print(
+                    f"[WBSL Backend] Skipping {onnx_file}: input width "
+                    f"{input_width} != {FEATURE_WIDTH}"
+                )
+                continue
+            avatar_dir = folder / "avatar"
+            has_avatar = avatar_dir.is_dir()
+            if not classes:
+                print(f"[WBSL Backend] Skipping {onnx_file}: no class list found")
+                continue
             try:
                 mtime = onnx_file.stat().st_mtime
             except OSError:
@@ -259,12 +178,14 @@ def _discover_models():
                 "path": str(onnx_file),
                 "classes_path": str(classes_file) if classes_file else None,
                 "classes": len(classes),
-                "temporal": is_temporal,
+                "temporal": True,
                 "input_width": input_width,
                 "input_rank": input_rank,
                 "frames": frames,
-                # The endpoint a request must hit for this graph to be usable.
-                "endpoint": "/api/predict/clip" if is_temporal else "/api/predict/frame",
+                "endpoint": "/api/stream/frame",
+                "has_avatar": has_avatar,
+                "report": {},
+                "confusion": {},
                 "has_external_data": external.exists(),
                 "size_mb": round(onnx_file.stat().st_size / (1024 * 1024), 2)
                 if onnx_file.exists() else 0.0,
@@ -287,26 +208,6 @@ def _discover_models():
     return [d for d in found if d["classes"] > 0]
 
 
-def _preferred_model(registry):
-    """Resolve which discovered model to activate."""
-    wanted = None
-    if ACTIVE_MODEL_PATH.exists():
-        try:
-            wanted = json.loads(ACTIVE_MODEL_PATH.read_text(encoding="utf-8")).get("path")
-        except Exception:
-            wanted = None
-    if wanted:
-        for d in registry:
-            if d["path"] == wanted:
-                return d
-        print(f"[WBSL Backend] Configured model missing, falling back to newest: {wanted}")
-    # prefer the newest temporal model, else the newest of anything
-    for d in registry:
-        if d["temporal"]:
-            return d
-    return registry[0]
-
-
 class ModelRegistry:
     """Holds the discovered artefacts and the currently loaded model.
 
@@ -316,12 +217,14 @@ class ModelRegistry:
     def __init__(self):
         self.models = []
         self.active = None
-        self.session = None           # static 126-landmark MLP
+        self.session = None
         self.input_name = None
         self.classes = []
-        self.temporal_session = None  # unified LSTM (None for static models)
+        self.temporal_session = None
         self.temporal_input = None
         self.temporal_classes = []
+        self.report = {}
+        self.confusion = {}
         self.error = None
         self.reload()
 
@@ -366,6 +269,21 @@ class ModelRegistry:
             self.input_name = self.session.get_inputs()[0].name
             self.classes = json.loads(
                 Path(target["classes_path"]).read_text(encoding="utf-8"))
+            report_file = Path(target["path"]).parent / "daily_report.json"
+            confusion_file = Path(target["path"]).parent / "confusion_matrix.json"
+            self.report = {}
+            self.confusion = {}
+            for path, key in ((report_file, "report"), (confusion_file, "confusion")):
+                if path.exists():
+                    try:
+                        value = json.loads(path.read_text(encoding="utf-8"))
+                    except (OSError, json.JSONDecodeError) as exc:
+                        print(f"[WBSL Backend] Could not load {path.name}: {exc}")
+                    else:
+                        if key == "report":
+                            self.report = value
+                        else:
+                            self.confusion = value
             self.temporal_session = None
             self.temporal_input = None
             self.temporal_classes = []
@@ -420,18 +338,6 @@ ACTIVE_MODEL = REGISTRY.active
 ACTIVE_CLASSES = REGISTRY.active_classes
 
 
-def _active_width() -> int:
-    """Feature width the active graph declares, defaulting to the two-hand vector.
-
-    Every prediction route needs this before it can call an extractor: 126 and
-    258 are different tensors, not the same tensor padded. Routing on the
-    graph's own shape keeps the 126-dim MLP runs working unchanged while letting
-    a 258-dim run (train_daily6) be fed what it was trained on.
-    """
-    width = (REGISTRY.active or {}).get("input_width")
-    return width if width in SERVABLE_WIDTHS else HANDS_DIM
-
-
 def _active_run_dir():
     """Return the bundle directory for the currently selected ONNX model."""
     active = REGISTRY.active
@@ -440,92 +346,22 @@ def _active_run_dir():
     return Path(active["path"]).parent
 
 
-def _model_sequence_path(label: str):
-    """Resolve a sequence only from the active model's bundled training data."""
-    normalized = label.upper().replace(" ", "_")
-    if normalized == "NONE" or normalized not in REGISTRY.active_classes:
-        return None
-    run_dir = _active_run_dir()
-    if run_dir is None:
-        return None
-    path = run_dir / "npy" / f"{normalized}.npy"
-    return path if path.is_file() else None
-
-
 def _available_model_classes():
-    """Vocabulary that the active model can both recognize and replay."""
+    """Return sign labels in the active model vocabulary."""
     return [
         label for label in REGISTRY.active_classes
-        if label not in NON_SIGN_CLASSES and _model_sequence_path(label) is not None
+        if label not in NON_SIGN_CLASSES
     ]
 
-
-def resample_feature_width(seq: np.ndarray, width: int) -> np.ndarray:
-    """Re-widen a stored landmark clip to the width the active graph expects.
-
-    Community recordings store the 126-dim two-hand vector, so a 258-dim graph
-    cannot be fed one as-is. Only the pose
-    block (columns 126:258) is missing; the hand block and its normalization are
-    already shared, so the pose columns are zero-padded rather than recomputed
-    from video that is no longer on hand. The model then sees a sign performed
-    with the body out of frame -- lossy, and deliberately so: the alternative is
-    refusing to serve every stored clip once a holistic model is active.
-    """
-    if seq.shape[-1] == width:
-        return seq
-    if width == HOLISTIC_DIM and seq.shape[-1] == HANDS_DIM:
-        pad = np.zeros((*seq.shape[:-1], HOLISTIC_DIM - HANDS_DIM), np.float32)
-        return np.concatenate([seq.astype(np.float32), pad], axis=-1)
-    if width == HANDS_DIM and seq.shape[-1] == HOLISTIC_DIM:
-        return seq[..., :HANDS_DIM].astype(np.float32)
-    raise ValueError(
-        f"Stored clip is {seq.shape[-1]}-wide and cannot be served to a "
-        f"{width}-wide graph."
-    )
 
 # ─────────────────────────────────────────────
 # FASTAPI APP
 # ─────────────────────────────────────────────
 
-# ─────────────────────────────────────────────
-# IN-MEMORY STATE
-# ─────────────────────────────────────────────
-def _sample_counts_by_label():
-    counts = {}
-    for record in _load_manifest():
-        label = record.get("label")
-        if not label:
-            continue
-        status = record.get("verification")
-        count_key = {
-            "accepted": "approved_samples",
-            "pending": "pending_samples",
-            "needs_review": "pending_samples",
-            "rejected": "rejected_samples",
-        }.get(status)
-        if count_key:
-            totals = counts.setdefault(label, {
-                "approved_samples": 0,
-                "pending_samples": 0,
-                "rejected_samples": 0,
-            })
-            totals[count_key] += 1
-    return counts
-
-
-def _refresh_catalog_sample_counts():
-    counts = _sample_counts_by_label()
-    for sign in sign_catalog:
-        sign.update(counts.get(sign["label"], {
-            "approved_samples": 0,
-            "pending_samples": 0,
-            "rejected_samples": 0,
-        }))
-
-
 def _build_catalog():
-    sample_counts = _sample_counts_by_label()
     classes = _available_model_classes()
+    run_dir = _active_run_dir()
+    avatar_dir = run_dir / "avatar" if run_dir else None
     catalog = [
         {
             "id": str(i),
@@ -533,12 +369,8 @@ def _build_catalog():
             "bengali_meaning": c.replace("_", " ").title(),
             "category": "Alphabet" if len(c) == 1 and c.isalpha() else "Word",
             "type": "word",
-            "has_landmarks": True,
-            **sample_counts.get(c, {
-                "approved_samples": 0,
-                "pending_samples": 0,
-                "rejected_samples": 0,
-            }),
+            "has_landmarks": bool(avatar_dir and (avatar_dir / c).is_dir()),
+            "has_avatar": bool(avatar_dir and (avatar_dir / c).is_dir()),
             "language": "ISL",
         }
         for i, c in enumerate(classes)
@@ -547,13 +379,23 @@ def _build_catalog():
 
 
 def _coverage_summary():
-    """Report classes bundled with replayable sequences for the active model."""
-    available = set(_available_model_classes())
+    """Report avatar-data coverage for the active model vocabulary."""
     recognized = [c for c in REGISTRY.active_classes if c not in NON_SIGN_CLASSES]
+    run_dir = _active_run_dir()
+    avatar_dir = run_dir / "avatar" if run_dir else None
+    available = (
+        {folder.name.upper() for folder in avatar_dir.iterdir() if folder.is_dir()}
+        if avatar_dir and avatar_dir.is_dir()
+        else set()
+    )
+    covered = [label for label in recognized if label in available]
+    missing = [label for label in recognized if label not in available]
     return {
         "total_classes": len(recognized),
-        "with_landmark_sequences": len(available),
-        "missing_sequences": [c for c in recognized if c not in available],
+        "with_avatar_data": len(covered),
+        "missing_avatar_data": missing,
+        "with_landmark_sequences": len(covered),
+        "missing_sequences": missing,
     }
 
 
@@ -591,88 +433,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ─────────────────────────────────────────────
-# NMM / AFFECT SENSITIVITY CONFIGURATION
-# ─────────────────────────────────────────────
-from backend.nmm import get_nmm_config, update_marker_gates, update_nmm_thresholds
-
-
-@app.get("/api/nmm/config")
-def get_nmm_settings():
-    return get_nmm_config()
-
-
-@app.post("/api/nmm/config")
-def set_nmm_settings(payload: dict):
-    """Update sensitivity thresholds and/or the per-marker enable gates.
-
-    One endpoint for both because the panel edits them together and a single
-    POST is what keeps the two in step. ``marker_gates`` is nested rather than
-    flattened because a marker name like ``negation`` is both a gate and a flag
-    in the detection output, and keeping the gates in their own object means a
-    future non-boolean threshold can never collide with one.
-    """
-    gates = payload.pop("marker_gates", None)
-    if isinstance(gates, dict):
-        update_marker_gates(gates)
-    if payload:
-        update_nmm_thresholds(payload)
-    return get_nmm_config()
-
-
 def _check_model_available(path):
-    """Guards against activating a graph the serving layer cannot feed.
-
-    There are two servable contracts, and they are distinguished by RANK, not
-    by width:
-
-      * static   ``[N, 126]`` / ``[N, 258]``  fed by ``/api/predict/frame`` (one frame)
-      * temporal ``[N, T, 126]`` / ``[N, T, 258]``  fed by ``/api/predict/clip``
-
-    The two widths are the two feature extractors in ``backend/extract.py``:
-    126 is the two-hand landmark vector, 258 adds the 33x4 pose block that
-    ``train_daily6.py`` learns. Rank is what separates a frame classifier from a
-    clip classifier -- width alone cannot, because both end in the same number.
-
-    Returns an error string, or None when the model is safe to activate."""
+    """Ensure the selected graph matches the active 64x98 feature contract."""
     desc = next((m for m in REGISTRY.models if m["path"] == path), None)
     if desc is None:
         return f"Model not in registry: {path}"
-    try:
-        classes = json.loads(Path(desc["classes_path"]).read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        return f"Cannot read the class list for '{desc['name']}': {exc}"
-    run_dir = Path(desc["path"]).parent
-    missing_sequences = [
-        label for label in classes
-        if label not in NON_SIGN_CLASSES
-        and not (run_dir / "npy" / f"{label}.npy").is_file()
-    ]
-    if missing_sequences:
-        preview = ", ".join(missing_sequences[:5])
-        suffix = "..." if len(missing_sequences) > 5 else ""
-        return (
-            f"'{desc['name']}' is missing bundled landmark sequences for "
-            f"{preview}{suffix}. Re-train it with the current training pipeline."
-        )
-    # Both contracts are servable: the frame route handles rank 2, the clip
-    # route handles rank 3. What is NOT servable is a graph whose last axis is
-    # not one of the feature vectors this layer emits -- feed it anything else
-    # and the run() raises a shape error the user reads as "detected nothing".
-    if desc.get("input_width") in SERVABLE_WIDTHS:
+    if (
+        desc.get("input_rank") == 3
+        and desc.get("frames") == SEQ_T
+        and desc.get("input_width") == FEATURE_WIDTH
+    ):
         return None
-    if desc.get("input_width") is None:
-        return (
-            f"'{desc['name']}' declares an open-ended final input axis, so its "
-            f"feature width cannot be verified against the extractors this "
-            f"backend serves. Re-export the graph with a fixed feature "
-            f"dimension."
-        )
     return (
-        f"'{desc['name']}' expects {desc['input_width']}-wide inputs, but the "
-        f"feature extractors in this project emit either a "
-        f"{HANDS_DIM}-dim two-hand landmark vector or a {HOLISTIC_DIM}-dim "
-        f"hands+pose holistic vector."
+        f"'{desc['name']}' does not match the required "
+        f"(batch, {SEQ_T}, {FEATURE_WIDTH}) model input."
     )
 
 
@@ -680,20 +454,17 @@ def _check_model_available(path):
 def health(response: Response):
     ai = get_ai_config()
     active = REGISTRY.active or {}
-    # This probes the LLM provider, which is a deliberate round trip that costs
-    # real time when the provider is absent. Every page fetches it on mount just
-    # to learn which prediction route is valid, so let the browser reuse the
-    # answer for a few seconds instead of re-probing on every navigation.
     response.headers["Cache-Control"] = "public, max-age=5"
     return {
         "api": True,
-        "model": True,
+        "model": REGISTRY.session is not None,
         "tts": True,
         "llm": is_llm_available(),
         "inference_mode": ai["provider"],
+        "ai_mode": ai["mode"],
         "llm_model": ai["model"],
         "dataset_version": "v0.1",
-        "model_version": "LSTM-unified" if REGISTRY.temporal_session else "MLP-static",
+        "model_version": active.get("name", "unavailable"),
         "unified": REGISTRY.temporal_session is not None,
         "active_classes": len(REGISTRY.active_classes),
         "vocabulary_classes": len(_available_model_classes()),
@@ -701,22 +472,15 @@ def health(response: Response):
         "model_run": REGISTRY.active["run"] if REGISTRY.active else None,
         "model_path": REGISTRY.active_id(),
         "model_error": REGISTRY.error,
-        # The contract, published so the UI knows which button to enable BEFORE
-        # the user clicks. A temporal model needs a 32-frame clip; a static one
-        # needs a single frame. Getting this wrong is what made the LSTM runs
-        # look like they "detected nothing".
+        # Publish the temporal model contract so clients can match their stream
+        # buffers to the exact input expected by the active model.
         "contract": {
-            "kind": "temporal" if active.get("temporal") else "static",
+            "kind": "temporal",
             "input_rank": active.get("input_rank"),
-            "frames": active.get("frames", 1),
+            "frames": active.get("frames", SEQ_T),
             "feature_width": active.get("input_width"),
-            # The extractor this width selects. Published for the same reason as
-            # the endpoint: a 258-dim graph needs hands AND pose in frame, and a
-            # client that knows that can tell the user to step back.
-            "feature_kind": ("two_hand" if active.get("input_width") == HANDS_DIM
-                             else "hands_pose" if active.get("input_width") == HOLISTIC_DIM
-                             else None),
-            "endpoint": active.get("endpoint", "/api/predict/frame"),
+            "feature_kind": "shoulder_box_98",
+            "endpoint": active.get("endpoint", "/api/stream/frame"),
         },
         "sequence_coverage": _coverage_summary(),
         "emotion_available": emotion_available(),
@@ -769,6 +533,27 @@ def admin_activate_model(payload: ModelSelectRequest):
             "models": REGISTRY.public_models()}
 
 
+@app.get("/api/admin/model/report")
+def admin_model_report():
+    return REGISTRY.report or {}
+
+
+@app.get("/api/admin/model/confusion")
+def admin_model_confusion():
+    return REGISTRY.confusion or {}
+
+
+@app.get("/api/admin/model/avatar-list")
+def admin_avatar_list():
+    run_dir = _active_run_dir()
+    avatar_dir = run_dir / "avatar" if run_dir else None
+    if not avatar_dir or not avatar_dir.is_dir():
+        return {"glosses": []}
+    return {
+        "glosses": sorted(folder.name for folder in avatar_dir.iterdir() if folder.is_dir())
+    }
+
+
 # ─────────────────────────────────────────────
 # DATASET / SIGNS
 # ─────────────────────────────────────────────
@@ -814,387 +599,199 @@ def get_sign_by_id(sign_id: str):
 
 @app.get("/api/dataset/stats")
 def dataset_stats():
-    total_signs = len(sign_catalog)
-    total_approved = sum(s["approved_samples"] for s in sign_catalog)
-    total_pending = sum(s["pending_samples"] for s in sign_catalog)
-    total_rejected = sum(s["rejected_samples"] for s in sign_catalog)
-    languages = list(set(s["language"] for s in sign_catalog))
-    categories = list(set(s["category"] for s in sign_catalog))
     return {
-        "total_signs": total_signs,
-        "total_approved_samples": total_approved,
-        "total_pending_samples": total_pending,
-        "total_rejected_samples": total_rejected,
-        "languages": languages,
-        "categories": categories,
+        "total_signs": len(sign_catalog),
+        "languages": sorted({s["language"] for s in sign_catalog}),
+        "categories": sorted({s["category"] for s in sign_catalog}),
         "dataset_version": "v0.1",
         "model_version": REGISTRY.active["name"] if REGISTRY.active else "none",
     }
 
 
 # ─────────────────────────────────────────────
-# PREDICTION: frame → landmark → MLP + NMM
+# PREDICTION: frame stream → span state machine → temporal model
 # ─────────────────────────────────────────────
-class PredictResponse(BaseModel):
-    detected: bool
-    label: str
-    confidence: float
-    top5: list
-    hands_detected: int
-    nmm: dict
-    # Affect + raw NMM geometry. These MUST be declared here: FastAPI validates
-    # the response against this model and silently DROPS undeclared keys, so
-    # detect_nmm() computing an emotion the model does not list means the client
-    # never receives it.
-    emotion: dict | None = None
-    metrics: dict | None = None
 
 
-@app.post("/api/predict/frame", response_model=PredictResponse)
-async def predict_frame(file: UploadFile = File(...)):
-    # A temporal graph declares [N, T, 126]: it cannot be fed one frame. Without
-    # this guard the run() below raises a shape error, the client sees a 500, and
-    # the model looks like it "detects nothing". Fail loudly and name the
-    # endpoint that CAN serve it instead.
-    if REGISTRY.temporal_session is not None:
-        frames = (REGISTRY.active or {}).get("frames", SEQ_T)
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                f"The active model '{REGISTRY.active['name']}' is temporal and "
-                f"expects a clip of {frames} frames, not a single frame. Use "
-                f"POST /api/predict/clip, or activate a static model "
-                f"(e.g. a 126-input MLP) in the admin panel."
-            ),
-        )
-    try:
-        raw = await file.read()
-        nparr = np.frombuffer(raw, np.uint8)
-        frame_bgr = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-
-        if frame_bgr is None:
-            raise HTTPException(status_code=400, detail="Could not decode image")
-
-        vec = process_bgr_frame(frame_bgr, _active_width())
-        nmm_flags = detect_nmm(frame_bgr)
-
-        if vec is None:
-            return PredictResponse(
-                detected=False,
-                label="NO_HAND",
-                confidence=0.0,
-                top5=[],
-                hands_detected=0,
-                nmm=nmm_flags,
-                emotion=nmm_flags.get("emotion"),
-                metrics=nmm_flags.get("metrics"),
-            )
-
-        # The width is the graph's, not a constant: a 126-dim MLP wants the
-        # two-hand vector, the 258-dim daily LSTM wants hands + pose. Hard-coding
-        # 126 here is what made the LSTM runs fail with a shape error.
-        width = _active_width()
-        logits = session.run(None, {INPUT_NAME: vec.reshape(1, width)})[0][0]
-        probs = np.exp(logits - logits.max())
-        probs = probs / probs.sum()
-
-        top_idx = np.argsort(probs)[::-1][:5]
-        top5 = [
-            {"label": CLASSES[i], "confidence": float(probs[i])}
-            for i in top_idx
-        ]
-
-        best = int(top_idx[0])
-        return PredictResponse(
-            detected=True,
-            label=CLASSES[best],
-            confidence=float(probs[best]),
-            top5=top5,
-            hands_detected=1,
-            nmm=nmm_flags,
-            emotion=nmm_flags.get("emotion"),
-            metrics=nmm_flags.get("metrics"),
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+def _span_duration(timestamps):
+    if len(timestamps) < 2:
+        return 1.0 / 30.0
+    intervals = np.diff(np.asarray(timestamps, dtype=np.float64))
+    intervals = intervals[np.isfinite(intervals) & (intervals > 0)]
+    if not len(intervals):
+        return len(timestamps) / 30.0
+    return float(len(timestamps) * np.median(intervals))
 
 
-# ─────────────────────────────────────────────
-# PREDICTION: T-frame clip → temporal model
-# ─────────────────────────────────────────────
-@app.post("/api/predict/clip")
-async def predict_clip(files: list[UploadFile] = File(...)):
-    if unified_session is None:
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                "The active model is static and expects a single frame. Use "
-                "POST /api/predict/frame, or activate a temporal (LSTM) model "
-                "in the admin panel."
-            ),
-        )
-    # Read the clip length from the graph's own contract rather than assuming
-    # SEQ_T: a run may be exported with a different T, and silently resampling
-    # to the wrong length produces confident nonsense instead of an error.
-    want_t = (REGISTRY.active or {}).get("frames") or SEQ_T
-    width = _active_width()
-    vecs, last = [], None
-    for f in files:
-        raw = await f.read()
-        fr = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
-        if fr is None:
-            continue
-        v = process_bgr_frame(fr, width)
-        if v is not None:
-            last = v
-        vecs.append(v if v is not None else last)
-    vecs = [v for v in vecs if v is not None]
-    if len(vecs) < 8:
-        return {"ready": False, "detail": "No hands detected in clip"}
-    arr = np.array(vecs, np.float32)
-    if len(arr) != want_t:
-        arr = arr[np.linspace(0, len(arr) - 1, want_t).astype(int)]
-    logits = unified_session.run(None, {UNIFIED_INPUT: arr[None]})[0][0]
-    probs = np.exp(logits - logits.max())
-    probs /= probs.sum()
-    order = np.argsort(probs)[::-1][:3]
-    return {"ready": True, "label": ACTIVE_CLASSES[int(order[0])],
-            "confidence": float(probs[order[0]]),
-            "frames_used": int(want_t), "frames_supplied": int(len(vecs)),
-            "top3": [{"label": ACTIVE_CLASSES[i], "confidence": float(probs[i])} for i in order]}
-
-
-# ─────────────────────────────────────────────
-# PREDICTION: streaming window → temporal model (live auto-detection)
-# ─────────────────────────────────────────────
-@app.post("/api/predict/stream")
-async def predict_stream(files: list[UploadFile] = File(...)):
-    """Recognise a sign from a rolling window of recent frames.
-
-    This is what makes live signing work with a temporal model. The old design
-    made the user press a button and hold still for exactly three seconds, which
-    is both unnatural to perform and easy to get wrong: if the sign finished
-    early, or the hand left the frame, the fixed window captured the wrong half
-    of the movement.
-
-    Instead the client keeps a ring buffer of the last ``frames`` frames and
-    posts it whenever it sees motion. The server recognises the window, and
-    reports ``margin`` -- the gap between the best and second-best class -- so
-    the client can demand a *decisive* win before committing a gloss to the
-    sequence. A hesitant window therefore produces no output rather than a
-    confident-looking wrong one.
-    """
-    if unified_session is None:
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                "The active model is static and expects a single frame. Use "
-                "POST /api/predict/frame, or activate a temporal (LSTM) model "
-                "in the admin panel."
-            ),
-        )
-    want_t = (REGISTRY.active or {}).get("frames") or SEQ_T
-    width = _active_width()
-    vecs, last = [], None
-    last_frame_bgr = None
-    for f in files:
-        raw = await f.read()
-        fr = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
-        if fr is None:
-            continue
-        last_frame_bgr = fr
-        v = process_bgr_frame(fr, width)
-        if v is not None:
-            last = v
-        vecs.append(v if v is not None else last)
-    vecs = [v for v in vecs if v is not None]
-    if len(vecs) < 8:
-        return {"ready": False, "detail": "No hands detected in window"}
-
-    nmm_data = detect_nmm(last_frame_bgr) if last_frame_bgr is not None else {
-        "question": False, "wh_question": False, "negation": False, "affirmation": False, "emphasis": False,
-        "emotion": {"dominant": "neutral", "confidence": 1.0, "scores": {"neutral": 1.0}},
-        "metrics": {"brow_ratio": 0.0, "mouth_ratio": 0.0, "shake_var": 0.0, "nod_var": 0.0}
-    }
-    arr = np.array(vecs, np.float32)
-    if len(arr) != want_t:
-        arr = arr[np.linspace(0, len(arr) - 1, want_t).astype(int)]
-
-    # Same unconditional motion gate as /api/stream/frame (see the comment
-    # there): the legacy batch path the page falls back to needs the identical
-    # policy, and a NONE class in the label list is not evidence the model can
-    # actually recognise idleness.
-    if len(arr) > 1:
-        motion = float(np.mean(np.abs(np.diff(arr, axis=0))))
-        spread = float(np.mean(np.abs(arr - arr.mean(axis=0))))
-        if motion < IDLE_MOTION_GATE or spread < IDLE_SPREAD_GATE:
-            return {"ready": False, "detail": "idle"}
-
-    logits = unified_session.run(None, {UNIFIED_INPUT: arr[None]})[0][0]
-    probs = np.exp(logits - logits.max())
-    probs /= probs.sum()
-    order = np.argsort(probs)[::-1][:3]
+def _recognize_stream_clip(clip, emotion, hands_detected):
+    logits = REGISTRY.session.run(
+        None, {REGISTRY.input_name: clip[np.newaxis].astype(np.float32)}
+    )[0][0]
+    probabilities = np.exp(logits - logits.max())
+    probabilities /= probabilities.sum()
+    order = np.argsort(probabilities)[::-1][:3]
+    top_probability = float(probabilities[order[0]])
+    margin = (
+        float(probabilities[order[0]] - probabilities[order[1]])
+        if len(order) > 1
+        else 1.0
+    )
+    not_sure = top_probability < 0.5 or margin < 0.15
     return {
         "ready": True,
-        "label": ACTIVE_CLASSES[int(order[0])],
-        "confidence": float(probs[order[0]]),
-        # Best minus runner-up. A one-hot softmax and a coin-flip can both report
-        # "99%", so confidence alone cannot tell a real sign from noise; margin can.
-        "margin": float(probs[order[0]] - probs[order[1]]) if len(order) > 1 else 1.0,
-        "frames_used": int(want_t),
-        "frames_supplied": int(len(vecs)),
-        "nmm": nmm_data,
-        "emotion": nmm_data.get("emotion"),
-        "metrics": nmm_data.get("metrics"),
+        "label": (
+            REGISTRY.active_classes[int(order[0])] if not not_sure else "NOT_SURE"
+        ),
+        "confidence": top_probability,
+        "margin": margin,
+        "frames_used": N_FRAMES,
+        "state": "IDLE",
+        "emotion": emotion,
+        "hands_detected": hands_detected,
         "top3": [
-            {"label": ACTIVE_CLASSES[i], "confidence": float(probs[i])}
-            for i in order
+            {
+                "label": REGISTRY.active_classes[int(index)],
+                "confidence": float(probabilities[index]),
+            }
+            for index in order
         ],
     }
 
 
-# ─────────────────────────────────────────────
-# PREDICTION: single frame in → server-side ring buffer → temporal model
-# ─────────────────────────────────────────────
-# The windows the server cuts out of its own buffer. Two lengths, not one: a
-# short window reads a fast sign, a long one reads a slow one, and the same
-# signer produces both. Fusing them and keeping the most decisive answer is
-# what stops a single unlucky window length from deciding the output.
-STREAM_WINDOWS = (24, 32)
-# Seconds between model runs per session. At 30 fps capture this is ~7 frames,
-# i.e. an order of magnitude fewer inferences than frames -- the client can push
-# frames as fast as the camera delivers them and the server does the throttling.
-STREAM_INFER_EVERY = 0.25
-
-
-# Below this mean frame-to-frame landmark motion a window is treated as idle.
-# Coordinates are normalised by hand size, so an absolutely still signer's
-# window sits around 1e-4 while even a slow sign clears 1e-2; the threshold is
-# set an order of magnitude above jitter and two below any real sign so sensor
-# noise alone can never cross it.
-IDLE_MOTION_GATE = 0.004
-# Mean per-column deviation from the window's own mean. This is the second,
-# independent idle signal: tracking jitter OSCILLATES, so its frame-to-frame
-# motion can sit above the gate while the hand never actually goes anywhere --
-# the window's spread stays tiny. A held "HUG" pose reported forever by a
-# signer who has stopped moving is exactly this signature; motion alone could
-# not see it, spread can.
-IDLE_SPREAD_GATE = 0.008
-
-
 @app.post("/api/stream/frame")
-async def stream_frame(session_id: str = "default", file: UploadFile = File(...)):
-    """One JPEG in, buffered landmark out.
-
-    Inference runs server-side on a sliding window every ``STREAM_INFER_EVERY``
-    seconds -- the client no longer uploads 32 frames per tick.
-
-    ``ready: false`` is a normal answer, not an error: it means the buffer is
-    still filling or the throttle is holding. The client uses ``buffered`` to
-    show how much history exists without inventing a count of its own.
-    """
-    if unified_session is None:
-        raise HTTPException(409, "Active model is static; activate a temporal model first.")
+async def stream_frame(
+    session_id: str = "default",
+    file: UploadFile = File(...),
+    mode: str = Form(default="auto"),
+    recording: bool = Form(default=False),
+    capture_time: float | None = Form(default=None),
+):
+    if REGISTRY.session is None:
+        raise HTTPException(409, "No model loaded.")
+    if mode not in {"auto", "manual"}:
+        raise HTTPException(422, "mode must be 'auto' or 'manual'")
+    if capture_time is not None and not math.isfinite(capture_time):
+        raise HTTPException(400, "capture_time must be finite")
 
     raw = await file.read()
     fr = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
     if fr is None:
-        raise HTTPException(400, "Could not decode image")
-
-    width = _active_width()
+        raise HTTPException(400, detail="Could not decode image")
     sess = get_session(session_id)
-    vec = process_bgr_frame(fr, width)
-    # Bounded carry-forward: <= 8 consecutive misses (~0.8 s at 10 Hz client)
-    # keep the window dense through a flicker; beyond that the signer's hands
-    # are genuinely gone, and freezing the last vector would replay the ending
-    # pose of the previous sign as if it were still being performed. Zeros are
-    # what the hand-presence channels read as "no hands".
-    if vec is None:
-        sess.miss += 1
-        vec = (sess.buf[-1] if sess.buf and sess.miss <= 8
-               else np.zeros(width, np.float32))
+    if sess.mode != mode:
+        sess.reset(mode)
+    timestamp = capture_time if capture_time is not None else time.monotonic()
+    height, width = fr.shape[:2]
+    emotion = detect_emotion_from_frame(fr)
+    frame_data = process_holistic_frame(fr)
+    if frame_data is None:
+        pose = hands = face = None
+        in_use = np.zeros(2, dtype=bool)
+        features = np.zeros(N_FEATURES, np.float32)
+        complete = False
+        hands_detected = 0
     else:
-        sess.miss = 0
-    sess.buf.append(np.asarray(vec, np.float32))
+        pose = frame_data["pose"]
+        hands = frame_data["hands"]
+        face = frame_data["face"]
+        in_use = frame_in_use(pose, width, height)
+        features = frame_features(pose, hands, face, in_use, width, height, 0.0)
+        complete = complete_mask_single(
+            pose, hands, frame_data["face_ok"], in_use, width, height
+        )
+        hands_detected = int(in_use.sum())
 
-    now = time.time()
-    if len(sess.buf) < STREAM_WINDOWS[0]:
-        return {"ready": False, "buffered": len(sess.buf), "detail": "filling"}
-    if now - sess.last_infer < STREAM_INFER_EVERY:
-        return {"ready": False, "buffered": len(sess.buf), "detail": "throttled"}
-    sess.last_infer = now
-
-    nmm = detect_nmm(fr)
-    tail = np.array(list(sess.buf), np.float32)
-    want_t = (REGISTRY.active or {}).get("frames") or SEQ_T
-
-    # Motion gate -- per WINDOW, not per buffer. The buffer holds up to 18 s of
-    # history; gating on its mean kept the gate open for ~15 s after a sign
-    # ended, so idle windows decoded as the previous sign and repeated until
-    # the camera stopped. Each candidate window is now gated on its own
-    # geometry: a window the signer visibly stopped moving in is skipped, and
-    # if EVERY window is idle the endpoint answers "idle" instead of guessing.
-    best = None
-    idle_stats = None
-    for w in STREAM_WINDOWS:                       # multi-window fusion: max margin wins
-        win = tail[-w:]
-        if len(win) < 2:
-            continue
-        motion = float(np.mean(np.abs(np.diff(win, axis=0))))
-        spread = float(np.mean(np.abs(win - win.mean(axis=0))))
-        if idle_stats is None or motion > idle_stats[0]:
-            idle_stats = (motion, spread)
-        if motion < IDLE_MOTION_GATE or spread < IDLE_SPREAD_GATE:
-            continue                               # this window is idle or frozen
-
-        # The interpolation in resample_arr mixes the source rows with float
-        # weights, which promotes the result to float64. ONNX Runtime rejects
-        # that outright ("Unexpected input data type ... expected float"), so the
-        # dtype is pinned here rather than left to the arithmetic.
-        arr = resample_feature_width(resample_arr(win, want_t)[None], width).astype(np.float32)
-        logits = unified_session.run(None, {UNIFIED_INPUT: arr})[0][0]
-        probs = np.exp(logits - logits.max())
-        probs /= probs.sum()
-        order = np.argsort(probs)[::-1][:2]
-        # Margin, not confidence: a hesitant window can still report 99% on one
-        # class, but it cannot report a large gap to the runner-up as well.
-        margin = float(probs[order[0]] - probs[order[1]]) if len(order) > 1 else 1.0
-        if best is None or margin > best["margin"]:
-            best = {
-                "label": ACTIVE_CLASSES[int(order[0])],
-                "confidence": float(probs[order[0]]),
-                "margin": margin,
-                "window": int(w),
-                "top3": [{"label": ACTIVE_CLASSES[i], "confidence": float(probs[i])}
-                         for i in np.argsort(probs)[::-1][:3]],
+    if mode == "manual":
+        if recording:
+            if not sess.manual_recording:
+                sess.reset("manual")
+                sess.manual_recording = True
+            sess.frames.append(frame_data)
+            sess.features.append((len(sess.features), features, complete))
+            sess.timestamps.append(timestamp)
+            return {
+                "ready": False,
+                "buffered": len(sess.frames),
+                "state": "SIGN",
+                "emotion": emotion,
+                "hands_detected": hands_detected,
             }
+        if not sess.manual_recording:
+            return {
+                "ready": False,
+                "buffered": 0,
+                "state": "IDLE",
+                "emotion": emotion,
+                "hands_detected": hands_detected,
+            }
+        sess.manual_recording = False
+        clip = select_frames_from_span(sess.features)
+        duration = _span_duration(sess.timestamps)
+        sess.frames = []
+        sess.features = []
+        sess.timestamps = []
+        if clip is None:
+            return {
+                "ready": False,
+                "buffered": 0,
+                "state": "IDLE",
+                "detail": "incomplete_span",
+                "emotion": emotion,
+                "hands_detected": hands_detected,
+            }
+        clip[:, -1] = duration
+        return _recognize_stream_clip(clip, emotion, hands_detected)
 
-    if best is None:
-        motion, spread = idle_stats if idle_stats else (0.0, 0.0)
-        return {"ready": False, "buffered": len(sess.buf),
-                "detail": "idle",
-                "motion": round(motion, 5), "spread": round(spread, 5),
-                "nmm": nmm, "emotion": nmm.get("emotion")}
+    if frame_data is None:
+        state = update_span_state(
+            sess, False, None, features, False, timestamp
+        )
+    else:
+        state = update_span_state(
+            sess, bool(in_use.any()), frame_data, features, complete, timestamp
+        )
 
-    return {**best, "ready": True, "buffered": len(sess.buf),
-            "frames_used": int(want_t),
-            "nmm": nmm, "emotion": nmm.get("emotion"), "metrics": nmm.get("metrics")}
+    if state == "SPAN_COMPLETE":
+        clip = select_frames_from_span(sess.features)
+        duration = _span_duration(sess.timestamps)
+        sess.frames = []
+        sess.features = []
+        sess.timestamps = []
+        sess.pre_roll.clear()
+        if clip is None:
+            return {
+                "ready": False,
+                "buffered": 0,
+                "state": "IDLE",
+                "detail": "incomplete_span",
+                "emotion": emotion,
+                "hands_detected": hands_detected,
+            }
+        clip[:, -1] = duration
+        return _recognize_stream_clip(clip, emotion, hands_detected)
+
+    return {
+        "ready": False,
+        "buffered": len(sess.frames),
+        "state": state,
+        "detail": "no_pose" if frame_data is None else None,
+        "emotion": emotion,
+        "hands_detected": hands_detected,
+    }
 
 
 @app.get("/api/coverage")
 def coverage():
-    """Vocabulary and replay coverage for the currently selected model."""
+    """Vocabulary and avatar-data coverage for the active model."""
     summary = _coverage_summary()
     return {
         **summary,
         "by_category": {
             cat: {
                 "total": sum(1 for s in sign_catalog if s["category"] == cat),
-                "with_landmark_sequences": sum(
-                    1 for s in sign_catalog if s["category"] == cat
+                "with_avatar_data": sum(
+                    1 for s in sign_catalog
+                    if s["category"] == cat and s["has_avatar"]
                 ),
             }
             for cat in sorted({s["category"] for s in sign_catalog})
@@ -1204,114 +801,66 @@ def coverage():
                 "label": s["label"],
                 "bengali": s["bengali_meaning"],
                 "category": s["category"],
-                "has_landmarks": True,
+                "has_landmarks": s["has_avatar"],
+                "has_avatar": s["has_avatar"],
             }
             for s in sign_catalog
         ],
         "active_model": REGISTRY.active["name"] if REGISTRY.active else None,
-        "endpoint": (REGISTRY.active or {}).get("endpoint", "/api/predict/frame"),
+        "endpoint": (REGISTRY.active or {}).get("endpoint", "/api/stream/frame"),
     }
 
 
-# ─────────────────────────────────────────────
-# REAL LANDMARK REPLAY (no synthetic skeletons anywhere)
-# ─────────────────────────────────────────────
 @app.get("/api/simulation/frames")
-def simulation_frames(label: str = "", sample_id: str = ""):
-    """Replay a model-bundled class sequence or a specific community sample."""
-    arr = None
-    face_mesh = None
-    source = ""
-    if sample_id:
-        rec = next((r for r in _load_manifest() if r["sample_id"] == sample_id), None)
-        if rec:
-            sample_path = (ROOT / rec["landmark_path"]).resolve()
-            if sample_path.parent != SAMPLES_DIR.resolve() and SAMPLES_DIR.resolve() not in sample_path.parents:
-                raise HTTPException(status_code=400, detail="Invalid community sample path")
-            if sample_path.is_file():
-                arr = np.load(sample_path, allow_pickle=False)
-                source = f"community:{sample_id}"
-    elif label:
-        sequence_path = _model_sequence_path(label)
-        if sequence_path:
-            loaded = np.load(sequence_path, allow_pickle=False)
-            arr = loaded[0] if loaded.ndim == 3 else loaded
-            source = f"{REGISTRY.active['run']}:{sequence_path.stem}"
-            face_mesh_path = sequence_path.with_name(
-                f"{sequence_path.stem}.face.npy"
-            )
-            if face_mesh_path.is_file():
-                try:
-                    face_sequences = np.load(face_mesh_path, allow_pickle=False)
-                except (OSError, ValueError) as exc:
-                    raise HTTPException(
-                        status_code=422,
-                        detail=f"Bundled face-mesh sequence cannot be loaded: {exc}",
-                    ) from exc
-                if (
-                    face_sequences.ndim != 4
-                    or face_sequences.shape[-2:] != (468, 3)
-                    or (loaded.ndim == 3 and face_sequences.shape[:2] != loaded.shape[:2])
-                    or (
-                        loaded.ndim == 2
-                        and (
-                            face_sequences.shape[0] != 1
-                            or face_sequences.shape[1] != loaded.shape[0]
-                        )
-                    )
-                ):
-                    raise HTTPException(
-                        status_code=422,
-                        detail="Bundled face mesh must align with model sequences "
-                        "and have shape (samples, frames, 468, 3).",
-                    )
-                face_mesh = np.asarray(face_sequences[0], dtype=np.float32)
-    if arr is None:
+def simulation_frames(label: str = ""):
+    """Serve the active model's per-sign avatar arrays."""
+    run_dir = _active_run_dir()
+    if not run_dir:
+        raise HTTPException(status_code=404, detail="No active model")
+
+    normalized = label.upper().replace(" ", "_")
+    if normalized not in _available_model_classes():
+        raise HTTPException(status_code=404, detail=f"No avatar data for '{label}'")
+    avatar_dir = run_dir / "avatar" / normalized
+    if not avatar_dir.is_dir():
+        raise HTTPException(status_code=404, detail=f"No avatar data for '{label}'")
+
+    try:
+        hands = np.load(avatar_dir / "hands.npy", allow_pickle=False)
+        pose = np.load(avatar_dir / "pose.npy", allow_pickle=False)
+        timestamps = np.load(avatar_dir / "t.npy", allow_pickle=False)
+        face_path = avatar_dir / "face.npy"
+        face = np.load(face_path, allow_pickle=False) if face_path.is_file() else None
+    except (OSError, ValueError) as exc:
         raise HTTPException(
-            status_code=404,
-            detail="No landmark sequence is bundled for this active-model sign.",
+            status_code=500, detail=f"Could not load avatar data for '{normalized}': {exc}"
+        ) from exc
+
+    frame_count = hands.shape[0] if hands.ndim else 0
+    if (
+        hands.ndim != 3
+        or hands.shape[1:] != (42, 3)
+        or frame_count == 0
+        or pose.shape != (frame_count, 8, 4)
+        or timestamps.shape != (frame_count,)
+        or (face is not None and face.shape != (frame_count, 19, 3))
+    ):
+        raise HTTPException(
+            status_code=422, detail=f"Avatar data for '{normalized}' has invalid shapes"
         )
 
-    arr = np.asarray(arr, dtype=np.float32)
-    if arr.ndim == 1:                                   # a single frame was stored
-        arr = arr[None]
-    if arr.ndim != 2 or arr.shape[-1] not in (HANDS_DIM, HOLISTIC_DIM):
-        raise HTTPException(status_code=422, detail="Bundled landmark sequence has an invalid shape")
-    arr = arr[:64]
-
-    if arr.shape[-1] == HOLISTIC_DIM:                   # 258 = hands 126 + pose 33x4
-        hands = arr[:, :126].reshape(len(arr), 42, 3)
-        pose = arr[:, 126:].reshape(len(arr), 33, 4)
-        result = {"frames": hands.tolist(), "pose": pose.tolist(), "points": 42,
-                  "count": int(len(arr)), "source": source, "width": HOLISTIC_DIM}
-    else:
-        result = {"frames": arr.reshape(len(arr), 42, 3).tolist(), "points": 42,
-                  "count": int(len(arr)), "source": source, "width": HANDS_DIM}
-    if face_mesh is not None:
-        face_mesh = face_mesh[:len(arr)]
-        result["face_mesh"] = [
-            frame.tolist() if np.any(frame) else []
-            for frame in face_mesh
-        ]
+    result = {
+        "frames": hands.tolist(),
+        "pose": pose.tolist(),
+        "times": timestamps.tolist(),
+        "points": 42,
+        "count": frame_count,
+        "source": f"avatar:{normalized}",
+        "width": FEATURE_WIDTH,
+    }
+    if face is not None:
+        result["face_avatar"] = face.tolist()
     return result
-
-
-@app.get("/api/dataset/index")
-def dataset_index(label: str = "", kind: str = ""):
-    idx = TRAINING_DATA_DIR / "index.jsonl"
-    if not idx.exists():
-        return {"items": []}
-    items = []
-    for line in idx.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        r = json.loads(line)
-        if label and r.get("label", "").upper() != label.upper():
-            continue
-        if kind and r.get("kind") != kind:
-            continue
-        items.append(r)
-    return {"items": items}
 
 
 # ─────────────────────────────────────────────
@@ -1319,20 +868,10 @@ def dataset_index(label: str = "", kind: str = ""):
 # ─────────────────────────────────────────────
 class NLGRequest(BaseModel):
     gloss: str
-    # Detected NMM / affect context from the recognition layer. Optional so old
-    # clients keep working; forwarded to the LLM when present.
-    nmm: dict | None = None
     emotion: dict | None = None
-    intensity: float | None = None
-    hand: str | None = None
 
     def meta(self) -> dict:
-        return {
-            "nmm": self.nmm,
-            "emotion": self.emotion,
-            "intensity": self.intensity,
-            "hand": self.hand,
-        }
+        return {"emotion": self.emotion}
 
 
 class NLGSequenceRequest(BaseModel):
@@ -1591,23 +1130,6 @@ def text_to_sign_llm(payload: TextToSignRequest):
     }
 
 
-@app.get("/api/contributions/needs-data")
-def needs_data():
-    needs = sorted(sign_catalog, key=lambda s: s["approved_samples"])[:10]
-    return {
-        "items": [
-            {
-                "id": s["id"],
-                "label": s["label"],
-                "bengali": s["bengali_meaning"],
-                "current": s["approved_samples"],
-                "target": 50,
-            }
-            for s in needs
-        ]
-    }
-
-
 # ─────────────────────────────────────────────
 # TTS (Independent Free & ElevenLabs Premium)
 # ─────────────────────────────────────────────
@@ -1735,211 +1257,24 @@ async def speech_to_text(
 
 
 
-# ─────────────────────────────────────────────
-# CONTRIBUTIONS: session + REAL ingestion
-# ─────────────────────────────────────────────
-@app.post("/api/contributions/session")
-def create_session(payload: dict):
-    return {
-        "session_id": f"sess_{uuid.uuid4().hex[:8]}",
-        "signer_id": payload.get("signer_id", "anonymous"),
-        "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "status": "active",
-    }
-
-
-@app.post("/api/contributions/session/{session_id}/samples")
-async def ingest_sample(
-    session_id: str,
-    label: str = Form(...),
-    signer_id: str = Form(...),
-    nmm_tags: str = Form("{}"),
-    file: UploadFile = File(...),
-):
-    """Real upload: decode video server-side, extract 126-dim landmarks every
-    3rd frame, save .npy + append manifest record. No simulation."""
-    canonical_label = label.upper().replace(" ", "_")
-    if canonical_label not in _available_model_classes():
-        raise HTTPException(
-            status_code=400,
-            detail="Sign is not part of the active model vocabulary.",
-        )
-
-    import os
-    import tempfile
-
-    suffix = Path(file.filename or "rec.webm").suffix or ".webm"
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-    try:
-        tmp.write(await file.read())
-        tmp.close()
-
-        width = _active_width()
-        cap = cv2.VideoCapture(tmp.name)
-        frames = []
-        idx = 0
-        while True:
-            ok, frame = cap.read()
-            if not ok:
-                break
-            if idx % 3 == 0:
-                vec = process_bgr_frame(frame, width)
-                if vec is not None:
-                    frames.append(vec)
-            idx += 1
-        cap.release()
-    finally:
-        try:
-            os.unlink(tmp.name)
-        except OSError:
-            pass
-
-    if len(frames) < 5:
-        raise HTTPException(
-            status_code=400,
-            detail="Not enough hand landmarks extracted. Keep both hands visible while recording.",
-        )
-
-    arr = np.array(frames, dtype=np.float32)
-    safe_label = re.sub(r"[^A-Za-z0-9_-]", "_", canonical_label)
-    safe_signer_id = re.sub(r"[^A-Za-z0-9_-]", "_", signer_id) or "anonymous"
-    sample_id = f"v001_{safe_label}_{safe_signer_id}_{time.strftime('%Y%m%dT%H%M%S')}"
-    label_dir = SAMPLES_DIR / safe_label / safe_signer_id
-    label_dir.mkdir(parents=True, exist_ok=True)
-    npy_path = label_dir / f"{sample_id}.npy"
-    np.save(npy_path, arr)
-
-    record = {
-        "sample_id": sample_id,
-        "session_id": session_id,
-        "label": canonical_label,
-        "signer_id": signer_id,
-        "split": "unassigned",
-        "source": "community",
-        "verification": "pending",
-        "verified_by": None,
-        "captured_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "frames": int(arr.shape[0]),
-        "width": int(arr.shape[-1]),
-        "landmark_path": str(npy_path.relative_to(ROOT)),
-        "nmm_tags": json.loads(nmm_tags or "{}"),
-        "upload_status": "success",
-    }
-    with open(MANIFEST_PATH, "a", encoding="utf-8") as f:
-        f.write(json.dumps(record, ensure_ascii=False) + "\n")
-    _refresh_catalog_sample_counts()
-
-    return {"sample_id": sample_id, "status": "pending_review", "frames": int(arr.shape[0])}
-
-
-@app.get("/api/admin/contributions")
-def get_contributions():
-    return _load_manifest()
-
-
-def resample_arr(arr, t):
-    """Linear resample of a landmark sequence to a fixed frame count."""
-    if len(arr) == t:
-        return arr
-    ix = np.linspace(0, len(arr) - 1, t)
-    i0, i1 = ix.astype(int), np.minimum(ix.astype(int) + 1, len(arr) - 1)
-    f = (ix - i0)[:, None]
-    return arr[i0] * (1 - f) + arr[i1] * f
-
-
-@app.get("/api/admin/contributions/{sample_id}/evidence")
-def get_evidence(sample_id: str):
-    rec = next((r for r in _load_manifest() if r["sample_id"] == sample_id), None)
-    if rec is None:
-        raise HTTPException(status_code=404, detail="Sample not found")
-
-    preds = []
-    top_conf = 0.0
-    frames = rec.get("frames", 0)
-    mean_vel = 0.0
-    npy = ROOT / rec["landmark_path"]
-    if npy.exists():
-        arr = np.load(npy)
-        frames = int(arr.shape[0])
-        if frames > 1:
-            mean_vel = float(np.linalg.norm(np.diff(arr[:, :63], axis=0), axis=1).mean())
-        if unified_session is not None:
-            seq = resample_arr(arr, SEQ_T)[None].astype(np.float32)
-            # Same dispatch as the endpoints: the clip is assembled in the width
-            # the active graph declares, not in whatever the upload happens to be.
-            seq = resample_feature_width(seq, _active_width())
-            logits = unified_session.run(None, {UNIFIED_INPUT: seq})[0][0]
-        else:
-            mid = arr[frames // 2]
-            logits = session.run(
-                None, {INPUT_NAME: mid.reshape(1, _active_width())})[0][0]
-        probs = np.exp(logits - logits.max())
-        probs /= probs.sum()
-        order = np.argsort(probs)[::-1][:3]
-        preds = [{"label": ACTIVE_CLASSES[i], "confidence": round(float(probs[i]), 3)} for i in order]
-        top_conf = float(probs[order[0]])
-
-    agree = round(top_conf * 100, 1) if preds and preds[0]["label"] == rec["label"] else round(top_conf * 60, 1)
-    geom = round(min(100.0, 70 + frames * 0.5), 1)
-    temp = round(min(100.0, 60 + frames * 0.8), 1) if mean_vel < 200 else 40.0
-    tags = [t.upper() for t, v in (rec.get("nmm_tags") or {}).items() if v]
-
-    return {
-        "geometry_score": geom,
-        "temporal_score": temp,
-        "similarity_score": agree,
-        "label_agreement": agree,
-        "synthetic_score": round(min(100.0, mean_vel * 2), 1),
-        "model_predictions": preds or [{"label": rec["label"], "confidence": 0.5}],
-        "numerical_features": {"frames": frames, "mean_velocity": round(mean_vel, 3)},
-        "symbolic_tags": tags or ["NO_NMM"],
-        "movement_description": (
-            f"Community recording of '{rec['label']}' by {rec['signer_id']}; "
-            f"{frames} landmark frames extracted at stride 3."
-        ),
-        "reasoning": {
-            "handshape_match": "Strong" if agree > 70 else "Moderate",
-            "movement_match": "Strong" if temp > 70 else "Moderate",
-            "temporal_match": f"{frames} frames captured",
-            "nmm_detected": ", ".join(tags).lower() or "none",
-            "top_candidate": f"{preds[0]['label']} · {preds[0]['confidence'] * 100:.1f}%" if preds else "—",
-        },
-    }
-
-
-@app.post("/api/admin/contributions/{sample_id}/verify")
-def verify_contribution(sample_id: str, payload: dict):
-    action = payload.get("action", "needs_review")
-    items = _load_manifest()
-    changed = False
-    for r in items:
-        if r["sample_id"] == sample_id:
-            r["verification"] = action
-            r["verified_by"] = payload.get("reviewer", "admin")
-            changed = True
-    if changed:
-        _write_manifest(items)
-        _refresh_catalog_sample_counts()
-    return {"success": changed}
-
-
 @app.get("/api/admin/stats")
 def admin_stats():
     ai = get_ai_config()
+    coverage = _coverage_summary()
     return {
         "total_signs": len(sign_catalog),
-        "total_approved_samples": sum(s["approved_samples"] for s in sign_catalog),
-        "total_pending_samples": sum(s["pending_samples"] for s in sign_catalog),
-        "total_rejected_samples": sum(s["rejected_samples"] for s in sign_catalog),
+        "avatar_classes": coverage["with_avatar_data"],
         "model_active": REGISTRY.active["name"] if REGISTRY.active else None,
         "model_classes": len(REGISTRY.active_classes),
-        "contract": (REGISTRY.active or {}).get("contract") or {
-            "kind": "temporal" if (REGISTRY.active or {}).get("temporal") else "static",
-            "feature_width": (REGISTRY.active or {}).get("input_width", 126),
+        "contract": {
+            "kind": "temporal",
+            "feature_width": FEATURE_WIDTH,
+            "frames": SEQ_T,
         },
         "llm_available": is_llm_available(),
         "llm_model": ai["model"],
         "inference_mode": ai["provider"],
+        "ai_mode": ai["mode"],
         "dataset_version": "v0.1",
     }
 

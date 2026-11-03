@@ -19,8 +19,6 @@ import { RoundAlpanaStage } from "./AlpanaStage";
 import { DHUTI_DROP, THRESH, TORSO_WORLD } from "./simulationConstants";
 import {
   POSE_BODY_PAIRS,
-  POSE_FACE_MARKERS,
-  POSE_FACE_PAIRS,
   POSE_POINTS,
   type PosePoint,
 } from "@/lib/pose";
@@ -35,49 +33,20 @@ const HAND_CONN: [number, number][] = [
   [18, 19], [19, 20], [0, 17],
 ];
 
-const FACE_OVAL_INDICES = [
-  10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378,
-  400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21,
-  54, 103, 67, 109,
-];
-
 type Point2 = { x: number; y: number };
 
-const EMPTY_POSE: PosePoint[] = Array.from(
-  { length: POSE_POINTS },
-  () => [0, 0, 0, 0],
-);
-
-const BODY_GUIDE: PosePoint[] = EMPTY_POSE.map((point) => [...point] as PosePoint);
-const setGuidePoint = (index: number, x: number, y: number) => {
-  BODY_GUIDE[index] = [x, y, 0, 1];
-};
-setGuidePoint(0, 0, -2.2);
-setGuidePoint(2, -0.2, -2.25);
-setGuidePoint(5, 0.2, -2.25);
-setGuidePoint(7, -0.4, -2.1);
-setGuidePoint(8, 0.4, -2.1);
-setGuidePoint(9, -0.18, -1.95);
-setGuidePoint(10, 0.18, -1.95);
-setGuidePoint(11, -0.7, -1.25);
-setGuidePoint(12, 0.7, -1.25);
-setGuidePoint(13, -1.1, -0.65);
-setGuidePoint(14, 1.1, -0.65);
-setGuidePoint(15, -1.35, 0);
-setGuidePoint(16, 1.35, 0);
-setGuidePoint(23, -0.45, 0.55);
-setGuidePoint(24, 0.45, 0.55);
-setGuidePoint(25, -0.48, 1.65);
-setGuidePoint(26, 0.48, 1.65);
-setGuidePoint(27, -0.5, 2.8);
-setGuidePoint(28, 0.5, 2.8);
-
-const GUIDE_BODY_PAIRS = POSE_BODY_PAIRS.filter(
-  ([a, b]) => ![0, 2, 5, 7, 9, 10].includes(a) && ![0, 2, 5, 7, 9, 10].includes(b),
-);
-const POSE_SKELETON_PAIRS = POSE_BODY_PAIRS.filter(
-  ([a, b]) => !(a <= 10 && b <= 10),
-);
+const BODY_GUIDE: PosePoint[] = [
+  [-0.7, -1.25, 0, 1],
+  [0.7, -1.25, 0, 1],
+  [-1.1, -0.65, 0, 1],
+  [1.1, -0.65, 0, 1],
+  [-1.35, 0, 0, 1],
+  [1.35, 0, 0, 1],
+  [-0.45, 0.55, 0, 1],
+  [0.45, 0.55, 0, 1],
+];
+const GUIDE_BODY_PAIRS = POSE_BODY_PAIRS;
+const POSE_SKELETON_PAIRS = POSE_BODY_PAIRS;
 
 const POSE_DRAW_THRESHOLD = 0.01;
 
@@ -88,8 +57,8 @@ const isMissingHand = (frame: number[][], offset: number) =>
 
 function handAnchor(frame: number[][]): Point2 {
   return isMissingHand(frame, 21)
-    ? { x: BODY_GUIDE[15][0], y: BODY_GUIDE[15][1] }
-    : { x: BODY_GUIDE[16][0], y: BODY_GUIDE[16][1] };
+    ? { x: BODY_GUIDE[4][0], y: BODY_GUIDE[4][1] }
+    : { x: BODY_GUIDE[5][0], y: BODY_GUIDE[5][1] };
 }
 
 function validPoint(point: number[] | undefined | null): point is number[] {
@@ -105,12 +74,12 @@ interface PoseAlignment {
 
 function getPoseAlignments(pose: PosePoint[][]): PoseAlignment[] {
   const measurements = pose.map((frame) => {
-    const shoulders = [frame[11], frame[12]];
-    const hips = [frame[23], frame[24]];
+    const shoulders = [frame[0], frame[1]];
+    const hips = [frame[6], frame[7]];
     const visible = [...shoulders, ...hips].filter(
       (point) => point && point[3] >= POSE_DRAW_THRESHOLD && validPoint(point),
     );
-    const centerPoints = visible.length ? visible : [frame[11], frame[12]].filter(Boolean);
+    const centerPoints = visible.length ? visible : [frame[0], frame[1]].filter(Boolean);
     const center = centerPoints.reduce(
       (sum, point) => ({ x: sum.x + point[0], y: sum.y + point[1] }),
       { x: 0, y: 0 },
@@ -119,12 +88,12 @@ function getPoseAlignments(pose: PosePoint[][]): PoseAlignment[] {
     center.y /= centerPoints.length || 1;
 
     const shoulderCenter = {
-      x: (frame[11]?.[0] + frame[12]?.[0]) / 2,
-      y: (frame[11]?.[1] + frame[12]?.[1]) / 2,
+      x: (frame[0]?.[0] + frame[1]?.[0]) / 2,
+      y: (frame[0]?.[1] + frame[1]?.[1]) / 2,
     };
     const hipCenter = {
-      x: (frame[23]?.[0] + frame[24]?.[0]) / 2,
-      y: (frame[23]?.[1] + frame[24]?.[1]) / 2,
+      x: (frame[6]?.[0] + frame[7]?.[0]) / 2,
+      y: (frame[6]?.[1] + frame[7]?.[1]) / 2,
     };
     const torsoLength = Math.hypot(
       shoulderCenter.x - hipCenter.x,
@@ -156,105 +125,6 @@ function stabilizePoint(point: number[], alignment: PoseAlignment): Point2 {
   };
 }
 
-function averagePoints(points: number[][]): Point2 | null {
-  const valid = points.filter(validPoint);
-  if (valid.length === 0) return null;
-  const total = valid.reduce(
-    (sum, point) => ({ x: sum.x + point[0], y: sum.y + point[1] }),
-    { x: 0, y: 0 },
-  );
-  return { x: total.x / valid.length, y: total.y / valid.length };
-}
-
-function sortedPair(points: Point2[]): Point2[] {
-  return [...points].sort((a, b) => a.x - b.x);
-}
-
-function alignFaceMeshToPose(
-  face: number[][],
-  pose: PosePoint[],
-): Point2[] {
-  const sourceNose = face[4];
-  const targetNose = pose[0];
-  if (!validPoint(sourceNose) || !validPoint(targetNose)) return [];
-
-  const faceEyes = [
-    averagePoints([face[33], face[133]].filter(validPoint)),
-    averagePoints([face[362], face[263]].filter(validPoint)),
-  ].filter((point): point is Point2 => point !== null);
-  const poseEyes = [
-    averagePoints([pose[1], pose[2], pose[3]].filter(validPoint)),
-    averagePoints([pose[4], pose[5], pose[6]].filter(validPoint)),
-  ].filter((point): point is Point2 => point !== null);
-
-  const anchors: [Point2, Point2][] = [[
-    { x: sourceNose[0], y: sourceNose[1] },
-    { x: targetNose[0], y: targetNose[1] },
-  ]];
-  const sourceEyes = sortedPair(faceEyes);
-  const targetEyes = sortedPair(poseEyes);
-  for (let index = 0; index < Math.min(sourceEyes.length, targetEyes.length); index++) {
-    anchors.push([sourceEyes[index], targetEyes[index]]);
-  }
-  const sourceMouth = sortedPair(
-    [face[61], face[291]].filter(validPoint).map(([x, y]) => ({ x, y })),
-  );
-  const targetMouth = sortedPair(
-    [pose[9], pose[10]].filter(validPoint).map((point) => ({ x: point[0], y: point[1] })),
-  );
-  for (let index = 0; index < Math.min(sourceMouth.length, targetMouth.length); index++) {
-    anchors.push([sourceMouth[index], targetMouth[index]]);
-  }
-
-  if (anchors.length < 2) return [];
-
-  const sourceCenter = anchors.reduce(
-    (sum, [source]) => ({ x: sum.x + source.x, y: sum.y + source.y }),
-    { x: 0, y: 0 },
-  );
-  const targetCenter = anchors.reduce(
-    (sum, [, target]) => ({ x: sum.x + target.x, y: sum.y + target.y }),
-    { x: 0, y: 0 },
-  );
-  sourceCenter.x /= anchors.length;
-  sourceCenter.y /= anchors.length;
-  targetCenter.x /= anchors.length;
-  targetCenter.y /= anchors.length;
-
-  let denominator = 0;
-  let coefficientA = 0;
-  let coefficientB = 0;
-  for (const [source, target] of anchors) {
-    const x = source.x - sourceCenter.x;
-    const y = source.y - sourceCenter.y;
-    const targetX = target.x - targetCenter.x;
-    const targetY = target.y - targetCenter.y;
-    denominator += x * x + y * y;
-    coefficientA += x * targetX + y * targetY;
-    coefficientB += x * targetY - y * targetX;
-  }
-  if (denominator < 1e-8) return [];
-  coefficientA /= denominator;
-  coefficientB /= denominator;
-
-  return face.map((point) => {
-    if (!validPoint(point)) return { x: Number.NaN, y: Number.NaN };
-    const [x, y] = point;
-    const centeredX = x - sourceCenter.x;
-    const centeredY = y - sourceCenter.y;
-    return {
-      x:
-        targetCenter.x +
-        coefficientA * centeredX -
-        coefficientB * centeredY,
-      y:
-        targetCenter.y +
-        coefficientB * centeredX +
-        coefficientA * centeredY,
-    };
-  });
-}
-
 /* ==========================================================================
  * 2. 3D: CONSTANTS, TYPES, FACE TOPOLOGY
  * ========================================================================== */
@@ -263,7 +133,6 @@ type PairList = ReadonlyArray<readonly [number, number]>;
 
 const Z_POSE = 0.15;
 const Z_HAND = 0.5;
-const Z_FACE = 0.5;
 const Z_LIMIT = 0.4;
 const SNAP_MAX_TORSOS = 1.0;
 const FOV = 38;
@@ -287,28 +156,16 @@ const COLOR = {
   gold: "#C79A32",
 } as const;
 
-const isHandStub = (i: number) => i >= 17 && i <= 22;
-const isLowerBodyBone = ([a, b]: readonly [number, number]) =>
-  a >= 23 || b >= 23;
 const RIG_POSE_PAIRS: PairList = POSE_SKELETON_PAIRS.filter(
-  ([a, b]) =>
-    !isHandStub(a) &&
-    !isHandStub(b) &&
-    !isLowerBodyBone([a, b]),
+  ([a, b]) => a < 6 && b < 6,
 );
 const RIG_GUIDE_PAIRS: PairList = GUIDE_BODY_PAIRS.filter(
-  ([a, b]) =>
-    !isHandStub(a) &&
-    !isHandStub(b) &&
-    !isLowerBodyBone([a, b]),
-);
-const POSE_FACE_JOINTS: number[] = Array.from(
-  new Set<number>([...POSE_FACE_MARKERS, ...POSE_FACE_PAIRS.flat()]),
+  ([a, b]) => a < 6 && b < 6,
 );
 
 const BODY_JOINT_RADIUS: Record<number, number> = {
-  11: 0.105, 12: 0.105, 13: 0.06, 14: 0.06, 15: 0.046, 16: 0.046,
-  23: 0.08, 24: 0.08, 25: 0.066, 26: 0.066, 27: 0.05, 28: 0.05,
+  0: 0.105, 1: 0.105, 2: 0.06, 3: 0.06, 4: 0.046, 5: 0.046,
+  6: 0.08, 7: 0.08,
 };
 const DEFAULT_BODY_JOINT_RADIUS = 0.034;
 const bodyJointRadius = (i: number) => BODY_JOINT_RADIUS[i] ?? DEFAULT_BODY_JOINT_RADIUS;
@@ -323,40 +180,105 @@ const HAND_BONE_RADIUS: number[] = HAND_CONN.map(
 const PALM_FAN = [0, 1, 5, 9, 13, 17];
 const PALM_INDICES = [0, 1, 2, 0, 2, 3, 0, 3, 4, 0, 4, 5];
 
-const FACE_LOOPS: { idx: number[]; closed: boolean }[] = [
-  { idx: FACE_OVAL_INDICES, closed: true },
-  { idx: [33, 160, 158, 133, 153, 144], closed: true },
-  { idx: [362, 385, 387, 263, 373, 380], closed: true },
-  { idx: [61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 409, 270, 269, 267, 0, 37, 39, 40, 185], closed: true },
-  { idx: [78, 95, 88, 178, 87, 14, 317, 402, 318, 324, 308, 415, 310, 311, 312, 13, 82, 81, 80, 191], closed: true },
-  { idx: [70, 63, 105, 66, 107], closed: false },
-  { idx: [336, 296, 334, 293, 300], closed: false },
-  { idx: [168, 6, 197, 195, 5, 4], closed: false },
-  { idx: [98, 97, 2, 326, 327], closed: false },
+const FACE_POINTS = 19;
+const FACE_CURVES: { points: number[]; closed: boolean; steps: number }[] = [
+  { points: [0, 2, 1, 3], closed: true, steps: 8 },
+  { points: [4, 5, 6], closed: false, steps: 6 },
+  { points: [7, 8, 9], closed: false, steps: 6 },
+  { points: [15, 17, 16, 18], closed: true, steps: 6 },
 ];
-const FACE_SLOTS: number[] = [];
-const FACE_SLOT_OF = new Map<number, number>();
-const slotOf = (landmark: number): number => {
-  let slot = FACE_SLOT_OF.get(landmark);
-  if (slot === undefined) {
-    slot = FACE_SLOTS.length;
-    FACE_SLOTS.push(landmark);
-    FACE_SLOT_OF.set(landmark, slot);
-  }
-  return slot;
-};
-const FACE_SEGMENTS: number[] = [];
-for (const { idx, closed } of FACE_LOOPS) {
-  for (let k = 0; k < idx.length - 1; k++) FACE_SEGMENTS.push(slotOf(idx[k]), slotOf(idx[k + 1]));
-  if (closed) FACE_SEGMENTS.push(slotOf(idx[idx.length - 1]), slotOf(idx[0]));
+const EYE_CURVE_STEPS = 16;
+const FACE_NOSE_SEGMENTS = 4;
+const FACE_SEGMENT_COUNT =
+  FACE_CURVES.reduce(
+    (total, curve) =>
+      total +
+      (curve.closed ? curve.points.length : curve.points.length - 1) * curve.steps,
+    0,
+  ) + 2 * EYE_CURVE_STEPS + FACE_NOSE_SEGMENTS;
+
+function catmullRomCoordinate(
+  p0: number,
+  p1: number,
+  p2: number,
+  p3: number,
+  t: number,
+): number {
+  const t2 = t * t;
+  const t3 = t2 * t;
+  return 0.5 * (
+    2 * p1 +
+    (-p0 + p2) * t +
+    (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 +
+    (-p0 + 3 * p1 - 3 * p2 + p3) * t3
+  );
 }
-const FACE_OVAL_SLOTS = FACE_OVAL_INDICES.map(slotOf);
-const FACE_KEY_SLOTS = [33, 133, 362, 263, 4, 61, 291, 13, 14, 105, 334, 152].map(slotOf);
-const EYE_L = slotOf(33);
-const EYE_R = slotOf(263);
-const SLOT_NOSE = slotOf(4);
-const SLOT_TEMPLE_A = slotOf(234);
-const SLOT_TEMPLE_B = slotOf(454);
+
+function writeFaceCurve(
+  positions: THREE.BufferAttribute,
+  face: Float32Array,
+  path: number[],
+  closed: boolean,
+  steps: number,
+  segmentOffset: number,
+): number {
+  const count = path.length;
+  const segmentCount = closed ? count : count - 1;
+  for (let segment = 0; segment < segmentCount; segment++) {
+    const p0 = path[closed ? (segment - 1 + count) % count : Math.max(segment - 1, 0)];
+    const p1 = path[segment];
+    const p2 = path[(segment + 1) % count];
+    const p3 = path[closed ? (segment + 2) % count : Math.min(segment + 2, count - 1)];
+    for (let step = 0; step < steps; step++) {
+      const t0 = step / steps;
+      const t1 = (step + 1) / steps;
+      const vertex = (segmentOffset + segment * steps + step) * 2;
+      for (let endpoint = 0; endpoint < 2; endpoint++) {
+        const t = endpoint === 0 ? t0 : t1;
+        const target = vertex + endpoint;
+        positions.setXYZ(
+          target,
+          catmullRomCoordinate(face[p0 * 3], face[p1 * 3], face[p2 * 3], face[p3 * 3], t),
+          catmullRomCoordinate(face[p0 * 3 + 1], face[p1 * 3 + 1], face[p2 * 3 + 1], face[p3 * 3 + 1], t),
+          catmullRomCoordinate(face[p0 * 3 + 2], face[p1 * 3 + 2], face[p2 * 3 + 2], face[p3 * 3 + 2], t),
+        );
+      }
+    }
+  }
+  return segmentOffset + segmentCount * steps;
+}
+
+function writeEyeCurve(
+  positions: THREE.BufferAttribute,
+  face: Float32Array,
+  startSegment: number,
+  upperIndex: number,
+  lowerIndex: number,
+  halfWidth: number,
+): void {
+  const centerX = (face[upperIndex * 3] + face[lowerIndex * 3]) / 2;
+  const centerY = (face[upperIndex * 3 + 1] + face[lowerIndex * 3 + 1]) / 2;
+  const centerZ = (face[upperIndex * 3 + 2] + face[lowerIndex * 3 + 2]) / 2 + 0.006;
+  const halfHeight =
+    Math.hypot(
+      face[upperIndex * 3] - face[lowerIndex * 3],
+      face[upperIndex * 3 + 1] - face[lowerIndex * 3 + 1],
+    ) * 1.15;
+  const segments = EYE_CURVE_STEPS;
+  for (let segment = 0; segment < segments; segment++) {
+    for (let endpoint = 0; endpoint < 2; endpoint++) {
+      const angle = ((segment + endpoint) / segments) * Math.PI * 2;
+      const x = Math.cos(angle);
+      const y = Math.sin(angle);
+      positions.setXYZ(
+        (startSegment + segment) * 2 + endpoint,
+        centerX + x * halfWidth,
+        centerY + y * halfHeight * (0.68 + 0.32 * Math.abs(x)),
+        centerZ,
+      );
+    }
+  }
+}
 
 interface Bounds {
   minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number;
@@ -384,7 +306,7 @@ interface SolvedFrame {
   pose: Float32Array;
   hands: Float32Array;
   handPresent: [boolean, boolean];
-  dense: boolean;
+  facePresent: boolean;
   face: Float32Array;
   head: Float32Array;
 }
@@ -409,14 +331,14 @@ function medianTorso(pose: PosePoint[][] | undefined, alignments: PoseAlignment[
   if (!pose?.length || !alignments) return TORSO_WORLD;
   const values: number[] = [];
   pose.forEach((frame, i) => {
-    const ok = [11, 12, 23, 24].every(
+    const ok = [0, 1, 6, 7].every(
       (k) => frame[k] && validPoint(frame[k]) && frame[k][3] >= THRESH,
     );
     if (!ok) return;
     const length =
       Math.hypot(
-        (frame[11][0] + frame[12][0]) / 2 - (frame[23][0] + frame[24][0]) / 2,
-        (frame[11][1] + frame[12][1]) / 2 - (frame[23][1] + frame[24][1]) / 2,
+        (frame[0][0] + frame[1][0]) / 2 - (frame[6][0] + frame[7][0]) / 2,
+        (frame[0][1] + frame[1][1]) / 2 - (frame[6][1] + frame[7][1]) / 2,
       ) * (alignments[i]?.scale ?? 1);
     if (Number.isFinite(length) && length > 0.02) values.push(length);
   });
@@ -428,66 +350,36 @@ function medianTorso(pose: PosePoint[][] | undefined, alignments: PoseAlignment[
 interface SolveContext {
   scale: number;
   bounds: Bounds;
-  hasDenseConnections: boolean;
 }
 
 function poseHeadFallback(pose: Float32Array, head: Float32Array): void {
   const vis = (i: number) => pose[i * 4 + 3] >= THRESH;
-  let cx: number, cy: number, cz: number, w: number, roll = 0;
-  if (vis(7) && vis(8)) {
-    const dx = pose[8 * 4] - pose[7 * 4];
-    const dy = pose[8 * 4 + 1] - pose[7 * 4 + 1];
-    const dz = pose[8 * 4 + 2] - pose[7 * 4 + 2];
-    w = Math.max(Math.hypot(dx, dy, dz) * 0.95, 0.2);
-    cx = (pose[7 * 4] + pose[8 * 4]) / 2;
-    cy = (pose[7 * 4 + 1] + pose[8 * 4 + 1]) / 2;
-    cz = (pose[7 * 4 + 2] + pose[8 * 4 + 2]) / 2;
-    roll = dx < 0 ? Math.atan2(-dy, -dx) : Math.atan2(dy, dx);
-  } else if (vis(0)) {
-    w = 0.54;
-    cx = pose[0];
-    cy = pose[1] + 0.04;
-    cz = pose[2] - 0.4 * w * 1.1;
-  } else {
-    return;
-  }
-  w *= 0.85;
+  if (!vis(0) || !vis(1)) return;
+  const dx = pose[4] - pose[0];
+  const dy = pose[5] - pose[1];
+  const dz = pose[6] - pose[2];
+  const width = Math.max(Math.hypot(dx, dy, dz) * 0.62, 0.2);
+  const cx = (pose[0] + pose[4]) / 2;
+  const shoulderY = (pose[1] + pose[5]) / 2;
+  const cy = shoulderY + width * 0.58;
+  const cz = (pose[2] + pose[6]) / 2;
+  const roll = Math.atan2(dx < 0 ? -dy : dy, Math.abs(dx));
+  const w = width;
   const h = w * 1.2;
   const d = w * 0.8;
-  head.set([1, cx, cy, cz, w, h, d, cx, cy - h * 0.5, 0, roll]);
+  head.set([1, cx, cy, cz, w, h, d, cx, shoulderY + NECK_LENGTH, cz, roll]);
 }
 
 const NECK_LENGTH = 0.2;
 const NECK_RADIUS = 0.1;
 const NECK_SEGMENTS = 5;
 
-function seatHead(pose: Float32Array, face: Float32Array, head: Float32Array): void {
-  if (head[0] === 0 || pose[11 * 4 + 3] < THRESH || pose[12 * 4 + 3] < THRESH) return;
-  const shoulderX = (pose[11 * 4] + pose[12 * 4]) / 2;
-  const shoulderY = (pose[11 * 4 + 1] + pose[12 * 4 + 1]) / 2;
-  const dx = head[7] - shoulderX;
-  const dy = head[8] - shoulderY - NECK_LENGTH;
-  head[1] -= dx; head[7] -= dx;
-  head[2] -= dy; head[8] -= dy;
-  for (let k = 0; k < FACE_SLOTS.length; k++) {
-    if (face[k * 4 + 3] !== 1) continue;
-    face[k * 4] -= dx;
-    face[k * 4 + 1] -= dy;
-  }
-  for (let i = 0; i <= 10; i++) {
-    if (pose[i * 4 + 3] < THRESH) continue;
-    pose[i * 4] -= dx;
-    pose[i * 4 + 1] -= dy;
-  }
-}
-
 function solveFrame(
   ctx: SolveContext,
   frame: number[][],
   poseFrame: PosePoint[] | undefined,
   alignment: PoseAlignment | undefined,
-  alignedFace: Point2[] | undefined,
-  rawFace: number[][] | undefined,
+  faceAvatar: number[][] | undefined,
 ): SolvedFrame {
   const S = ctx.scale;
   const hasPose = Boolean(poseFrame);
@@ -495,7 +387,7 @@ function solveFrame(
 
   let zc = 0;
   if (hasPose) {
-    const zs = [11, 12]
+    const zs = [0, 1]
       .map((i) => pf[i])
       .filter((p) => p && validPoint(p) && p[3] >= THRESH && Number.isFinite(p[2]));
     if (zs.length) zc = zs.reduce((s, p) => s + p[2], 0) / zs.length;
@@ -508,7 +400,7 @@ function solveFrame(
     const p = pf[i];
     if (!p || !validPoint(p) || !(p[3] >= THRESH)) continue;
     const xy = alignment ? stabilizePoint(p, alignment) : { x: p[0], y: p[1] };
-    const isArm = i >= 13 && i <= 22;
+    const isArm = i >= 2 && i <= 5;
     const rawZ = hasPose && isArm && Number.isFinite(p[2]) ? (p[2] - zc) * zScale : 0;
     const z = Math.max(-zLimit, Math.min(zLimit, rawZ));
     poseMpZ[i] = z;
@@ -523,7 +415,7 @@ function solveFrame(
   ([0, 21] as const).forEach((off, slot) => {
     if (isMissingHand(frame, off)) return;
     handPresent[slot] = true;
-    const wristIdx = slot === 0 ? 15 : 16;
+    const wristIdx = slot === 0 ? 4 : 5;
     const ref = [wristIdx, wristIdx - 2].find((i) => pose[i * 4 + 3] >= THRESH);
     const baseZ = ref !== undefined ? poseMpZ[ref] : 0;
     for (let j = 0; j < 21; j++) {
@@ -551,55 +443,78 @@ function solveFrame(
     }
   });
 
-  const face = new Float32Array(FACE_SLOTS.length * 4);
+  const face = new Float32Array(FACE_POINTS * 4);
   const head = new Float32Array(HEAD_LEN);
-  let dense = ctx.hasDenseConnections;
-  if (ctx.hasDenseConnections && alignedFace?.length && rawFace) {
-    dense = true;
-    let ratio = 1;
-    const r1 = rawFace[234], r2 = rawFace[454], a1 = alignedFace[234], a2 = alignedFace[454];
-    if (validPoint(r1) && validPoint(r2) && a1 && a2 && Number.isFinite(a1.x) && Number.isFinite(a2.x)) {
-      const rawWidth = Math.hypot(r2[0] - r1[0], r2[1] - r1[1]);
-      if (rawWidth > 1e-4) ratio = Math.hypot(a2.x - a1.x, a2.y - a1.y) / rawWidth;
-    }
-    const noseZ = Number.isFinite(rawFace[4]?.[2]) ? rawFace[4][2] : 0;
-    const baseZ = pose[3] >= THRESH ? poseMpZ[0] : 0;
-    for (let k = 0; k < FACE_SLOTS.length; k++) {
-      const ap = alignedFace[FACE_SLOTS[k]];
-      const rp = rawFace[FACE_SLOTS[k]];
-      if (!ap || !Number.isFinite(ap.x) || !Number.isFinite(ap.y) || !rp) continue;
-      const rz = Number.isFinite(rp[2]) ? rp[2] - noseZ : 0;
-      writeWorld(face, k * 4, ap.x, ap.y, baseZ + rz * ratio * Z_FACE, S);
-      face[k * 4 + 3] = 1;
-    }
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, sumZ = 0, n = 0;
-    for (const slot of FACE_OVAL_SLOTS) {
-      const o = slot * 4;
-      if (face[o + 3] < 1) continue;
-      minX = Math.min(minX, face[o]); maxX = Math.max(maxX, face[o]);
-      minY = Math.min(minY, face[o + 1]); maxY = Math.max(maxY, face[o + 1]);
-      sumZ += face[o + 2]; n++;
-    }
-    if (n >= 8) {
-      const w = (maxX - minX) * 0.9, h = (maxY - minY) * 0.95, d = w * 0.8;
-      const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2, cz = sumZ / n - 0.3 * d;
-      let roll = 0;
-      if (face[EYE_L * 4 + 3] === 1 && face[EYE_R * 4 + 3] === 1) {
-        let dx = face[EYE_R * 4] - face[EYE_L * 4];
-        let dy = face[EYE_R * 4 + 1] - face[EYE_L * 4 + 1];
-        if (dx < 0) { dx = -dx; dy = -dy; }
-        roll = Math.atan2(dy, dx);
+  poseHeadFallback(pose, head);
+  let facePresent = false;
+  if (faceAvatar?.length === FACE_POINTS && head[0] > 0) {
+    const leftTemple = faceAvatar[2];
+    const rightTemple = faceAvatar[3];
+    const forehead = faceAvatar[0];
+    const chin = faceAvatar[1];
+    if (
+      validPoint(leftTemple) &&
+      validPoint(rightTemple) &&
+      validPoint(forehead) &&
+      validPoint(chin)
+    ) {
+      const sourceWidth = Math.hypot(
+        rightTemple[0] - leftTemple[0],
+        rightTemple[1] - leftTemple[1],
+      );
+      if (sourceWidth > 1e-5) {
+        const faceCenter = alignment
+          ? stabilizePoint([
+              (leftTemple[0] + rightTemple[0]) / 2,
+              (forehead[1] + chin[1]) / 2,
+            ], alignment)
+          : {
+              x: (leftTemple[0] + rightTemple[0]) / 2,
+              y: (forehead[1] + chin[1]) / 2,
+            };
+        const faceScale =
+          head[4] /
+          (sourceWidth * (alignment?.scale ?? 1) * S);
+        const cos = Math.cos(head[10]);
+        const sin = Math.sin(head[10]);
+        const noseZ = Number.isFinite(faceAvatar[14]?.[2]) ? faceAvatar[14][2] : 0;
+        const stabilizedChin = alignment ? stabilizePoint(chin, alignment) : {
+          x: chin[0],
+          y: chin[1],
+        };
+        const chinX = (stabilizedChin.x - faceCenter.x) * S * faceScale;
+        const chinY = -(stabilizedChin.y - faceCenter.y) * S * faceScale;
+        const faceOriginX = head[7] - (chinX * cos - chinY * sin);
+        const faceOriginY = head[8] - (chinX * sin + chinY * cos);
+        let validCount = 0;
+        for (let index = 0; index < FACE_POINTS; index++) {
+          const point = faceAvatar[index];
+          if (!validPoint(point) || !Number.isFinite(point[2])) continue;
+          const stabilized = alignment ? stabilizePoint(point, alignment) : {
+            x: point[0],
+            y: point[1],
+          };
+          const localX = (stabilized.x - faceCenter.x) * S * faceScale;
+          const localY = -(stabilized.y - faceCenter.y) * S * faceScale;
+          const offset = index * 4;
+          face[offset] = faceOriginX + localX * cos - localY * sin;
+          face[offset + 1] = faceOriginY + localX * sin + localY * cos;
+          face[offset + 2] =
+            head[3] +
+            head[6] * 0.52 +
+            (noseZ - point[2]) * S * faceScale * 0.25;
+          face[offset + 3] = 1;
+          validCount++;
+        }
+        facePresent = validCount >= Math.ceil(FACE_POINTS * 0.75);
       }
-      head.set([1, cx, cy, cz, w, h, d, cx, minY, 0, roll]);
     }
   }
-  if (head[0] === 0 && !ctx.hasDenseConnections) poseHeadFallback(pose, head);
-  seatHead(pose, face, head);
 
   /* Reject stray landmarks while retaining the upper-body and hand range. */
   const b = ctx.bounds;
   let ccx = 0, ccy = 0, ccz = 0, ccn = 0;
-  for (const i of [11, 12, 23, 24]) {
+  for (const i of [0, 1, 6, 7]) {
     if (pose[i * 4 + 3] < THRESH) continue;
     ccx += pose[i * 4]; ccy += pose[i * 4 + 1]; ccz += pose[i * 4 + 2]; ccn++;
   }
@@ -609,7 +524,7 @@ function solveFrame(
     Math.abs(z - ccz) <= maxTorso * TORSO_WORLD;
   for (let i = 0; i < POSE_POINTS; i++) {
     if (
-      i < 23 && pose[i * 4 + 3] >= THRESH && !isHandStub(i) &&
+      pose[i * 4 + 3] >= THRESH &&
       inReach(pose[i * 4], pose[i * 4 + 1], pose[i * 4 + 2], 3.4)
     ) {
       growBounds(b, pose[i * 4], pose[i * 4 + 1], pose[i * 4 + 2]);
@@ -627,35 +542,31 @@ function solveFrame(
     growBounds(b, head[1] - head[4] / 2, head[2] - head[5] / 2, head[3]);
     growBounds(b, head[1] + head[4] / 2, head[2] + head[5] / 2, head[3] + head[6] / 2);
   }
-  void SLOT_NOSE; void SLOT_TEMPLE_A; void SLOT_TEMPLE_B;
-  return { hasPose, pose, hands, handPresent, dense, face, head };
+  return { hasPose, pose, hands, handPresent, facePresent, face, head };
 }
 
 function solveSequence(
   frames: number[][][],
   pose: PosePoint[][] | undefined,
   alignments: PoseAlignment[] | undefined,
-  alignedFaces: Point2[][] | undefined,
-  faceMesh: number[][][] | undefined,
-  hasDenseConnections: boolean,
+  faceAvatar: number[][][] | undefined,
 ): SolvedSequence {
   const ctx: SolveContext = {
     scale: TORSO_WORLD / medianTorso(pose, alignments),
     bounds: emptyBounds(),
-    hasDenseConnections,
   };
   const solved = frames.map((frame, f) =>
-    solveFrame(ctx, frame, pose?.[f], alignments?.[f], alignedFaces?.[f], faceMesh?.[f]),
+    solveFrame(ctx, frame, pose?.[f], alignments?.[f], faceAvatar?.[f]),
   );
 
   const hemHeights = solved.flatMap(({ pose: framePose }) => {
     if (
-      framePose[23 * 4 + 3] < THRESH ||
-      framePose[24 * 4 + 3] < THRESH
+      framePose[6 * 4 + 3] < THRESH ||
+      framePose[7 * 4 + 3] < THRESH
     ) {
       return [];
     }
-    return [(framePose[23 * 4 + 1] + framePose[24 * 4 + 1]) / 2 - DHUTI_DROP];
+    return [(framePose[6 * 4 + 1] + framePose[7 * 4 + 1]) / 2 - DHUTI_DROP];
   });
   if (hemHeights.length) {
     ctx.bounds.minY = Math.min(
@@ -663,10 +574,10 @@ function solveSequence(
       hemHeights.reduce((lowest, height) => Math.min(lowest, height), Infinity) - 0.44,
     );
     const hips = solved.flatMap(({ pose: framePose }) =>
-      framePose[23 * 4 + 3] >= THRESH && framePose[24 * 4 + 3] >= THRESH
+      framePose[6 * 4 + 3] >= THRESH && framePose[7 * 4 + 3] >= THRESH
         ? [{
-            x: (framePose[23 * 4] + framePose[24 * 4]) / 2,
-            z: (framePose[23 * 4 + 2] + framePose[24 * 4 + 2]) / 2,
+            x: (framePose[6 * 4] + framePose[7 * 4]) / 2,
+            z: (framePose[6 * 4 + 2] + framePose[7 * 4 + 2]) / 2,
           }]
         : [],
     );
@@ -699,13 +610,12 @@ interface SampleState {
   head: Float32Array;
   headValid: boolean;
   headInit: boolean;
-  dense: boolean;
+  facePresent: boolean;
   hasPose: boolean;
 }
 export type SampleRef = { current: SampleState };
 
 function createSampleState(): SampleState {
-  const faceCount = FACE_SLOTS.length;
   return {
     pose: new Float32Array(POSE_POINTS * 4),
     poseInit: new Uint8Array(POSE_POINTS),
@@ -713,13 +623,13 @@ function createSampleState(): SampleState {
     handValid: [new Uint8Array(21), new Uint8Array(21)],
     handInit: new Uint8Array(2),
     handAlpha: new Float32Array(2),
-    face: new Float32Array(faceCount * 3),
-    faceValid: new Uint8Array(faceCount),
-    faceInit: new Uint8Array(faceCount),
+    face: new Float32Array(FACE_POINTS * 3),
+    faceValid: new Uint8Array(FACE_POINTS),
+    faceInit: new Uint8Array(FACE_POINTS),
     head: new Float32Array(HEAD_LEN),
     headValid: false,
     headInit: false,
-    dense: false,
+    facePresent: false,
     hasPose: false,
   };
 }
@@ -797,34 +707,29 @@ function sampleFrame(
     st.handInit[h] = 1;
   }
 
-  const selectedFrame = a < 0.5 ? f0 : f1;
-  st.dense = selectedFrame.dense;
-  if (st.dense) {
-    for (let k = 0; k < FACE_SLOTS.length; k++) {
-      if (!blendSource(f0.face, f1.face, k, a, 0.5)) {
-        st.faceValid[k] = 0;
-        st.faceInit[k] = 0;
-        continue;
-      }
-      st.faceValid[k] = 1;
-      easeInto(st.face, k * 3, st.faceInit[k] === 1, kxy, kz);
-      st.faceInit[k] = 1;
+  st.facePresent = f0.facePresent || f1.facePresent;
+  for (let k = 0; k < FACE_POINTS; k++) {
+    if (!blendSource(f0.face, f1.face, k, a, 0.5)) {
+      st.faceValid[k] = 0;
+      st.faceInit[k] = 0;
+      continue;
     }
+    st.faceValid[k] = 1;
+    easeInto(st.face, k * 3, st.faceInit[k] === 1, kxy, kz);
+    st.faceInit[k] = 1;
   }
 
   const v0 = f0.head[0] > 0;
   const v1 = f1.head[0] > 0;
-  st.headValid = st.dense ? selectedFrame.head[0] > 0 : v0 || v1;
+  st.headValid = v0 || v1;
   if (st.headValid) {
     const kh = snap ? 1 : 1 - Math.exp(-delta * 25);
     for (let k = 1; k < HEAD_LEN; k++) {
-      const t = st.dense
-        ? selectedFrame.head[k]
-        : v0 && v1
-          ? f0.head[k] + (f1.head[k] - f0.head[k]) * a
-          : v0
-            ? f0.head[k]
-            : f1.head[k];
+      const t = v0 && v1
+        ? f0.head[k] + (f1.head[k] - f0.head[k]) * a
+        : v0
+          ? f0.head[k]
+          : f1.head[k];
       st.head[k] = st.headInit ? st.head[k] + (t - st.head[k]) * kh : t;
     }
     st.headInit = true;
@@ -904,18 +809,7 @@ const visTint = (v: number) => 0.4 + 0.6 * Math.min(1, Math.max(0.2, v));
 function BodyRig({ sampleRef, pairs }: { sampleRef: SampleRef; pairs: PairList }) {
   const bonesRef = useRef<THREE.InstancedMesh>(null);
   const jointsRef = useRef<THREE.InstancedMesh>(null);
-  const joints = useMemo(
-    () => Array.from(new Set(pairs.flat())).filter(
-      (index) =>
-        index !== 23 &&
-        index !== 24 &&
-        index !== 25 &&
-        index !== 26 &&
-        index !== 27 &&
-        index !== 28,
-    ),
-    [pairs],
-  );
+  const joints = useMemo(() => Array.from(new Set(pairs.flat())), [pairs]);
   const radii = useMemo(
     () => pairs.map(([a, b]) => ((bodyJointRadius(a) + bodyJointRadius(b)) / 2) * 0.58),
     [pairs],
@@ -923,10 +817,10 @@ function BodyRig({ sampleRef, pairs }: { sampleRef: SampleRef; pairs: PairList }
   const baseColors = useMemo(
     () =>
       pairs.map(([a, b]) => {
-        const torso = [11, 12, 23, 24];
+        const torso = [0, 1, 6, 7];
         if (torso.includes(a) && torso.includes(b)) return new THREE.Color(COLOR.torso);
-        if (a >= 11 && a <= 16 && b >= 11 && b <= 16) return new THREE.Color(COLOR.arm);
-        if (a >= 23 || b >= 23) return new THREE.Color(COLOR.leg);
+        if (a >= 2 && a <= 5 && b >= 2 && b <= 5) return new THREE.Color(COLOR.arm);
+        if (a >= 6 || b >= 6) return new THREE.Color(COLOR.leg);
         return new THREE.Color(COLOR.other);
       }),
     [pairs],
@@ -1070,24 +964,24 @@ function TorsoRig({
     if (!mesh) return;
     if (!playbackRef.current.playing) idleTime.current += Math.min(delta, 0.1);
     const P = sampleRef.current.pose;
-    const ok = P[11 * 4 + 3] >= THRESH && P[12 * 4 + 3] >= THRESH && P[23 * 4 + 3] >= THRESH && P[24 * 4 + 3] >= THRESH;
+    const ok = P[0 * 4 + 3] >= THRESH && P[1 * 4 + 3] >= THRESH && P[6 * 4 + 3] >= THRESH && P[7 * 4 + 3] >= THRESH;
     mesh.visible = ok;
     if (!ok) return;
-    const shoulderCenterX = (P[11 * 4] + P[12 * 4]) / 2;
-    const shoulderCenterY = (P[11 * 4 + 1] + P[12 * 4 + 1]) / 2;
-    const shoulderCenterZ = (P[11 * 4 + 2] + P[12 * 4 + 2]) / 2;
-    const hipCenterX = (P[23 * 4] + P[24 * 4]) / 2;
-    const hipCenterY = (P[23 * 4 + 1] + P[24 * 4 + 1]) / 2 - 0.12;
-    const hipCenterZ = (P[23 * 4 + 2] + P[24 * 4 + 2]) / 2;
+    const shoulderCenterX = (P[0] + P[4]) / 2;
+    const shoulderCenterY = (P[1] + P[5]) / 2;
+    const shoulderCenterZ = (P[2] + P[6]) / 2;
+    const hipCenterX = (P[6 * 4] + P[7 * 4]) / 2;
+    const hipCenterY = (P[6 * 4 + 1] + P[7 * 4 + 1]) / 2 - 0.12;
+    const hipCenterZ = (P[6 * 4 + 2] + P[7 * 4 + 2]) / 2;
     const shoulderHalfWidth = Math.max(
       Math.hypot(
-        P[11 * 4] - P[12 * 4],
-        P[11 * 4 + 1] - P[12 * 4 + 1],
-        P[11 * 4 + 2] - P[12 * 4 + 2],
+        P[0] - P[4],
+        P[1] - P[5],
+        P[2] - P[6],
       ) * 0.52,
       0.12,
     );
-    const hipHalfWidth = Math.max(Math.abs(P[23 * 4] - P[24 * 4]) * 0.52, 0.1);
+    const hipHalfWidth = Math.max(Math.abs(P[6 * 4] - P[7 * 4]) * 0.52, 0.1);
     const pos = geometry.getAttribute("position") as THREE.BufferAttribute;
     for (let ring = 0; ring < TORSO_RINGS; ring++) {
       const t = ring / (TORSO_RINGS - 1);
@@ -1166,7 +1060,7 @@ function HeadRig({ sampleRef }: { sampleRef: SampleRef }) {
     const neck = neckRef.current;
     if (!head || !neck) return;
     const st = sampleRef.current;
-    head.visible = st.headValid;
+    head.visible = st.headValid && !st.facePresent;
     if (!st.headValid) {
       hideAll(neck);
       return;
@@ -1177,10 +1071,10 @@ function HeadRig({ sampleRef }: { sampleRef: SampleRef }) {
     head.rotation.z = H[10];
 
     const P = st.pose;
-    if (P[11 * 4 + 3] >= THRESH && P[12 * 4 + 3] >= THRESH) {
-      _sa[0] = (P[11 * 4] + P[12 * 4]) / 2;
-      _sa[1] = (P[11 * 4 + 1] + P[12 * 4 + 1]) / 2;
-      _sa[2] = (P[11 * 4 + 2] + P[12 * 4 + 2]) / 2;
+    if (P[0 * 4 + 3] >= THRESH && P[1 * 4 + 3] >= THRESH) {
+      _sa[0] = (P[0] + P[4]) / 2;
+      _sa[1] = (P[1] + P[5]) / 2;
+      _sa[2] = (P[2] + P[6]) / 2;
       _sb[0] = H[7]; _sb[1] = H[8]; _sb[2] = H[9];
       const dx = _sb[0] - _sa[0];
       const dy = _sb[1] - _sa[1];
@@ -1235,88 +1129,151 @@ function HeadRig({ sampleRef }: { sampleRef: SampleRef }) {
 function FaceRig({ sampleRef }: { sampleRef: SampleRef }) {
   const linesRef = useRef<THREE.LineSegments>(null);
   const keysRef = useRef<THREE.InstancedMesh>(null);
-  const stubBonesRef = useRef<THREE.InstancedMesh>(null);
-  const stubJointsRef = useRef<THREE.InstancedMesh>(null);
+  const eyeCenters = useMemo(() => new Float32Array(6), []);
 
   const lineGeo = useMemo(() => {
     const g = new THREE.BufferGeometry();
     g.setAttribute(
       "position",
-      new THREE.BufferAttribute(new Float32Array(FACE_SEGMENTS.length * 3), 3).setUsage(THREE.DynamicDrawUsage),
+      new THREE.BufferAttribute(new Float32Array(FACE_SEGMENT_COUNT * 6), 3).setUsage(THREE.DynamicDrawUsage),
     );
     return g;
   }, []);
   const lineMat = useMemo(
-    () => new THREE.LineBasicMaterial({ color: COLOR.face, transparent: true, opacity: 0.8 }),
+    () => new THREE.LineBasicMaterial({ color: "#59F4FF", transparent: true, opacity: 0.96 }),
     [],
   );
-  const keyMat = useMemo(() => new THREE.MeshStandardMaterial({ color: COLOR.faceKey, roughness: 0.4, metalness: 0.1 }), []);
-  const stubMat = useMemo(() => new THREE.MeshStandardMaterial({ color: COLOR.face, roughness: 0.45, metalness: 0.2 }), []);
-  useEffect(
-    () => () => { lineGeo.dispose(); lineMat.dispose(); keyMat.dispose(); stubMat.dispose(); },
-    [lineGeo, lineMat, keyMat, stubMat],
+  const keyMat = useMemo(
+    () => new THREE.MeshStandardMaterial({
+      color: "#BDFBFF",
+      emissive: "#38DDF0",
+      emissiveIntensity: 0.35,
+      roughness: 0.35,
+      metalness: 0.05,
+    }),
+    [],
   );
-  useLayoutEffect(() => {
-    hideAll(keysRef.current);
-    hideAll(stubBonesRef.current);
-    hideAll(stubJointsRef.current);
-  }, []);
+  useEffect(
+    () => () => { lineGeo.dispose(); lineMat.dispose(); keyMat.dispose(); },
+    [lineGeo, lineMat, keyMat],
+  );
+  useLayoutEffect(() => hideAll(keysRef.current), []);
 
   useFrame(() => {
     const lines = linesRef.current, keys = keysRef.current;
-    const stubBones = stubBonesRef.current, stubJoints = stubJointsRef.current;
-    if (!lines || !keys || !stubBones || !stubJoints) return;
+    if (!lines || !keys) return;
     const st = sampleRef.current;
-    const dense = st.dense;
-    lines.visible = dense;
-    keys.visible = dense;
-    stubBones.visible = !dense;
-    stubJoints.visible = !dense;
+    lines.visible = st.facePresent;
+    keys.visible = st.facePresent;
+    const pos = lineGeo.getAttribute("position") as THREE.BufferAttribute;
+    const F = st.face;
+    let segmentOffset = 0;
+    for (const curve of FACE_CURVES) {
+      const segmentCount = (curve.closed ? curve.points.length : curve.points.length - 1) * curve.steps;
+      if (curve.points.every((point) => st.faceValid[point])) {
+        segmentOffset = writeFaceCurve(
+          pos,
+          F,
+          curve.points,
+          curve.closed,
+          curve.steps,
+          segmentOffset,
+        );
+      } else {
+        for (let segment = 0; segment < segmentCount; segment++) {
+          pos.setXYZ((segmentOffset + segment) * 2, 0, 0, 0);
+          pos.setXYZ((segmentOffset + segment) * 2 + 1, 0, 0, 0);
+        }
+        segmentOffset += segmentCount;
+      }
+    }
+    const eyesAvailable = [10, 11, 12, 13].every((index) => st.faceValid[index]);
+    let eyeGap = 0;
+    let leftAperture = 0;
+    let rightAperture = 0;
+    if (eyesAvailable) {
+      const leftX = (F[10 * 3] + F[11 * 3]) / 2;
+      const leftY = (F[10 * 3 + 1] + F[11 * 3 + 1]) / 2;
+      const rightX = (F[12 * 3] + F[13 * 3]) / 2;
+      const rightY = (F[12 * 3 + 1] + F[13 * 3 + 1]) / 2;
+      eyeGap = Math.hypot(rightX - leftX, rightY - leftY);
+      const halfWidth = THREE.MathUtils.clamp(eyeGap * 0.27, 0.008, 0.035);
+      leftAperture = Math.hypot(
+        F[10 * 3] - F[11 * 3],
+        F[10 * 3 + 1] - F[11 * 3 + 1],
+      );
+      rightAperture = Math.hypot(
+        F[12 * 3] - F[13 * 3],
+        F[12 * 3 + 1] - F[13 * 3 + 1],
+      );
+      writeEyeCurve(pos, F, segmentOffset, 10, 11, halfWidth);
+      writeEyeCurve(pos, F, segmentOffset + EYE_CURVE_STEPS, 12, 13, halfWidth);
+      segmentOffset += EYE_CURVE_STEPS * 2;
 
-    if (dense) {
-      const pos = lineGeo.getAttribute("position") as THREE.BufferAttribute;
-      const F = st.face;
-      for (let s = 0; s < FACE_SEGMENTS.length; s += 2) {
-        const a = FACE_SEGMENTS[s], b = FACE_SEGMENTS[s + 1];
-        const i = s;
-        if (st.faceValid[a] && st.faceValid[b]) {
-          pos.setXYZ(i, F[a * 3], F[a * 3 + 1], F[a * 3 + 2]);
-          pos.setXYZ(i + 1, F[b * 3], F[b * 3 + 1], F[b * 3 + 2]);
-        } else {
-          pos.setXYZ(i, 0, 0, 0);
-          pos.setXYZ(i + 1, 0, 0, 0);
+      eyeCenters.set([
+        leftX,
+        leftY,
+        (F[10 * 3 + 2] + F[11 * 3 + 2]) / 2 + 0.012,
+        rightX,
+        rightY,
+        (F[12 * 3 + 2] + F[13 * 3 + 2]) / 2 + 0.012,
+      ]);
+      if (st.faceValid[14]) {
+        const noseX = F[14 * 3];
+        const noseY = F[14 * 3 + 1];
+        const noseZ = F[14 * 3 + 2] + 0.008;
+        const length = eyeGap * 0.12;
+        for (let segment = 0; segment < FACE_NOSE_SEGMENTS; segment++) {
+          const top = 1 - segment / FACE_NOSE_SEGMENTS;
+          const bottom = 1 - (segment + 1) / FACE_NOSE_SEGMENTS;
+          pos.setXYZ(
+            (segmentOffset + segment) * 2,
+            noseX,
+            noseY + length * top,
+            noseZ,
+          );
+          pos.setXYZ(
+            (segmentOffset + segment) * 2 + 1,
+            noseX,
+            noseY + length * bottom,
+            noseZ,
+          );
+        }
+      } else {
+        for (let segment = 0; segment < FACE_NOSE_SEGMENTS; segment++) {
+          pos.setXYZ((segmentOffset + segment) * 2, 0, 0, 0);
+          pos.setXYZ((segmentOffset + segment) * 2 + 1, 0, 0, 0);
         }
       }
-      pos.needsUpdate = true;
-      for (let k = 0; k < FACE_KEY_SLOTS.length; k++) {
-        const slot = FACE_KEY_SLOTS[k];
-        if (st.faceValid[slot]) placeJoint(keys, k, F, slot * 3, slot === SLOT_NOSE ? 0.016 : 0.011);
-        else keys.setMatrixAt(k, _zero);
-      }
-      keys.instanceMatrix.needsUpdate = true;
+      segmentOffset += FACE_NOSE_SEGMENTS;
     } else {
-      const P = st.pose;
-      for (let i = 0; i < POSE_FACE_PAIRS.length; i++) {
-        const a = POSE_FACE_PAIRS[i][0], b = POSE_FACE_PAIRS[i][1];
-        if (P[a * 4 + 3] >= THRESH && P[b * 4 + 3] >= THRESH) placeBone(stubBones, i, P, a * 4, P, b * 4, 0.007);
-        else stubBones.setMatrixAt(i, _zero);
+      const emptySegments = EYE_CURVE_STEPS * 2 + FACE_NOSE_SEGMENTS;
+      for (let segment = 0; segment < emptySegments; segment++) {
+        pos.setXYZ((segmentOffset + segment) * 2, 0, 0, 0);
+        pos.setXYZ((segmentOffset + segment) * 2 + 1, 0, 0, 0);
       }
-      for (let i = 0; i < POSE_FACE_JOINTS.length; i++) {
-        const idx = POSE_FACE_JOINTS[i];
-        if (P[idx * 4 + 3] >= THRESH) placeJoint(stubJoints, i, P, idx * 4, idx === 0 ? 0.02 : 0.013);
-        else stubJoints.setMatrixAt(i, _zero);
-      }
-      stubBones.instanceMatrix.needsUpdate = true;
-      stubJoints.instanceMatrix.needsUpdate = true;
+      segmentOffset += emptySegments;
+      eyeCenters.fill(0);
     }
+    pos.needsUpdate = true;
+    for (let index = 0; index < 2; index++) {
+      if (eyesAvailable) {
+        const aperture = index === 0 ? leftAperture : rightAperture;
+        const eyeScale = eyeGap > 0
+          ? THREE.MathUtils.clamp(aperture / (eyeGap * 0.12), 0, 1)
+          : 0;
+        placeJoint(keys, index, eyeCenters, index * 3, 0.008 * eyeScale);
+      } else {
+        keys.setMatrixAt(index, _zero);
+      }
+    }
+    keys.instanceMatrix.needsUpdate = true;
   });
 
   return (
     <group>
       <lineSegments ref={linesRef} geometry={lineGeo} material={lineMat} frustumCulled={false} />
-      <instancedMesh ref={keysRef} args={[getJointGeometry(), keyMat, FACE_KEY_SLOTS.length]} frustumCulled={false} />
-      <instancedMesh ref={stubBonesRef} args={[getBoneGeometry(), stubMat, POSE_FACE_PAIRS.length]} frustumCulled={false} />
-      <instancedMesh ref={stubJointsRef} args={[getJointGeometry(), stubMat, POSE_FACE_JOINTS.length]} frustumCulled={false} />
+      <instancedMesh ref={keysRef} args={[getJointGeometry(), keyMat, 2]} frustumCulled={false} />
     </group>
   );
 }
@@ -1378,16 +1335,16 @@ function HandRig({ slot, color, sampleRef }: { slot: 0 | 1; color: string; sampl
     correction.current.set(0, 0, 0);
     const P = st.pose;
     if (
-      P[11 * 4 + 3] >= THRESH && P[12 * 4 + 3] >= THRESH &&
-      P[23 * 4 + 3] >= THRESH && P[24 * 4 + 3] >= THRESH &&
+      P[0 * 4 + 3] >= THRESH && P[1 * 4 + 3] >= THRESH &&
+      P[6 * 4 + 3] >= THRESH && P[7 * 4 + 3] >= THRESH &&
       valid[0]
     ) {
-      const shoulderY = (P[11 * 4 + 1] + P[12 * 4 + 1]) / 2;
-      const hipY = (P[23 * 4 + 1] + P[24 * 4 + 1]) / 2;
-      const shoulderCenterX = (P[11 * 4] + P[12 * 4]) / 2;
-      const shoulderCenterZ = (P[11 * 4 + 2] + P[12 * 4 + 2]) / 2;
-      const hipCenterX = (P[23 * 4] + P[24 * 4]) / 2;
-      const hipCenterZ = (P[23 * 4 + 2] + P[24 * 4 + 2]) / 2;
+      const shoulderY = (P[1] + P[5]) / 2;
+      const hipY = (P[6 * 4 + 1] + P[7 * 4 + 1]) / 2;
+      const shoulderCenterX = (P[0] + P[4]) / 2;
+      const shoulderCenterZ = (P[2] + P[6]) / 2;
+      const hipCenterX = (P[6 * 4] + P[7 * 4]) / 2;
+      const hipCenterZ = (P[6 * 4 + 2] + P[7 * 4 + 2]) / 2;
       const wristT = THREE.MathUtils.clamp(
         (shoulderY - pts[1]) / Math.max(shoulderY - hipY, 1e-5),
         0,
@@ -1400,10 +1357,10 @@ function HandRig({ slot, color, sampleRef }: { slot: 0 | 1; color: string; sampl
       const directionZ = directionLength > 1e-5 ? wristZ / directionLength : 0;
       let requiredOffset = 0;
       const shoulderWidth = Math.max(Math.hypot(
-        P[11 * 4] - P[12 * 4],
-        P[11 * 4 + 2] - P[12 * 4 + 2],
+        P[0] - P[4],
+        P[2] - P[6],
       ) * 0.52, 0.12);
-      const hipWidth = Math.max(Math.abs(P[23 * 4] - P[24 * 4]) * 0.52, 0.1);
+      const hipWidth = Math.max(Math.abs(P[6 * 4] - P[7 * 4]) * 0.52, 0.1);
 
       for (let joint = 0; joint < 21; joint++) {
         if (!valid[joint]) continue;
@@ -1893,8 +1850,7 @@ function detectWebGL(): boolean {
 interface LandmarkSimulationProps {
   frames?: number[][][];
   pose?: PosePoint[][];
-  faceMesh?: number[][][];
-  faceMeshError?: string;
+  faceAvatar?: number[][][];
   fps?: number;
   title?: string;
   minimal?: boolean;
@@ -1919,8 +1875,7 @@ const VIEW_BUTTONS: { label: string; kind: ViewKind }[] = [
 export function LandmarkSimulation({
   frames,
   pose,
-  faceMesh,
-  faceMeshError,
+  faceAvatar,
   fps = 15,
   title,
   minimal = false,
@@ -1950,31 +1905,12 @@ export function LandmarkSimulation({
     () => (pose?.length ? getPoseAlignments(pose) : undefined),
     [pose],
   );
-  const alignedFaceFrames = useMemo(
-    () =>
-      faceMesh?.map((faceFrame, index) => {
-        const targetPose = pose?.[index] ?? BODY_GUIDE;
-        const aligned = alignFaceMeshToPose(faceFrame, targetPose);
-        const alignment = poseAlignments?.[index];
-        return alignment
-          ? aligned.map((point) => stabilizePoint([point.x, point.y], alignment))
-          : aligned;
-      }),
-    [faceMesh, pose, poseAlignments],
-  );
   const seq = useMemo(
     () =>
       frames?.length
-        ? solveSequence(
-            frames,
-            pose,
-            poseAlignments,
-            alignedFaceFrames,
-            faceMesh,
-            Boolean(faceMesh?.some((frame) => frame.length > 0)),
-          )
+        ? solveSequence(frames, pose, poseAlignments, faceAvatar)
         : null,
-    [frames, pose, poseAlignments, alignedFaceFrames, faceMesh],
+    [frames, pose, poseAlignments, faceAvatar],
   );
 
   const mode: "pending" | "3d" | "unavailable" =
@@ -1984,7 +1920,7 @@ export function LandmarkSimulation({
   const currentHandsCount = currentFrameData
     ? [0, 21].filter((offset) => !isMissingHand(currentFrameData, offset)).length
     : 0;
-  const currentFaceMeshCount = alignedFaceFrames?.[currentFrame]?.length ?? 0;
+  const currentFaceAvatarCount = faceAvatar?.[currentFrame]?.length ?? 0;
   const displayTitle = title?.replace(/^.*onnx_models[\\/]\d+[:/\\]?/i, "") ?? title;
 
   useEffect(() => {
@@ -2057,22 +1993,15 @@ export function LandmarkSimulation({
         ) : (
           <span className="shrink-0 text-[#818CF8]">Body guide</span>
         )}
-        {currentFaceMeshCount > 0 ? (
+        {currentFaceAvatarCount > 0 ? (
           <>
             <span className="shrink-0" aria-hidden="true">|</span>
-            <span className="shrink-0 text-sky-300">Face: {currentFaceMeshCount}</span>
+            <span className="shrink-0 text-sky-300">Face: {currentFaceAvatarCount}</span>
           </>
-        ) : faceMesh ? (
+        ) : faceAvatar ? (
           <>
             <span className="shrink-0" aria-hidden="true">|</span>
             <span className="shrink-0 text-text-muted">No face</span>
-          </>
-        ) : faceMeshError ? (
-          <>
-            <span className="shrink-0" aria-hidden="true">|</span>
-            <span className="shrink-0 text-status-unknown" title={faceMeshError}>
-              Face mesh unavailable
-            </span>
           </>
         ) : null}
         {displayTitle && (

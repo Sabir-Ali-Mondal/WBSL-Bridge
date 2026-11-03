@@ -2,9 +2,6 @@ import apiClient from "./api";
 
 export interface DatasetStats {
   total_signs: number;
-  total_approved_samples: number;
-  total_pending_samples: number;
-  total_rejected_samples: number;
   languages: string[];
   categories: string[];
   dataset_version: string;
@@ -13,18 +10,18 @@ export interface DatasetStats {
 
 export interface AdminStats {
   total_signs: number;
-  total_approved_samples: number;
-  total_pending_samples: number;
-  total_rejected_samples: number;
-  model_active: string;
+  avatar_classes: number;
+  model_active: string | null;
   model_classes: number;
   contract?: {
     kind?: string;
     feature_width?: number;
+    frames?: number;
   };
   llm_available: boolean;
   llm_model: string;
   inference_mode: string;
+  ai_mode: string;
   dataset_version: string;
 }
 

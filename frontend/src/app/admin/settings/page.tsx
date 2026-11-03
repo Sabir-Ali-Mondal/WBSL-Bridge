@@ -21,9 +21,11 @@ export default function AdminSettingsPage() {
   const rows: [string, string][] = [
     ["API PORT", "8200"],
     ["ACTIVE MODEL", `${health?.active_model ?? "—"} (${health?.model_run ?? "—"})`],
-    ["MODEL CONTRACT", `${health?.contract?.kind ?? "—"} · ${health?.contract?.feature_width ?? "—"}-dim · ${health?.contract?.frames ?? 1} frames`],
+    ["MODEL CONTRACT", `${health?.contract?.kind ?? "—"} · ${health?.contract?.feature_width ?? 98}-dim · ${health?.contract?.frames ?? 64} frames`],
+    ["ARCHITECTURE", "BiLSTM + Attention (98-dim shoulder box)"],
     ["SIGN VOCABULARY", String(health?.vocabulary_classes ?? 0)],
     ["LLM ENDPOINT", `${health?.llm_model ?? "—"} · ${health?.inference_mode ?? "—"}`],
+    ["AI MODE", health?.ai_mode ?? "offline"],
     ["TTS ENGINE", "edge-tts → BanglaTTS fallback"],
     ["MODEL SEQUENCE COVERAGE", `${health?.sequence_coverage?.with_landmark_sequences ?? 0}/${health?.sequence_coverage?.total_classes ?? 0}`],
   ];

@@ -24,9 +24,6 @@ def _load_dotenv():
 
 _load_dotenv()
 
-DEFAULT_BASE_URL = "https://api.openai.com/v1"
-DEFAULT_MODEL_NAME = "gpt-4o-mini"
-
 _KEYLESS_HOSTS = ("localhost", "127.0.0.1", "0.0.0.0", "::1")
 
 
@@ -42,20 +39,35 @@ def _env(name: str, default: str = "") -> str:
 
 
 def get_ai_config() -> dict:
-    configured_url = _env("AI_BASE_URL")
-    base_url = configured_url or DEFAULT_BASE_URL
-    is_local = any(h in base_url for h in _KEYLESS_HOSTS)
+    mode = _env("AI_MODE", "offline").lower()
+    if mode not in ("online", "offline"):
+        raise ValueError(f"AI_MODE must be 'online' or 'offline', got '{mode}'")
 
-    api_key = _env("AI_API_KEY")
+    if mode == "online":
+        base_url = _env("AI_ONLINE_BASE_URL")
+        api_key = _env("AI_ONLINE_API_KEY")
+        model = _env("AI_ONLINE_MODEL_NAME")
+    else:
+        base_url = _env("AI_OFFLINE_BASE_URL")
+        api_key = _env("AI_OFFLINE_API_KEY")
+        model = _env("AI_OFFLINE_MODEL_NAME")
+
+    if not base_url:
+        raise ValueError(f"AI_{mode.upper()}_BASE_URL is empty. Set it in .env.")
+    if not model:
+        raise ValueError(f"AI_{mode.upper()}_MODEL_NAME is empty. Set it in .env.")
+
+    is_local = urlparse(base_url).hostname in _KEYLESS_HOSTS
     if not api_key:
         api_key = "no-key-required" if is_local else ""
 
     return {
         "base_url": base_url.rstrip("/"),
         "api_key": api_key,
-        "model": _env("AI_MODEL_NAME", DEFAULT_MODEL_NAME),
+        "model": model,
         "is_local": is_local,
         "provider": "local" if is_local else "cloud",
+        "mode": mode,
         "configured": bool(api_key),
         "stream": _env_bool("AI_STREAM", True),
         "reasoning": _env_bool("AI_REASONING", True),
@@ -86,21 +98,6 @@ def build_user_message(gloss_text: str, meta: dict | None = None) -> str:
     meta = meta or {}
     lines: list[str] = []
 
-    nmm = meta.get("nmm") or {}
-    if isinstance(nmm, dict):
-        if nmm.get("negation"):
-            lines.append("- NEGATION: head shake detected. The signer negated it.")
-        if nmm.get("affirmation"):
-            lines.append("- AFFIRMATION: deliberate head nod detected.")
-        if nmm.get("wh_question"):
-            lines.append("- WH-QUESTION: brow furrow detected. Marked tokens are WH-questions.")
-        if nmm.get("question"):
-            lines.append(
-                "- POLAR QUESTION: eyebrow raise detected. Marked tokens are yes/no questions."
-            )
-        if nmm.get("emphasis"):
-            lines.append("- EMPHASIS: mouth opening detected on the marked token(s).")
-
     gloss_with_affect = gloss_text
     emotion = meta.get("emotion")
     if isinstance(emotion, dict):
@@ -121,11 +118,11 @@ def build_user_message(gloss_text: str, meta: dict | None = None) -> str:
     if hand:
         lines.append(f"- DOMINANT HAND: {hand}.")
 
-    if not lines and gloss_with_affect == gloss_text:
-        return gloss_text
+    if not lines:
+        return gloss_with_affect
 
     return (
-        "SIGN METADATA (detected non-manual markers and affect):\n"
+        "SIGN METADATA (affect and sign context):\n"
         + "\n".join(lines)
         + "\n\nGLOSS:\n"
         + gloss_with_affect
@@ -171,6 +168,7 @@ def _base_result(cfg: dict, **extra) -> dict:
         "status": "success",
         "engine": cfg["model"],
         "provider": cfg["provider"],
+        "mode": cfg.get("mode", "offline"),
         "endpoint": cfg["base_url"],
         "tokens_used": 0,
     }
@@ -178,7 +176,7 @@ def _base_result(cfg: dict, **extra) -> dict:
     return result
 
 
-def _offline_result(status: str, error: str, tokens: int = 0) -> dict:
+def _error_result(status: str, error: str, tokens: int = 0) -> dict:
     return _base_result(
         get_ai_config(), status=status, tokens_used=tokens, error=error
     )
@@ -339,10 +337,10 @@ def stream_bengali(
 ) -> Iterator[dict]:
     cfg = get_ai_config()
     if not cfg["configured"]:
-        yield _offline_result(
+        yield _error_result(
             "llm_not_configured",
-            "No AI provider configured. Set AI_API_KEY (and AI_BASE_URL / "
-            "AI_MODEL_NAME) in .env -- see .env.example.",
+            f"No AI provider configured for AI_MODE={cfg['mode']}. "
+            "Configure the selected provider in the root .env.",
         ) | {"type": "error"}
         return
 
@@ -392,11 +390,11 @@ def stream_bengali(
         )
 
     except httpx.TimeoutException:
-        yield _offline_result(
+        yield _error_result(
             "timeout", "LLM generation timed out. Try a shorter gloss."
         ) | {"type": "error"}
     except Exception as e:
-        yield _offline_result("error", str(e)) | {"type": "error"}
+        yield _error_result("error", str(e)) | {"type": "error"}
 
 
 def generate_bengali(
@@ -409,10 +407,10 @@ def generate_bengali(
 ) -> dict:
     cfg = get_ai_config()
     if not cfg["configured"]:
-        return _offline_result(
+        return _error_result(
             "llm_not_configured",
-            "No AI provider configured. Set AI_API_KEY (and AI_BASE_URL / "
-            "AI_MODEL_NAME) in .env -- see .env.example.",
+            f"No AI provider configured for AI_MODE={cfg['mode']}. "
+            "Configure the selected provider in the root .env.",
         )
 
     if stream is None:
@@ -429,7 +427,7 @@ def generate_bengali(
         ):
             if event["type"] in ("done", "error"):
                 final = event
-        final = dict(final or _offline_result("error", "Empty stream"))
+        final = dict(final or _error_result("error", "Empty stream"))
         final.pop("type", None)
         return final
 
@@ -461,11 +459,11 @@ def generate_bengali(
         )
 
     except httpx.TimeoutException:
-        return _offline_result(
+        return _error_result(
             "timeout", "LLM generation timed out. Try a shorter gloss."
         )
     except Exception as e:
-        return _offline_result("error", str(e))
+        return _error_result("error", str(e))
 
 
 def generate_bengali_with_uncertainty(

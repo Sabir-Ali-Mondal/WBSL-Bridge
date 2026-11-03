@@ -2,8 +2,7 @@
 import React, { useState } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { LandmarkSimulation } from "@/components/simulation/LandmarkSimulation";
-import { PipelineStatus } from "@/components/pipeline/PipelineStatus";
-import { Play, Volume2, Sparkles, AlertCircle } from "lucide-react";
+import { Volume2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
 export default function StandaloneDemoPage() {
@@ -91,12 +90,6 @@ export default function StandaloneDemoPage() {
           </button>
         ))}
       </div>
-
-      {/* Pipeline Status */}
-      <PipelineStatus
-        stages={{ camera: "idle", landmarks: "active", recognition: "active", nlg: "active", tts: "active" }}
-        fps={30}
-      />
 
       {/* Canvas Landmark Player */}
       <div className="bg-surface border border-border rounded-lg p-6 space-y-4">

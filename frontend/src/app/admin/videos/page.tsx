@@ -15,7 +15,7 @@ interface ModelSign {
 interface LandmarkReplay {
   frames: number[][][];
   pose?: [number, number, number, number][][];
-  face_mesh?: number[][][];
+  face_avatar?: number[][][];
   source: string;
 }
 
@@ -80,7 +80,7 @@ export default function ModelSimulationPage() {
                 key={`${current?.label}-${replay.source}`}
                 frames={replay.frames}
                 pose={replay.pose}
-                faceMesh={replay.face_mesh}
+                faceAvatar={replay.face_avatar}
                 fps={15}
                 title={replay.source}
               />

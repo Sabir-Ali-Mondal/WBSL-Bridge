@@ -11,3 +11,4 @@ edge-tts>=7,<8
 mutagen>=1.47,<2
 banglatts==0.0.3
 openai>=1.0.0
+python-dotenv>=1.0,<2
