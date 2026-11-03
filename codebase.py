@@ -150,6 +150,7 @@ SKIP_FILES = {
 # ============================================================
 
 SKIP_EXTENSIONS = {
+    ".json"
     # Images
     ".png",
     ".jpg",
@@ -255,7 +256,6 @@ INCLUDE_EXTENSIONS = {
     ".sass",
 
     # Config
-    ".json",
     ".yaml",
     ".yml",
     ".toml",
