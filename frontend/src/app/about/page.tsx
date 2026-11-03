@@ -1,7 +1,6 @@
 import React from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import {
-  Eye,
   Brain,
   MessageSquareText,
   Volume2,
@@ -13,7 +12,6 @@ import {
   Layers,
   Cpu,
   Camera,
-  ScanFace,
   Hand,
   Sparkles,
   AlertTriangle,
@@ -21,9 +19,9 @@ import {
   XCircle,
   Clock3,
   ArrowRight,
-  Lock,
   Globe,
   WifiOff,
+  Lock,
 } from "lucide-react";
 
 export default function AboutPage() {
@@ -38,7 +36,7 @@ export default function AboutPage() {
       name: "Koushaki Singha",
       roll: "34900124074",
       role: "Sign Language Data & Quality Lead",
-      focus: "WBSL/ISL/BdSL sign recording coordination, dataset annotation, NMM tagging, landmark data quality review",
+      focus: "WBSL/ISL/BdSL sign recording coordination, dataset annotation, landmark data quality review",
     },
     {
       name: "Monirul Halder",
@@ -54,58 +52,52 @@ export default function AboutPage() {
     },
   ];
 
+  // NMM GATE stage removed — only 5 stages remain
   const pipelineStages = [
     {
       id: "camera",
       icon: Camera,
       label: "CAMERA",
       color: "text-accent-primary",
-      desc: "30 FPS webcam capture, MediaPipe Holistic extracts 540 landmarks (42 hand + 468 face + 33 pose)",
+      desc: "30 FPS webcam capture, MediaPipe Holistic extracts hand, pose (8-point) and face landmarks",
     },
     {
       id: "recognition",
       icon: Hand,
       label: "RECOGNITION",
-      color: "text-status-pending",
-      desc: "Static MLP (99.9% acc) is LIVE. Continuous LSTM video training for dynamic signs is currently HALF-DONE and in active progress.",
-    },
-    {
-      id: "nmm",
-      icon: ScanFace,
-      label: "NMM GATE",
-      color: "text-accent-secondary",
-      desc: "5 geometry-based markers: eyebrow raise/furrow, head shake/nod, mouth open. Deterministic, < 5ms",
+      color: "text-status-approved",
+      desc: "98-dim shoulder-box feature vector → BiLSTM + Attention (64-frame temporal clips). Span-based auto-detection: hands raised = sign starts, hands lowered = inference runs.",
     },
     {
       id: "emotion",
       icon: Sparkles,
       label: "EMOTION",
       color: "text-accent-secondary",
-      desc: "ViT-ONNX 7-class classifier, robust to glasses, ~30–50ms. Supplementary affective context",
+      desc: "ViT-ONNX 7-class classifier, robust to glasses, ~30–50ms. Supplementary affective context for Bengali output tone.",
     },
     {
       id: "nlg",
       icon: Brain,
       label: "BENGALI NLG",
       color: "text-accent-primary",
-      desc: "gemma-4-E4B, 50-criteria constrained prompt, preserves question/negation/WHETHER/IF-THEN scope",
+      desc: "NVIDIA Nemotron 3.5-B (offline) / OpenRouter (online). 50-criteria constrained prompt. OpenAI-compatible API. AI_MODE selects the engine.",
     },
     {
       id: "tts",
       icon: Volume2,
       label: "TTS",
       color: "text-accent-primary",
-      desc: "edge-tts (online, ~604 ms/word) → BanglaTTS (offline, ~453 ms/word) automatic fallback",
+      desc: "edge-tts (online, ~604 ms/word) → BanglaTTS (offline, ~453 ms/word) automatic fallback. ElevenLabs premium option.",
     },
   ];
 
   const techStack = [
     { category: "Vision", items: "MediaPipe Holistic 0.10.14 · OpenCV · ViT-ONNX (trpakov/vit-face-expression)" },
-    { category: "ML", items: "PyTorch · ONNX Runtime · MLP (static) · LSTM (temporal, in progress) · 258-dim holistic (hands+pose) active contract" },
-    { category: "LLM", items: "gemma-4-E4B-it-Q4_K_M (deployment) · gemma-4-12b-it-Q4_0 (reference) · KoboldCpp" },
-    { category: "TTS", items: "edge-tts (bn-BD-NabanitaNeural) · BanglaTTS (silero) · mutagen" },
-    { category: "Frontend", items: "Next.js 14 · TypeScript · Tailwind · shadcn/ui · Framer Motion · Recharts" },
-    { category: "Backend", items: "FastAPI · WebSocket · Python 3.11 · Single venv deployment" },
+    { category: "ML", items: "PyTorch · ONNX Runtime · BiLSTM + Attention (98-dim shoulder box, 64-frame clips) · Training zone: extract → train → avatar_extract → test_model" },
+    { category: "LLM", items: "NVIDIA-Nemotron-3.5-Bolt-E4B-UD-Q3_K_XL.gguf (offline, KoboldCpp) · OpenRouter (online) · OpenAI-compatible API · AI_MODE selection" },
+    { category: "TTS", items: "edge-tts (bn-BD-NabanitaNeural) · BanglaTTS (silero) · ElevenLabs eleven_v3 (premium) · mutagen" },
+    { category: "Frontend", items: "Next.js · TypeScript · Tailwind · shadcn/ui · Framer Motion · Recharts · Three.js (3D avatar simulation)" },
+    { category: "Backend", items: "FastAPI · Python 3.11 · Single venv deployment · .env-driven AI_MODE configuration" },
   ];
 
   const gaps = [
@@ -118,19 +110,20 @@ export default function AboutPage() {
   ];
 
   const currentStatus = [
-    { label: "MediaPipe Stream", desc: "540 landmarks extracted at stable 30 FPS.", status: "DONE" },
-    { label: "Emotion & NMM", desc: "ViT-ONNX (glasses-robust) and 5 geometric NMM markers live.", status: "DONE" },
-    { label: "Static Recognition", desc: "126-dim MLP achieving 99.9% validation accuracy.", status: "DONE" },
-    { label: "Bengali NLG & TTS", desc: "6 models benchmarked; gemma-4-E4B selected and stress-tested.", status: "DONE" },
-    { label: "Continuous Action Recognition", desc: "Pipeline designed; LSTM video training is half-done.", status: "HALF-DONE" },
+    { label: "MediaPipe Stream", desc: "Hand + 8-point pose + 19-point face extracted at stable 30 FPS.", status: "DONE" },
+    { label: "Emotion Detection", desc: "ViT-ONNX 7-class classifier (glasses-robust) live. NMM geometry markers removed.", status: "DONE" },
+    { label: "98-dim Feature Extraction", desc: "Shoulder-box coordinate system. 66 handshape + 12 palm + 4 wrist + 4 elbow + 6 wrist-face + 3 head + 2 flags + 1 duration.", status: "DONE" },
+    { label: "BiLSTM + Attention Model", desc: "Model 5 (sign_daily_lstm.onnx). Input: (batch, 64, 98). Span-based auto-detection with pre-roll and tail trimming.", status: "DONE" },
+    { label: "Bengali NLG & TTS", desc: "AI_MODE env variable. Offline: Nemotron 3.5-B via KoboldCpp. Online: OpenRouter. Dual-engine TTS.", status: "DONE" },
+    { label: "3D Avatar Simulation", desc: "Per-gloss avatar data (pose.npy, hands.npy, face.npy, t.npy) served from model bundle. Three.js 3D rendering.", status: "DONE" },
   ];
 
   const roadmap = [
-    { num: 1, label: "Continuous Action Recognition", desc: "Finalizing LSTM training on continuous video sequences for dynamic signs (currently half-done).", active: false },
+    { num: 1, label: "Expanded Sign Vocabulary", desc: "Growing the training dataset with more WBSL-specific signs beyond the current ISL-based vocabulary.", active: true },
     { num: 2, label: "WB Region Data Creation", desc: "A dedicated data collector tool is being prepared to build the first continuous dataset for WBSL/ISL/BdSL.", active: true },
-    { num: 3, label: "Field Survey", desc: "50+ field verification questions prepared and structured for real-world community data collection.", active: true },
-    { num: 4, label: "Unknown Sign Handling", desc: "Fully implementing the “Honesty Layer” to detect unknown signs and prevent AI hallucination.", active: false },
-    { num: 5, label: "Real-Time Workable UI", desc: "Conversation documenting, Sign-to-Voice and Voice-to-Sign on a single, high-speed interface.", active: false },
+    { num: 3, label: "Community Contributions", desc: "Planned future feature. Privacy-first landmark submission with human verification pipeline. Currently disabled.", active: false },
+    { num: 4, label: "Field Survey", desc: "50+ field verification questions prepared and structured for real-world community data collection.", active: true },
+    { num: 5, label: "Unknown Sign Handling", desc: "Fully implementing the 'Honesty Layer' to detect unknown signs and prevent AI hallucination.", active: false },
   ];
 
   return (
@@ -202,14 +195,10 @@ export default function AboutPage() {
           </div>
           <div className="space-y-3">
             {currentStatus.map((item) => (
-              <div key={item.label} className={`flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 p-4 rounded-md border ${item.status === "HALF-DONE" ? "bg-status-unknown/5 border-status-unknown" : "bg-surface border-border"}`}>
+              <div key={item.label} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 p-4 rounded-md border bg-surface border-border">
                 <div className="flex items-center gap-3 sm:w-1/3">
-                  {item.status === "DONE" ? (
-                    <CheckCircle2 size={18} className="text-status-approved shrink-0" />
-                  ) : (
-                    <Clock3 size={18} className="text-status-unknown shrink-0" />
-                  )}
-                  <span className={`text-sm font-semibold ${item.status === "HALF-DONE" ? "text-status-unknown" : "text-text-primary"}`}>
+                  <CheckCircle2 size={18} className="text-status-approved shrink-0" />
+                  <span className="text-sm font-semibold text-text-primary">
                     {item.label}
                   </span>
                 </div>
@@ -279,7 +268,7 @@ export default function AboutPage() {
           <h2 className="text-2xl font-bold text-text-primary">System Architecture</h2>
         </div>
 
-        {/* Pipeline Flow */}
+        {/* Pipeline Flow — now 5 stages (NMM removed) */}
         <div className="space-y-1">
           {pipelineStages.map((stage, i) => (
             <React.Fragment key={stage.id}>
@@ -292,7 +281,7 @@ export default function AboutPage() {
                     <span className={`text-xs font-mono font-bold uppercase tracking-wider ${stage.color}`}>
                       {stage.label}
                     </span>
-                    <span className="text-[10px] font-mono text-text-muted">STAGE {i + 1}/6</span>
+                    <span className="text-[10px] font-mono text-text-muted">STAGE {i + 1}/{pipelineStages.length}</span>
                   </div>
                   <p className="text-xs text-text-secondary mt-1 leading-relaxed">{stage.desc}</p>
                 </div>
@@ -309,10 +298,10 @@ export default function AboutPage() {
         {/* Key Innovations */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4">
           {[
-            { title: "Landmark-Based Signer Independence", desc: "126-dim normalized vector removes skin color, background, lighting bias. 99.9% val accuracy for static signs." },
+            { title: "98-dim Shoulder Box Features", desc: "Signer-independent coordinate system. Origin at shoulder midpoint, unit = shoulder width. Removes skin color, background, lighting bias." },
+            { title: "Span-Based Auto-Detection", desc: "Hands raised → recording starts automatically. Hands lowered → 64-frame clip selected → inference. No button press needed." },
             { title: "Open-Set Honesty Layer", desc: "OOD gate detects unknown signs BEFORE LLM reasoning. Output carries সম্ভবত (probably), never forced classification." },
-            { title: "Fast/Slow Path Separation", desc: "Real-time recognition in fast path (<50ms). Heavy LLM reasoning runs asynchronously off critical path." },
-            { title: "Privacy-First Verification", desc: "Landmarks only, never raw video. Human reviewers decide. DPDP Act 2023 compliant." },
+            { title: "Privacy-First Design", desc: "Landmarks only, never raw video. Community contributions planned as future feature. DPDP Act 2023 compliant." },
           ].map((item) => (
             <div key={item.title} className="p-4 rounded-md bg-surface border border-border space-y-1">
               <div className="text-sm font-semibold text-text-primary">{item.title}</div>
@@ -339,7 +328,7 @@ export default function AboutPage() {
           ))}
         </div>
         <p className="text-xs text-text-muted font-mono">
-          All modules run in a single Python 3.11 venv on CPU. No cloud dependency for core operation.
+          All modules run in a single Python 3.11 venv on CPU. No cloud dependency for core operation. AI_MODE in .env selects offline or online LLM.
         </p>
       </section>
 
@@ -351,8 +340,7 @@ export default function AboutPage() {
         </div>
         <p className="text-sm text-text-secondary leading-relaxed max-w-3xl">
           Transfer-first approach. Ready-made datasets (BdSLW401, iSign, ISLTranslate) provide
-          ~15,000 pre-labelled sequences covering 460+ signs. Community collection via web platform
-          targets 10–15 recordings per sign from 3–5 signers across WBSL, ISL, and BdSL varieties.
+          ~15,000 pre-labelled sequences covering 460+ signs. Training pipeline: extract.py → train.py → avatar_extract.py → test_model.py.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {[
@@ -369,8 +357,8 @@ export default function AboutPage() {
         <div className="p-4 rounded-md bg-surface border border-border">
           <div className="text-xs font-mono text-text-muted mb-2">DATA INDEXING</div>
           <p className="text-xs text-text-secondary">
-            Signer-disjoint splits enforced. Manifest-based indexing by provenance, signer, and verification status.
-            Only human-accepted community data enters training. Embedding index rebuilt per dataset version.
+            Signer-disjoint splits enforced. Features id and model id are append-only (new id per run).
+            Daily report and confusion matrix stored per model. Avatar data co-located with model bundle.
           </p>
         </div>
       </section>
@@ -382,13 +370,13 @@ export default function AboutPage() {
           <h2 className="text-2xl font-bold text-text-primary">Unknown Sign Handling</h2>
         </div>
         <p className="text-sm text-text-secondary leading-relaxed max-w-3xl">
-          When the OOD gate detects a sign outside trained vocabulary, the system does not guess confidently.
-          It generates a three-tier movement representation and produces ranked tentative candidates.
+          When the confidence margin is below threshold or top probability &lt; 0.5, the system reports &quot;Not sure&quot;
+          instead of guessing. It generates ranked tentative candidates from the top-3 model outputs.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {[
             { tier: "LEVEL 1", label: "Numerical", desc: "finger_extension, velocity, repetition, duration, distance_to_mouth" },
-            { tier: "LEVEL 2", label: "Symbolic", desc: "RIGHT_HAND INDEX_EXTENDED TOWARD_MOUTH REPEATED_3X NO_NMM" },
+            { tier: "LEVEL 2", label: "Symbolic", desc: "RIGHT_HAND INDEX_EXTENDED TOWARD_MOUTH REPEATED_3X" },
             { tier: "LEVEL 3", label: "Natural Language", desc: "\"The right hand moves toward the mouth, pauses, and returns. Repeated three times.\"" },
           ].map((level) => (
             <div key={level.tier} className="p-3 rounded-md bg-surface border border-border space-y-1">
@@ -407,24 +395,27 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* ─── COMMUNITY VERIFICATION ─── */}
+      {/* ─── COMMUNITY DATA (PLANNED FUTURE) ─── */}
       <section className="space-y-4">
         <div className="flex items-center gap-3">
           <ShieldCheck size={20} className="text-accent-primary" />
-          <h2 className="text-2xl font-bold text-text-primary">Community Data Verification</h2>
+          <h2 className="text-2xl font-bold text-text-primary">Community Data Collection</h2>
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-status-pending/20 border border-status-pending/40 text-status-pending font-bold">
+            PLANNED FUTURE FEATURE
+          </span>
         </div>
         <p className="text-sm text-text-secondary leading-relaxed max-w-3xl">
-          Privacy-first submission. Only landmarks are collected; original video is discarded on-device
-          before transmission. Automated validation produces evidence only. Human reviewers make all
+          Privacy-first submission. Only landmarks will be collected; original video discarded on-device
+          before transmission. Automated validation will produce evidence only. Human reviewers will make all
           final decisions. Compliant with India&rsquo;s Digital Personal Data Protection Act 2023.
         </p>
-        <div className="flex flex-wrap items-center gap-2 p-4 rounded-md bg-surface border border-border">
+        <div className="flex flex-wrap items-center gap-2 p-4 rounded-md bg-surface border border-border opacity-60">
           <Lock size={14} className="text-accent-primary" />
           <span className="text-xs font-mono text-text-secondary">
             AUTOMATION → ANALYSE → EXPLAIN → SIMULATE → SHOW EVIDENCE → HUMAN DECIDES
           </span>
         </div>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-3 opacity-60">
           {[
             { icon: CheckCircle2, label: "ACCEPT", desc: "Enters trusted dataset", color: "text-status-approved" },
             { icon: XCircle, label: "REJECT", desc: "Not used for training", color: "text-status-error" },
@@ -452,8 +443,8 @@ export default function AboutPage() {
               <span className="text-xs font-mono font-bold text-text-primary">FORWARD: SIGN → BENGALI</span>
             </div>
             <p className="text-xs text-text-secondary leading-relaxed">
-              Camera → MediaPipe → 126-dim landmarks → MLP/LSTM → OOD Gate → NMM + Emotion packet
-              → Constrained LLM → Natural Bengali text → Dual-engine TTS audio
+              Camera → MediaPipe → 98-dim shoulder-box features → BiLSTM + Attention (64 frames)
+              → Emotion ViT → Constrained LLM (AI_MODE) → Natural Bengali text → Dual-engine TTS audio
             </p>
           </div>
           <div className="p-4 rounded-md bg-surface border border-border space-y-2">
@@ -463,7 +454,7 @@ export default function AboutPage() {
             </div>
             <p className="text-xs text-text-secondary leading-relaxed">
               Bengali text/voice → LLM gloss generation → Sign sequence mapping →
-              Admin-approved reference videos → Continuous sequential playback
+              Avatar landmark replay → Continuous sequential 3D simulation
             </p>
           </div>
         </div>
@@ -506,15 +497,15 @@ export default function AboutPage() {
         <div className="flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-2">
             <Globe size={14} className="text-status-approved" />
-            <span className="text-xs font-mono text-text-secondary">ONLINE: edge-tts + full features</span>
+            <span className="text-xs font-mono text-text-secondary">ONLINE: edge-tts + OpenRouter LLM</span>
           </div>
           <div className="flex items-center gap-2">
             <WifiOff size={14} className="text-status-pending" />
-            <span className="text-xs font-mono text-text-secondary">OFFLINE: BanglaTTS + local LLM (KoboldCpp)</span>
+            <span className="text-xs font-mono text-text-secondary">OFFLINE: BanglaTTS + Nemotron 3.5-B (KoboldCpp)</span>
           </div>
           <div className="flex items-center gap-2">
             <Cpu size={14} className="text-accent-primary" />
-            <span className="text-xs font-mono text-text-secondary">LLM: LOCAL (gemma-4-E4B)</span>
+            <span className="text-xs font-mono text-text-secondary">AI_MODE in .env selects the engine</span>
           </div>
         </div>
       </section>
