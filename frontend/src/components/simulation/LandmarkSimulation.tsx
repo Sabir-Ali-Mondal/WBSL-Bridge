@@ -16,7 +16,16 @@ import { OrbitControls } from "@react-three/drei";
 import { Play, Pause, RotateCcw, Database } from "lucide-react";
 import { DhutiRig } from "./DhutiRig";
 import { RoundAlpanaStage } from "./AlpanaStage";
-import { DHUTI_DROP, THRESH, TORSO_WORLD } from "./simulationConstants";
+import { TorsoRig } from "./TorsoRig";
+import {
+  DHUTI_DROP,
+  HEAD_WIDTH_RATIO,
+  THRESH,
+  TORSO_HIP_HALF_WIDTH_RATIO,
+  TORSO_SHOULDER_HALF_WIDTH_RATIO,
+  TORSO_WIDTH_SCALE,
+  TORSO_WORLD,
+} from "./simulationConstants";
 import { FaceRig, HeadRig, FACE_POINTS, HEAD_LEN, type SampleRef, type SampleState } from "./HeadFaceRig";
 import {
   getBoneGeometry,
@@ -264,12 +273,26 @@ interface SolveContext {
 function poseHeadFallback(pose: Float32Array, head: Float32Array): void {
   const vis = (i: number) => pose[i * 4 + 3] >= THRESH;
   if (!vis(0) || !vis(1)) return;
+  const shoulderWidth = Math.hypot(
+    pose[4] - pose[0],
+    pose[5] - pose[1],
+    pose[6] - pose[2],
+  );
   const dx = pose[4] - pose[0];
   const dy = pose[5] - pose[1];
-  const dz = pose[6] - pose[2];
-  const width = Math.max(Math.hypot(dx, dy, dz) * 0.62, 0.2);
   const cx = (pose[0] + pose[4]) / 2;
   const shoulderY = (pose[1] + pose[5]) / 2;
+  const torsoLength = vis(6) && vis(7)
+    ? Math.hypot(
+        cx - (pose[6 * 4] + pose[7 * 4]) / 2,
+        shoulderY - (pose[6 * 4 + 1] + pose[7 * 4 + 1]) / 2,
+        (pose[2] + pose[6]) / 2 - (pose[6 * 4 + 2] + pose[7 * 4 + 2]) / 2,
+      )
+    : 0;
+  const width = Math.max(
+    torsoLength > 0.1 ? torsoLength * HEAD_WIDTH_RATIO : shoulderWidth * 0.62,
+    0.2,
+  );
   const cy = shoulderY + width * 0.58;
   const cz = (pose[2] + pose[6]) / 2;
   const roll = Math.atan2(dx < 0 ? -dy : dy, Math.abs(dx));
@@ -369,7 +392,8 @@ function solveFrame(
         rightTemple[0] - leftTemple[0],
         rightTemple[1] - leftTemple[1],
       );
-      if (sourceWidth > 1e-5) {
+      const sourceHeight = Math.abs(forehead[1] - chin[1]);
+      if (sourceWidth > 1e-5 && sourceHeight > 1e-5) {
         const faceCenter = alignment
           ? stabilizePoint([
               (leftTemple[0] + rightTemple[0]) / 2,
@@ -382,6 +406,9 @@ function solveFrame(
         const faceScale =
           head[4] /
           (sourceWidth * (alignment?.scale ?? 1) * S);
+        const faceHeightScale =
+          head[5] /
+          (sourceHeight * (alignment?.scale ?? 1) * S);
         const cos = Math.cos(head[10]);
         const sin = Math.sin(head[10]);
         const noseZ = Number.isFinite(faceAvatar[14]?.[2]) ? faceAvatar[14][2] : 0;
@@ -390,7 +417,7 @@ function solveFrame(
           y: chin[1],
         };
         const chinX = (stabilizedChin.x - faceCenter.x) * S * faceScale;
-        const chinY = -(stabilizedChin.y - faceCenter.y) * S * faceScale;
+        const chinY = -(stabilizedChin.y - faceCenter.y) * S * faceHeightScale;
         const faceOriginX = head[7] - (chinX * cos - chinY * sin);
         const faceOriginY = head[8] - (chinX * sin + chinY * cos);
         let validCount = 0;
@@ -402,7 +429,7 @@ function solveFrame(
             y: point[1],
           };
           const localX = (stabilized.x - faceCenter.x) * S * faceScale;
-          const localY = -(stabilized.y - faceCenter.y) * S * faceScale;
+          const localY = -(stabilized.y - faceCenter.y) * S * faceHeightScale;
           const offset = index * 4;
           face[offset] = faceOriginX + localX * cos - localY * sin;
           face[offset + 1] = faceOriginY + localX * sin + localY * cos;
@@ -736,136 +763,6 @@ function BodyRig({ sampleRef, pairs }: { sampleRef: SampleRef; pairs: PairList }
   );
 }
 
-const TORSO_RING_PROFILE = [0.72, 0.9, 0.99, 1.04, 1.03, 0.96, 0.8];
-const TORSO_RINGS = TORSO_RING_PROFILE.length;
-const TORSO_SEGMENTS = 16;
-const TORSO_CAPS = 2;
-const TORSO_CAP_TOP = TORSO_RINGS * TORSO_SEGMENTS;
-const TORSO_CAP_BOTTOM = TORSO_CAP_TOP + 1;
-const TORSO_INDICES = (() => {
-  const indices: number[] = [];
-  for (let ring = 0; ring < TORSO_RINGS - 1; ring++) {
-    const upper = ring * TORSO_SEGMENTS;
-    const lower = (ring + 1) * TORSO_SEGMENTS;
-    for (let segment = 0; segment < TORSO_SEGMENTS; segment++) {
-      const next = (segment + 1) % TORSO_SEGMENTS;
-      indices.push(
-        upper + segment, lower + segment, lower + next,
-        upper + segment, lower + next, upper + next,
-      );
-    }
-  }
-  for (let segment = 0; segment < TORSO_SEGMENTS; segment++) {
-    const next = (segment + 1) % TORSO_SEGMENTS;
-    indices.push(TORSO_CAP_TOP, next, segment);
-    const bottom = (TORSO_RINGS - 1) * TORSO_SEGMENTS;
-    indices.push(TORSO_CAP_BOTTOM, bottom + segment, bottom + next);
-  }
-  return indices;
-})();
-
-function TorsoRig({
-  sampleRef,
-  playbackRef,
-}: {
-  sampleRef: SampleRef;
-  playbackRef: React.MutableRefObject<PlaybackState>;
-}) {
-  const meshRef = useRef<THREE.Mesh>(null);
-  const idleTime = useRef(0);
-  const geometry = useMemo(() => {
-    const g = new THREE.BufferGeometry();
-    g.setAttribute(
-      "position",
-      new THREE.BufferAttribute(
-        new Float32Array((TORSO_RINGS * TORSO_SEGMENTS + TORSO_CAPS) * 3),
-        3,
-      )
-        .setUsage(THREE.DynamicDrawUsage),
-    );
-    g.setIndex(TORSO_INDICES);
-    return g;
-  }, []);
-  const material = useMemo(
-    () =>
-      new THREE.MeshStandardMaterial({
-        color: COLOR.volume,
-        emissive: "#080f29",
-        emissiveIntensity: 0.1,
-        roughness: 0.38,
-        metalness: 0.34,
-        side: THREE.DoubleSide, flatShading: false,
-      }),
-    [],
-  );
-  useEffect(() => () => { geometry.dispose(); material.dispose(); }, [geometry, material]);
-
-  useFrame((_, delta) => {
-    const mesh = meshRef.current;
-    if (!mesh) return;
-    if (!playbackRef.current.playing) idleTime.current += Math.min(delta, 0.1);
-    const P = sampleRef.current.pose;
-    const ok = P[0 * 4 + 3] >= THRESH && P[1 * 4 + 3] >= THRESH && P[6 * 4 + 3] >= THRESH && P[7 * 4 + 3] >= THRESH;
-    mesh.visible = ok;
-    if (!ok) return;
-    const shoulderCenterX = (P[0] + P[4]) / 2;
-    const shoulderCenterY = (P[1] + P[5]) / 2;
-    const shoulderCenterZ = (P[2] + P[6]) / 2;
-    const hipCenterX = (P[6 * 4] + P[7 * 4]) / 2;
-    const hipCenterY = (P[6 * 4 + 1] + P[7 * 4 + 1]) / 2 - 0.12;
-    const hipCenterZ = (P[6 * 4 + 2] + P[7 * 4 + 2]) / 2;
-    const shoulderHalfWidth = Math.max(
-      Math.hypot(
-        P[0] - P[4],
-        P[1] - P[5],
-        P[2] - P[6],
-      ) * 0.52,
-      0.12,
-    );
-    const hipHalfWidth = Math.max(Math.abs(P[6 * 4] - P[7 * 4]) * 0.52, 0.1);
-    const pos = geometry.getAttribute("position") as THREE.BufferAttribute;
-    for (let ring = 0; ring < TORSO_RINGS; ring++) {
-      const t = ring / (TORSO_RINGS - 1);
-      const profile = TORSO_RING_PROFILE[ring];
-      const centerX = THREE.MathUtils.lerp(shoulderCenterX, hipCenterX, t);
-      const centerY = THREE.MathUtils.lerp(shoulderCenterY, hipCenterY, t);
-      const centerZ = THREE.MathUtils.lerp(shoulderCenterZ, hipCenterZ, t);
-      const idleBreath = playbackRef.current.playing
-        ? 1
-        : 1 + Math.sin(idleTime.current * 1.35) * 0.003;
-      const halfWidth =
-        THREE.MathUtils.lerp(shoulderHalfWidth, hipHalfWidth, t) * profile * idleBreath;
-      const depth = Math.max(halfWidth * 0.62, 0.08);
-      for (let segment = 0; segment < TORSO_SEGMENTS; segment++) {
-        const angle = (segment / TORSO_SEGMENTS) * Math.PI * 2;
-        const index = ring * TORSO_SEGMENTS + segment;
-        pos.setXYZ(
-          index,
-          centerX + Math.cos(angle) * halfWidth,
-          centerY,
-          centerZ + Math.sin(angle) * depth,
-        );
-      }
-    }
-    pos.setXYZ(TORSO_CAP_TOP, shoulderCenterX, shoulderCenterY, shoulderCenterZ);
-    pos.setXYZ(TORSO_CAP_BOTTOM, hipCenterX, hipCenterY, hipCenterZ);
-    pos.needsUpdate = true;
-    geometry.computeVertexNormals();
-  });
-
-  return (
-    <mesh
-      ref={meshRef}
-      geometry={geometry}
-      material={material}
-      frustumCulled={false}
-      renderOrder={-1}
-      castShadow
-      receiveShadow
-    />
-  );
-}
-
 function HandRig({ slot, color, sampleRef }: { slot: 0 | 1; color: string; sampleRef: SampleRef }) {
   const groupRef = useRef<THREE.Group>(null);
   const bonesRef = useRef<THREE.InstancedMesh>(null);
@@ -944,11 +841,14 @@ function HandRig({ slot, color, sampleRef }: { slot: 0 | 1; color: string; sampl
       const directionX = directionLength > 1e-5 ? wristX / directionLength : (slot === 0 ? -1 : 1);
       const directionZ = directionLength > 1e-5 ? wristZ / directionLength : 0;
       let requiredOffset = 0;
-      const shoulderWidth = Math.max(Math.hypot(
-        P[0] - P[4],
-        P[2] - P[6],
-      ) * 0.52, 0.12);
-      const hipWidth = Math.max(Math.abs(P[6 * 4] - P[7 * 4]) * 0.52, 0.1);
+      const shoulderWidth = Math.max(
+        (shoulderY - hipY) * TORSO_SHOULDER_HALF_WIDTH_RATIO * TORSO_WIDTH_SCALE,
+        0.12,
+      );
+      const hipWidth = Math.max(
+        (shoulderY - hipY) * TORSO_HIP_HALF_WIDTH_RATIO * TORSO_WIDTH_SCALE,
+        0.1,
+      );
 
       for (let joint = 0; joint < 21; joint++) {
         if (!valid[joint]) continue;

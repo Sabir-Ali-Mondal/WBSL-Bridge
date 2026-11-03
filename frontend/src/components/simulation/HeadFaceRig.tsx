@@ -7,11 +7,8 @@ import { mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import { THRESH } from "./simulationConstants";
 import {
   getBoneGeometry,
-  getJointGeometry,
   hideAll,
   placeBone,
-  placeJoint,
-  ZERO_MATRIX,
 } from "./RigUtils";
 
 export const FACE_POINTS = 19;
@@ -37,29 +34,35 @@ export interface SampleState {
 export type SampleRef = { current: SampleState };
 
 // Curve segment counts
-const BROW_STEPS = 8;
-const MOUTH_STEPS = 10;
-const EYE_STEPS = 16;
+const BROW_STEPS = 10;
+const EYE_STEPS = 28;
+const PUPIL_STEPS = 16;
 const SPARKLE_STEPS = 8;
-const NOSE_SEGMENTS = 3;
+const NOSE_SEGMENTS = 4;
+const LIP_STEPS = 20;
+const NECK_SEGMENTS = 4;
 
-// Total vertices calculation:
-// 2 brows (8*2) + mouth (4*10) + 2 eyes (16*2) + 2 sparkles (8*2) + nose (3)
-const FACE_SEGMENTS = 2 * BROW_STEPS + 4 * MOUTH_STEPS + 2 * EYE_STEPS + 2 * SPARKLE_STEPS + NOSE_SEGMENTS;
+const FACE_SEGMENTS = 240;
 
 // ---------------------------------------------------------------------------
 // Head Shell Tuning
 // ---------------------------------------------------------------------------
-const HEAD_FIT_X = 1.15;
-const HEAD_FIT_Y = 1.05;
-const HEAD_DEPTH = 0.95;
-const HEAD_BACK = 0.35;
+const HEAD_FIT_X = 1.26;
+const HEAD_FIT_Y = 1.06;
+const HEAD_DEPTH = 0.62;
+const HEAD_BACK = 0.48;
 const HEAD_FOLLOW = 0.45;
 const HEAD_SCALE_FOLLOW = 0.12;
 
-const HEAD_FACING = {
+// Downward pitch correction (~5.5 degrees) so head looks straight forward
+const PITCH_DOWN = 0.095;
+const cosPitch = Math.cos(PITCH_DOWN);
+const sinPitch = Math.sin(PITCH_DOWN);
+
+export const HEAD_FACING = {
   center: new THREE.Vector3(),
   front: new THREE.Vector3(0, 0, 1),
+  right: new THREE.Vector3(1, 0, 0),
   valid: false,
 };
 
@@ -74,8 +77,8 @@ function createCleanCuteHeadGeometry(): THREE.BufferGeometry {
     const y = pos.getY(i);
     const z = pos.getZ(i);
 
-    // Superellipsoid "squircle" rounding (cute bot head)
-    const n = 2.8;
+    // Superellipsoid squircle rounding
+    const n = 2.75;
     const sum = Math.pow(Math.abs(x), n) + Math.pow(Math.abs(y), n) + Math.pow(Math.abs(z), n);
     const r = Math.pow(sum, -1 / n);
 
@@ -83,9 +86,9 @@ function createCleanCuteHeadGeometry(): THREE.BufferGeometry {
     let ny = y * r;
     let nz = z * r;
 
-    // Gentle bottom taper so it's not a block
+    // Gentle bottom taper
     if (ny < 0) {
-      const taper = 1.0 - 0.12 * Math.pow(-ny, 1.6);
+      const taper = 1.0 - 0.1 * Math.pow(-ny, 1.5);
       nx *= taper;
       nz *= taper;
     }
@@ -99,19 +102,27 @@ function createCleanCuteHeadGeometry(): THREE.BufferGeometry {
   return merged;
 }
 
+function createExteriorEarGeometry(): THREE.BufferGeometry {
+  const geo = new THREE.CylinderGeometry(0.14, 0.18, 0.08, 32);
+  geo.rotateZ(Math.PI / 2);
+  geo.translate(0.04, 0, 0);
+  return geo;
+}
+
 // ---------------------------------------------------------------------------
-// Shaders: Bioluminescent Glass with Dual-Tone Mint/Electric Blue
+// Frosted Glass Shader: Reduced Inner Blue Core + Luminous Mint Rim
 // ---------------------------------------------------------------------------
 function createHeadMaterial(): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     transparent: true,
-    depthWrite: false,
+    depthWrite: true,
     side: THREE.FrontSide,
-    blending: THREE.AdditiveBlending,
+    blending: THREE.NormalBlending,
     uniforms: {
-      uInnerGlow: { value: new THREE.Color("#0a1f38") },
-      uRimColor: { value: new THREE.Color("#4effd3") }, // Fresh neon mint
-      uCoreGlow: { value: new THREE.Color("#008cff") }, // Deep electric cyan
+      uInnerGlow: { value: new THREE.Color("#050f1a") },
+      uCoreGlow: { value: new THREE.Color("#0b4e78") },
+      uRimColor: { value: new THREE.Color("#5effdc") },
+      uHazeColor: { value: new THREE.Color("#4effd3") },
     },
     vertexShader: /* glsl */ `
       varying vec3 vNormal;
@@ -127,30 +138,43 @@ function createHeadMaterial(): THREE.ShaderMaterial {
       uniform vec3 uInnerGlow;
       uniform vec3 uRimColor;
       uniform vec3 uCoreGlow;
+      uniform vec3 uHazeColor;
       varying vec3 vNormal;
       varying vec3 vView;
+
+      float hash(vec2 p) {
+        return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+      }
+
       void main() {
-        float fresnel = 1.0 - abs(dot(normalize(vNormal), normalize(vView)));
-        float rim = pow(fresnel, 2.2);
-        float softCore = pow(fresnel, 1.2) * 0.3;
+        vec3 N = normalize(vNormal);
+        vec3 V = normalize(vView);
 
-        vec3 color = mix(uInnerGlow, uCoreGlow, softCore);
-        color = mix(color, uRimColor, rim);
-        float alpha = 0.08 + rim * 0.65;
+        float grain = (hash(gl_FragCoord.xy * 0.75) - 0.5) * 0.035;
+        float NdotV = clamp(abs(dot(N, V)) + grain, 0.0, 1.0);
+        float fresnel = 1.0 - NdotV;
 
-        gl_FragColor = vec4(color, clamp(alpha, 0.0, 1.0));
+        float softMist = smoothstep(0.04, 0.88, fresnel);
+        float blurredRim = pow(softMist, 1.45);
+        float deepGlow = pow(fresnel, 0.9) * 0.35;
+
+        vec3 color = mix(uInnerGlow, uCoreGlow, deepGlow);
+        color = mix(color, uHazeColor, pow(fresnel, 2.5) * 0.25);
+        color = mix(color, uRimColor, blurredRim);
+
+        float alpha = clamp(0.60 + blurredRim * 0.40, 0.0, 1.0);
+        gl_FragColor = vec4(color, alpha);
       }
     `,
   });
 }
 
+// ---------------------------------------------------------------------------
+// Head Rig Component
+// ---------------------------------------------------------------------------
 export function HeadRig({ sampleRef }: { sampleRef: SampleRef }) {
   const headRef = useRef<THREE.Mesh>(null);
   const neckRef = useRef<THREE.InstancedMesh>(null);
-  const neckStart = useRef(new Float32Array(3));
-  const neckEnd = useRef(new Float32Array(3));
-  const shoulderStart = useRef(new Float32Array(3));
-  const headEnd = useRef(new Float32Array(3));
   const neckColor = useMemo(() => new THREE.Color(), []);
 
   const tmp = useMemo(
@@ -168,42 +192,37 @@ export function HeadRig({ sampleRef }: { sampleRef: SampleRef }) {
       quat: new THREE.Quaternion(),
       scale: new THREE.Vector3(),
       wasFace: false,
+      shoulderPt: new THREE.Vector3(),
+      headBasePt: new THREE.Vector3(),
+      tangent0: new THREE.Vector3(),
+      tangent1: new THREE.Vector3(),
+      pA: new THREE.Vector3(),
+      pB: new THREE.Vector3(),
+      arrA: new Float32Array(3),
+      arrB: new Float32Array(3),
     }),
     [],
   );
 
   const headGeo = useMemo(() => createCleanCuteHeadGeometry(), []);
+  const earGeo = useMemo(() => createExteriorEarGeometry(), []);
   const headMat = useMemo(() => createHeadMaterial(), []);
-
-  // Flush Outer Ear Nodes (sitting directly on outer sides)
-  const earGeo = useMemo(() => new THREE.CapsuleGeometry(0.12, 0.18, 16, 24), []);
-  const earMat = useMemo(
-    () =>
-      new THREE.MeshStandardMaterial({
-        color: "#163459",
-        emissive: "#4effd3",
-        emissiveIntensity: 0.5,
-        roughness: 0.2,
-        metalness: 0.8,
-      }),
-    [],
-  );
 
   const neckMat = useMemo(
     () =>
       new THREE.MeshStandardMaterial({
-        color: "#183256",
-        emissive: "#00a2ff",
+        color: "#1c3863",
+        emissive: "#091c36",
         emissiveIntensity: 0.2,
-        metalness: 0.6,
-        roughness: 0.3,
+        metalness: 0.8,
+        roughness: 0.25,
       }),
     [],
   );
 
   useEffect(() => () => {
-    headGeo.dispose(); headMat.dispose(); earGeo.dispose(); earMat.dispose(); neckMat.dispose();
-  }, [headGeo, headMat, earGeo, earMat, neckMat]);
+    headGeo.dispose(); earGeo.dispose(); headMat.dispose(); neckMat.dispose();
+  }, [headGeo, earGeo, headMat, neckMat]);
 
   useLayoutEffect(() => hideAll(neckRef.current), []);
 
@@ -221,6 +240,7 @@ export function HeadRig({ sampleRef }: { sampleRef: SampleRef }) {
     }
 
     const F = st.face;
+    const P = st.pose;
     const fv = st.faceValid;
     const faceFit = st.facePresent && !!fv[0] && !!fv[1] && !!fv[2] && !!fv[3];
 
@@ -241,6 +261,12 @@ export function HeadRig({ sampleRef }: { sampleRef: SampleRef }) {
       right.addScaledVector(up, -right.dot(up)).normalize();
       front.crossVectors(right, up).normalize();
 
+      // Pitch adjustment: rotates front vector slightly down and up vector forward
+      const pitchedUp = up.clone().multiplyScalar(cosPitch).addScaledVector(front, sinPitch).normalize();
+      const pitchedFront = front.clone().multiplyScalar(cosPitch).addScaledVector(up, -sinPitch).normalize();
+      up.copy(pitchedUp);
+      front.copy(pitchedFront);
+
       basis.makeBasis(right, up, front);
       quat.setFromRotationMatrix(basis);
 
@@ -249,8 +275,8 @@ export function HeadRig({ sampleRef }: { sampleRef: SampleRef }) {
       const radiusX = (width / 2) * HEAD_FIT_X;
       const radiusY = (height / 2) * HEAD_FIT_Y;
       const radiusZ = ((radiusX + radiusY) / 2) * HEAD_DEPTH;
-      scale.set(radiusX, radiusY, radiusZ);
 
+      scale.set(radiusX, radiusY, radiusZ);
       target.copy(center).addScaledVector(front, -radiusZ * HEAD_BACK);
 
       if (!tmp.wasFace) {
@@ -263,38 +289,55 @@ export function HeadRig({ sampleRef }: { sampleRef: SampleRef }) {
         head.scale.lerp(scale, HEAD_SCALE_FOLLOW);
       }
       tmp.wasFace = true;
-      HEAD_FACING.center.copy(head.position);
-      HEAD_FACING.front.copy(front);
+      HEAD_FACING.center.copy(center);
+      HEAD_FACING.front.set(0, 0, 1).applyQuaternion(head.quaternion);
+      HEAD_FACING.right.set(1, 0, 0).applyQuaternion(head.quaternion);
       HEAD_FACING.valid = true;
     }
 
-    // Articulated Vertebrae Neck
-    const P = st.pose;
-    const H = st.head;
-    const NECK_SEGMENTS = 4;
+    // -----------------------------------------------------------------------
+    // Flexible Throat/Neck: Attached right to underside of chin (2/3 height)
+    // -----------------------------------------------------------------------
     if (P[0 * 4 + 3] >= THRESH && P[1 * 4 + 3] >= THRESH) {
-      shoulderStart.current[0] = (P[0] + P[4]) / 2;
-      shoulderStart.current[1] = (P[1] + P[5]) / 2;
-      shoulderStart.current[2] = (P[2] + P[6]) / 2;
-      headEnd.current[0] = H[7];
-      headEnd.current[1] = H[8];
-      headEnd.current[2] = H[9];
-      const dx = headEnd.current[0] - shoulderStart.current[0];
-      const dy = headEnd.current[1] - shoulderStart.current[1];
-      const dz = headEnd.current[2] - shoulderStart.current[2];
+      const { shoulderPt, headBasePt, tangent0, tangent1, pA, pB, arrA, arrB } = tmp;
+
+      shoulderPt.set((P[0] + P[4]) / 2, (P[1] + P[5]) / 2, (P[2] + P[6]) / 2);
+
+      headBasePt.set(0, -head.scale.y * 0.95, -head.scale.z * 0.08)
+        .applyQuaternion(head.quaternion)
+        .add(head.position);
+
+      const curveLength = shoulderPt.distanceTo(headBasePt);
+      tangent0.set(0, 1, 0).multiplyScalar(curveLength * 0.65);
+      tangent1.set(0, 1, 0).applyQuaternion(head.quaternion).multiplyScalar(curveLength * 0.65);
+
+      const evalHermite = (t: number, out: THREE.Vector3) => {
+        const t2 = t * t;
+        const t3 = t2 * t;
+        const h00 = 2 * t3 - 3 * t2 + 1;
+        const h10 = t3 - 2 * t2 + t;
+        const h01 = -2 * t3 + 3 * t2;
+        const h11 = t3 - t2;
+        out.set(0, 0, 0)
+          .addScaledVector(shoulderPt, h00)
+          .addScaledVector(tangent0, h10)
+          .addScaledVector(headBasePt, h01)
+          .addScaledVector(tangent1, h11);
+      };
 
       for (let i = 0; i < NECK_SEGMENTS; i++) {
-        const s = (i + 0.12) / NECK_SEGMENTS;
-        const e = (i + 0.88) / NECK_SEGMENTS;
-        neckStart.current[0] = shoulderStart.current[0] + dx * s;
-        neckStart.current[1] = shoulderStart.current[1] + dy * s;
-        neckStart.current[2] = shoulderStart.current[2] + dz * s;
-        neckEnd.current[0] = shoulderStart.current[0] + dx * e;
-        neckEnd.current[1] = shoulderStart.current[1] + dy * e;
-        neckEnd.current[2] = shoulderStart.current[2] + dz * e;
+        const s = (i + 0.05) / NECK_SEGMENTS;
+        const e = (i + 0.95) / NECK_SEGMENTS;
 
-        placeBone(neck, i, neckStart.current, 0, neckEnd.current, 0, 0.046);
-        neck.setColorAt(i, neckColor.set(i === 0 ? "#4effd3" : "#183256"));
+        evalHermite(s, pA);
+        evalHermite(e, pB);
+
+        arrA[0] = pA.x; arrA[1] = pA.y; arrA[2] = pA.z;
+        arrB[0] = pB.x; arrB[1] = pB.y; arrB[2] = pB.z;
+
+        const neckThickness = THREE.MathUtils.lerp(0.08, 0.07, i / NECK_SEGMENTS);
+        placeBone(neck, i, arrA, 0, arrB, 0, neckThickness);
+        neck.setColorAt(i, neckColor.set("#1c3863"));
       }
     } else {
       hideAll(neck);
@@ -306,57 +349,111 @@ export function HeadRig({ sampleRef }: { sampleRef: SampleRef }) {
   return (
     <group>
       <mesh ref={headRef} geometry={headGeo} material={headMat} frustumCulled={false}>
-        {/* Exterior Left Ear Node */}
-        <mesh geometry={earGeo} material={earMat} position={[1.02, 0, 0]} rotation={[0, 0, 0]} />
-        {/* Exterior Right Ear Node */}
-        <mesh geometry={earGeo} material={earMat} position={[-1.02, 0, 0]} rotation={[0, 0, 0]} />
+        <mesh geometry={earGeo} material={headMat} position={[0.99, 0, -0.04]} />
+        <mesh
+          geometry={earGeo}
+          material={headMat}
+          position={[-0.99, 0, -0.04]}
+          rotation={[0, 0, Math.PI]}
+        />
       </mesh>
-      <instancedMesh ref={neckRef} args={[getBoneGeometry(), neckMat, 4]} frustumCulled={false} />
+      <instancedMesh
+        ref={neckRef}
+        args={[getBoneGeometry(), neckMat, NECK_SEGMENTS]}
+        frustumCulled={false}
+      />
     </group>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Face Rig: Data-driven Eyes, Sparkles, Brows & Lips
+// Face Rig: Straight-Facing Eye Gaze & Natural Expression
 // ---------------------------------------------------------------------------
 export function FaceRig({ sampleRef }: { sampleRef: SampleRef }) {
   const linesRef = useRef<THREE.LineSegments>(null);
+  const toCamVec = useMemo(() => new THREE.Vector3(), []);
+  const ptA = useMemo(() => new THREE.Vector3(), []);
+  const ptB = useMemo(() => new THREE.Vector3(), []);
 
   const lineGeo = useMemo(() => {
     const geo = new THREE.BufferGeometry();
     geo.setAttribute(
       "position",
-      new THREE.BufferAttribute(new Float32Array(FACE_SEGMENTS * 6), 3).setUsage(THREE.DynamicDrawUsage),
+      new THREE.BufferAttribute(new Float32Array(FACE_SEGMENTS * 6), 3).setUsage(
+        THREE.DynamicDrawUsage,
+      ),
     );
     return geo;
   }, []);
 
-  // Vivid Glowing Mint/Cyan Line Material
   const lineMat = useMemo(
     () =>
       new THREE.LineBasicMaterial({
-        color: "#68ffd8",
+        color: "#6effe0",
         transparent: true,
         opacity: 0.98,
         depthTest: false,
+        depthWrite: false,
       }),
     [],
   );
 
   useEffect(() => () => { lineGeo.dispose(); lineMat.dispose(); }, [lineGeo, lineMat]);
 
-  useFrame(() => {
+  useFrame((state) => {
     const lines = linesRef.current;
     if (!lines) return;
     const st = sampleRef.current;
-    lines.visible = st.facePresent;
+
+    if (HEAD_FACING.valid) {
+      toCamVec.subVectors(state.camera.position, HEAD_FACING.center).normalize();
+      const facing = HEAD_FACING.front.dot(toCamVec);
+      if (facing <= 0.0) {
+        lines.visible = false;
+        return;
+      }
+      lines.visible = true;
+      lineMat.opacity = THREE.MathUtils.clamp(facing * 2.2, 0.0, 0.98);
+    } else {
+      lines.visible = st.facePresent;
+    }
+
     if (!st.facePresent) return;
 
+    const time = state.clock.getElapsedTime();
     const positions = lineGeo.getAttribute("position") as THREE.BufferAttribute;
     const face = st.face;
     let segOffset = 0;
 
-    // 1. DATA-DRIVEN EYEBROWS (4,5,6 and 7,8,9)
+    // Rotates face point down slightly to match head orientation
+    const rotatePoint = (x: number, y: number, z: number, out: THREE.Vector3) => {
+      if (!HEAD_FACING.valid) {
+        out.set(x, y, z);
+        return;
+      }
+      const cx = HEAD_FACING.center.x;
+      const cy = HEAD_FACING.center.y;
+      const cz = HEAD_FACING.center.z;
+      const dx = x - cx;
+      const dy = y - cy;
+      const dz = z - cz;
+
+      // Downward pitch rotation
+      const rY = dy * cosPitch - dz * sinPitch;
+      const rZ = dy * sinPitch + dz * cosPitch;
+      out.set(cx + dx, cy + rY, cz + rZ);
+    };
+
+    const addSegment = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number) => {
+      if (segOffset >= FACE_SEGMENTS) return;
+      rotatePoint(x0, y0, z0, ptA);
+      rotatePoint(x1, y1, z1, ptB);
+      positions.setXYZ(segOffset * 2, ptA.x, ptA.y, ptA.z);
+      positions.setXYZ(segOffset * 2 + 1, ptB.x, ptB.y, ptB.z);
+      segOffset++;
+    };
+
+    // 1. DATA-DRIVEN EYEBROWS
     const brows = [
       { pts: [4, 5, 6], valid: [4, 5, 6].every((i) => st.faceValid[i]) },
       { pts: [7, 8, 9], valid: [7, 8, 9].every((i) => st.faceValid[i]) },
@@ -366,7 +463,6 @@ export function FaceRig({ sampleRef }: { sampleRef: SampleRef }) {
         for (let s = 0; s < BROW_STEPS; s++) {
           const t0 = s / BROW_STEPS;
           const t1 = (s + 1) / BROW_STEPS;
-          // Quadratic interpolation for sleek brow curve
           const p0x = face[b.pts[0] * 3], p0y = face[b.pts[0] * 3 + 1], p0z = face[b.pts[0] * 3 + 2];
           const p1x = face[b.pts[1] * 3], p1y = face[b.pts[1] * 3 + 1], p1z = face[b.pts[1] * 3 + 2];
           const p2x = face[b.pts[2] * 3], p2y = face[b.pts[2] * 3 + 1], p2z = face[b.pts[2] * 3 + 2];
@@ -379,115 +475,144 @@ export function FaceRig({ sampleRef }: { sampleRef: SampleRef }) {
           const y1 = (1 - t1) * (1 - t1) * p0y + 2 * (1 - t1) * t1 * p1y + t1 * t1 * p2y;
           const z1 = (1 - t1) * (1 - t1) * p0z + 2 * (1 - t1) * t1 * p1z + t1 * t1 * p2z;
 
-          positions.setXYZ((segOffset + s) * 2, x0, y0, z0 + 0.005);
-          positions.setXYZ((segOffset + s) * 2 + 1, x1, y1, z1 + 0.005);
-        }
-      } else {
-        for (let s = 0; s < BROW_STEPS; s++) {
-          positions.setXYZ((segOffset + s) * 2, 0, 0, 0);
-          positions.setXYZ((segOffset + s) * 2 + 1, 0, 0, 0);
+          addSegment(x0, y0, z0 + 0.006, x1, y1, z1 + 0.006);
         }
       }
-      segOffset += BROW_STEPS;
     }
 
-    // 2. DATA-DRIVEN EYES & BLINKING (MediaPipe Points 10/11 & 12/13)
+    // 2. BIG ADORABLE EYES (Straight-Forward Gaze)
     const eyesValid = [10, 11, 12, 13].every((i) => st.faceValid[i]);
     if (eyesValid) {
       const lX = (face[10 * 3] + face[11 * 3]) / 2;
       const lY = (face[10 * 3 + 1] + face[11 * 3 + 1]) / 2;
-      const lZ = (face[10 * 3 + 2] + face[11 * 3 + 2]) / 2 + 0.006;
+      const lZ = (face[10 * 3 + 2] + face[11 * 3 + 2]) / 2 + 0.008;
 
       const rX = (face[12 * 3] + face[13 * 3]) / 2;
       const rY = (face[12 * 3 + 1] + face[13 * 3 + 1]) / 2;
-      const rZ = (face[12 * 3 + 2] + face[13 * 3 + 2]) / 2 + 0.006;
+      const rZ = (face[12 * 3 + 2] + face[13 * 3 + 2]) / 2 + 0.008;
 
       const eyeDist = Math.hypot(rX - lX, rY - lY);
-      const eyeWidth = THREE.MathUtils.clamp(eyeDist * 0.26, 0.015, 0.04);
+      const eyeRadius = THREE.MathUtils.clamp(eyeDist * 0.44, 0.032, 0.07);
 
-      // Raw aperture from tracking
       const lAperture = Math.hypot(face[10 * 3] - face[11 * 3], face[10 * 3 + 1] - face[11 * 3 + 1]);
       const rAperture = Math.hypot(face[12 * 3] - face[13 * 3], face[12 * 3 + 1] - face[13 * 3 + 1]);
 
-      // Blink coefficient: 0.0 = completely shut, 1.0 = fully open
       const normalOpen = eyeDist * 0.11;
-      const lOpen = THREE.MathUtils.clamp(lAperture / normalOpen, 0.05, 1.0);
-      const rOpen = THREE.MathUtils.clamp(rAperture / normalOpen, 0.05, 1.0);
+      let lOpen = THREE.MathUtils.clamp(lAperture / normalOpen, 0.03, 1.0);
+      let rOpen = THREE.MathUtils.clamp(rAperture / normalOpen, 0.03, 1.0);
+
+      const blinkCycle = Math.sin(time * 1.8);
+      if (blinkCycle > 0.96) {
+        const blinkAmount = (1 - (blinkCycle - 0.96) / 0.04);
+        lOpen *= blinkAmount;
+        rOpen *= blinkAmount;
+      }
 
       const eyeData = [
-        { cx: lX, cy: lY, cz: lZ, open: lOpen },
-        { cx: rX, cy: rY, cz: rZ, open: rOpen },
+        { cx: lX, cy: lY, cz: lZ, open: lOpen, isLeft: true },
+        { cx: rX, cy: rY, cz: rZ, open: rOpen, isLeft: false },
       ];
 
       for (const e of eyeData) {
-        const h = eyeWidth * 0.65 * e.open;
-        for (let s = 0; s < EYE_STEPS; s++) {
-          for (let ep = 0; ep < 2; ep++) {
-            const angle = ((s + ep) / EYE_STEPS) * Math.PI * 2;
-            const px = e.cx + Math.cos(angle) * eyeWidth;
-            // When blinking (open -> 0), height collapses naturally into a cute sleeping lash
-            const py = e.cy + Math.sin(angle) * h;
-            positions.setXYZ((segOffset + s) * 2 + ep, px, py, e.cz);
-          }
-        }
-        segOffset += EYE_STEPS;
+        const h = eyeRadius * 0.9 * e.open;
 
-        // Sparkle scale shrinks with blink
-        const spSize = eyeWidth * 0.45 * Math.max(0, e.open - 0.2);
-        for (let s = 0; s < SPARKLE_STEPS; s++) {
-          for (let ep = 0; ep < 2; ep++) {
-            const k = (s + ep) % SPARKLE_STEPS;
-            const a = (k / SPARKLE_STEPS) * Math.PI * 2 + Math.PI / 4;
-            const rad = k % 2 === 0 ? spSize : spSize * 0.35;
-            positions.setXYZ(
-              (segOffset + s) * 2 + ep,
-              e.cx + Math.cos(a) * rad,
-              e.cy + Math.sin(a) * rad,
+        for (let s = 0; s < EYE_STEPS; s++) {
+          const a0 = (s / EYE_STEPS) * Math.PI * 2;
+          const a1 = ((s + 1) / EYE_STEPS) * Math.PI * 2;
+          const x0 = e.cx + Math.cos(a0) * eyeRadius;
+          const y0 = e.cy + Math.sin(a0) * h;
+          const x1 = e.cx + Math.cos(a1) * eyeRadius;
+          const y1 = e.cy + Math.sin(a1) * h;
+          addSegment(x0, y0, e.cz, x1, y1, e.cz);
+        }
+
+        if (e.open > 0.25) {
+          const pupilRad = eyeRadius * 0.54 * e.open;
+          for (let s = 0; s < PUPIL_STEPS; s++) {
+            const a0 = (s / PUPIL_STEPS) * Math.PI * 2;
+            const a1 = ((s + 1) / PUPIL_STEPS) * Math.PI * 2;
+            addSegment(
+              e.cx + Math.cos(a0) * pupilRad,
+              e.cy + Math.sin(a0) * pupilRad,
+              e.cz + 0.001,
+              e.cx + Math.cos(a1) * pupilRad,
+              e.cy + Math.sin(a1) * pupilRad,
               e.cz + 0.001,
             );
           }
+
+          // Center-leveled sparkle so gaze looks straight ahead
+          const spSize = eyeRadius * 0.28;
+          const spOx = e.cx + (e.isLeft ? -spSize * 0.5 : spSize * 0.5);
+          const spOy = e.cy + spSize * 0.25;
+          for (let s = 0; s < SPARKLE_STEPS; s++) {
+            const a0 = (s / SPARKLE_STEPS) * Math.PI * 2 + Math.PI / 4;
+            const a1 = ((s + 1) / SPARKLE_STEPS) * Math.PI * 2 + Math.PI / 4;
+            const r0 = s % 2 === 0 ? spSize : spSize * 0.35;
+            const r1 = (s + 1) % 2 === 0 ? spSize : spSize * 0.35;
+            addSegment(
+              spOx + Math.cos(a0) * r0,
+              spOy + Math.sin(a0) * r0,
+              e.cz + 0.002,
+              spOx + Math.cos(a1) * r1,
+              spOy + Math.sin(a1) * r1,
+              e.cz + 0.002,
+            );
+          }
         }
-        segOffset += SPARKLE_STEPS;
       }
 
-      // 3. MINIMAL BUTTON NOSE (Point 14)
+      // 3. MINIMAL BUTTON NOSE
       if (st.faceValid[14]) {
-        const nx = face[14 * 3], ny = face[14 * 3 + 1], nz = face[14 * 3 + 2] + 0.006;
-        const nLen = eyeDist * 0.07;
+        const nx = face[14 * 3], ny = face[14 * 3 + 1], nz = face[14 * 3 + 2] + 0.008;
+        const nLen = eyeDist * 0.06;
         for (let s = 0; s < NOSE_SEGMENTS; s++) {
           const t0 = 1 - s / NOSE_SEGMENTS;
           const t1 = 1 - (s + 1) / NOSE_SEGMENTS;
-          positions.setXYZ((segOffset + s) * 2, nx, ny + nLen * t0, nz);
-          positions.setXYZ((segOffset + s) * 2 + 1, nx, ny + nLen * t1, nz);
+          addSegment(nx, ny + nLen * t0, nz, nx, ny + nLen * t1, nz);
         }
       }
-      segOffset += NOSE_SEGMENTS;
     }
 
-    // 4. DATA-DRIVEN MOUTH (Points 15, 17, 16, 18)
+    // 4. CLEAN DATA-DRIVEN LIPS
     const mouthValid = [15, 16, 17, 18].every((i) => st.faceValid[i]);
     if (mouthValid) {
-      const pts = [15, 17, 16, 18]; // Left corner, Upper lip, Right corner, Lower lip
-      for (let i = 0; i < 4; i++) {
-        const pA = pts[i];
-        const pB = pts[(i + 1) % 4];
-        for (let s = 0; s < MOUTH_STEPS; s++) {
-          const t0 = s / MOUTH_STEPS;
-          const t1 = (s + 1) / MOUTH_STEPS;
+      const cL = { x: face[15 * 3], y: face[15 * 3 + 1], z: face[15 * 3 + 2] + 0.008 };
+      const cR = { x: face[16 * 3], y: face[16 * 3 + 1], z: face[16 * 3 + 2] + 0.008 };
+      const upLip = { x: face[17 * 3], y: face[17 * 3 + 1], z: face[17 * 3 + 2] + 0.008 };
+      const loLip = { x: face[18 * 3], y: face[18 * 3 + 1], z: face[18 * 3 + 2] + 0.008 };
 
-          const x0 = THREE.MathUtils.lerp(face[pA * 3], face[pB * 3], t0);
-          const y0 = THREE.MathUtils.lerp(face[pA * 3 + 1], face[pB * 3 + 1], t0);
-          const z0 = THREE.MathUtils.lerp(face[pA * 3 + 2], face[pB * 3 + 2], t0);
+      for (let s = 0; s < LIP_STEPS; s++) {
+        const t0 = s / LIP_STEPS;
+        const t1 = (s + 1) / LIP_STEPS;
 
-          const x1 = THREE.MathUtils.lerp(face[pA * 3], face[pB * 3], t1);
-          const y1 = THREE.MathUtils.lerp(face[pA * 3 + 1], face[pB * 3 + 1], t1);
-          const z1 = THREE.MathUtils.lerp(face[pA * 3 + 2], face[pB * 3 + 2], t1);
+        const evalQuad = (p0: typeof cL, p1: typeof upLip, p2: typeof cR, t: number) => {
+          const inv = 1 - t;
+          return {
+            x: inv * inv * p0.x + 2 * inv * t * p1.x + t * t * p2.x,
+            y: inv * inv * p0.y + 2 * inv * t * p1.y + t * t * p2.y,
+            z: inv * inv * p0.z + 2 * inv * t * p1.z + t * t * p2.z,
+          };
+        };
 
-          positions.setXYZ((segOffset + s) * 2, x0, y0, z0 + 0.004);
-          positions.setXYZ((segOffset + s) * 2 + 1, x1, y1, z1 + 0.004);
-        }
-        segOffset += MOUTH_STEPS;
+        const u0 = evalQuad(cL, upLip, cR, t0);
+        const u1 = evalQuad(cL, upLip, cR, t1);
+        addSegment(u0.x, u0.y, u0.z, u1.x, u1.y, u1.z);
+
+        const l0 = evalQuad(cL, loLip, cR, t0);
+        const l1 = evalQuad(cL, loLip, cR, t1);
+        addSegment(l0.x, l0.y, l0.z, l1.x, l1.y, l1.z);
       }
+
+      const mouthWidth = Math.hypot(cR.x - cL.x, cR.y - cL.y);
+      const tick = mouthWidth * 0.06;
+      addSegment(cL.x, cL.y, cL.z, cL.x - tick * 0.7, cL.y + tick * 0.7, cL.z);
+      addSegment(cR.x, cR.y, cR.z, cR.x + tick * 0.7, cR.y + tick * 0.7, cR.z);
+    }
+
+    for (let i = segOffset; i < FACE_SEGMENTS; i++) {
+      positions.setXYZ(i * 2, 0, 0, 0);
+      positions.setXYZ(i * 2 + 1, 0, 0, 0);
     }
 
     positions.needsUpdate = true;
@@ -499,7 +624,7 @@ export function FaceRig({ sampleRef }: { sampleRef: SampleRef }) {
       geometry={lineGeo}
       material={lineMat}
       frustumCulled={false}
-      renderOrder={2}
+      renderOrder={10}
     />
   );
 }

@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 import type { SampleRef } from "./HeadFaceRig";
-import { DHUTI_DROP, THRESH } from "./simulationConstants";
+import { DHUTI_DROP, DHUTI_HALF_WIDTH_RATIO, THRESH, TORSO_WORLD } from "./simulationConstants";
 
 const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
@@ -235,7 +235,7 @@ export function DhutiRig({ sampleRef }: { sampleRef: SampleRef }) {
     const hipY = (P[6 * 4 + 1] + P[7 * 4 + 1]) / 2;
     frame.cx = (P[6 * 4] + P[7 * 4]) / 2;
     frame.cz = (P[6 * 4 + 2] + P[7 * 4 + 2]) / 2;
-    frame.hw = Math.max(Math.abs(P[7 * 4] - P[6 * 4]) / 2, 0.14) * 1.12;
+    frame.hw = TORSO_WORLD * DHUTI_HALF_WIDTH_RATIO;
     frame.waistY = hipY + 0.08;
 
     /* Fixed knee-length hem; leg motion never stretches it. */

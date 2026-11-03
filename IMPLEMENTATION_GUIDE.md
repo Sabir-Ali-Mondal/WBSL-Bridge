@@ -5,7 +5,10 @@ that that training data will be saved in modle folder and that can be viewd usin
 
 never do it directly from model_training_zone\dataset_train all the frontend task should controlleable by only models\onnx_models 
 
+
 one model folder will have all data , avater data , report etc and models
 
 2. report viewing in frontend admin pamel for model as we are saving these in model folder we need to view in fronend admin area of model 
 models\onnx_models\5\confusion_matrix.json models\onnx_models\5\daily_report.json
+
+3. ACTIVE MODEL SIMULATION will be renames as avater data simulation 
