@@ -94,5 +94,5 @@ Designed for consumer-grade computers, WBSL Bridge aims to provide accessible co
 </p>
 
 <p align="center">
-  <img src="docs\assets\Robot Front View.png" alt="WBSL Bridge Logo" width="500" />
+  <img src="docs\assets\model front view.png" alt="WBSL Bridge ROBOT" width="500" />
 </p>
