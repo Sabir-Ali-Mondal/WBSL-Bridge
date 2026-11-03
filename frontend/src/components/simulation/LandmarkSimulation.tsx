@@ -17,6 +17,16 @@ import { Play, Pause, RotateCcw, Database } from "lucide-react";
 import { DhutiRig } from "./DhutiRig";
 import { RoundAlpanaStage } from "./AlpanaStage";
 import { DHUTI_DROP, THRESH, TORSO_WORLD } from "./simulationConstants";
+import { FaceRig, HeadRig, FACE_POINTS, HEAD_LEN, type SampleRef, type SampleState } from "./HeadFaceRig";
+import {
+  getBoneGeometry,
+  getJointGeometry,
+  hideAll,
+  placeBone,
+  placeJoint,
+  ZERO_MATRIX,
+} from "./RigUtils";
+export type { SampleRef } from "./HeadFaceRig";
 import {
   POSE_BODY_PAIRS,
   POSE_POINTS,
@@ -136,7 +146,6 @@ const Z_HAND = 0.5;
 const Z_LIMIT = 0.4;
 const SNAP_MAX_TORSOS = 1.0;
 const FOV = 38;
-const HEAD_LEN = 11;
 
 /* Keep the dhuti knee-length and independent of leg landmarks so pose noise
  * cannot stretch or shorten the garment. */
@@ -179,106 +188,6 @@ const HAND_BONE_RADIUS: number[] = HAND_CONN.map(
 );
 const PALM_FAN = [0, 1, 5, 9, 13, 17];
 const PALM_INDICES = [0, 1, 2, 0, 2, 3, 0, 3, 4, 0, 4, 5];
-
-const FACE_POINTS = 19;
-const FACE_CURVES: { points: number[]; closed: boolean; steps: number }[] = [
-  { points: [0, 2, 1, 3], closed: true, steps: 8 },
-  { points: [4, 5, 6], closed: false, steps: 6 },
-  { points: [7, 8, 9], closed: false, steps: 6 },
-  { points: [15, 17, 16, 18], closed: true, steps: 6 },
-];
-const EYE_CURVE_STEPS = 16;
-const FACE_NOSE_SEGMENTS = 4;
-const FACE_SEGMENT_COUNT =
-  FACE_CURVES.reduce(
-    (total, curve) =>
-      total +
-      (curve.closed ? curve.points.length : curve.points.length - 1) * curve.steps,
-    0,
-  ) + 2 * EYE_CURVE_STEPS + FACE_NOSE_SEGMENTS;
-
-function catmullRomCoordinate(
-  p0: number,
-  p1: number,
-  p2: number,
-  p3: number,
-  t: number,
-): number {
-  const t2 = t * t;
-  const t3 = t2 * t;
-  return 0.5 * (
-    2 * p1 +
-    (-p0 + p2) * t +
-    (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 +
-    (-p0 + 3 * p1 - 3 * p2 + p3) * t3
-  );
-}
-
-function writeFaceCurve(
-  positions: THREE.BufferAttribute,
-  face: Float32Array,
-  path: number[],
-  closed: boolean,
-  steps: number,
-  segmentOffset: number,
-): number {
-  const count = path.length;
-  const segmentCount = closed ? count : count - 1;
-  for (let segment = 0; segment < segmentCount; segment++) {
-    const p0 = path[closed ? (segment - 1 + count) % count : Math.max(segment - 1, 0)];
-    const p1 = path[segment];
-    const p2 = path[(segment + 1) % count];
-    const p3 = path[closed ? (segment + 2) % count : Math.min(segment + 2, count - 1)];
-    for (let step = 0; step < steps; step++) {
-      const t0 = step / steps;
-      const t1 = (step + 1) / steps;
-      const vertex = (segmentOffset + segment * steps + step) * 2;
-      for (let endpoint = 0; endpoint < 2; endpoint++) {
-        const t = endpoint === 0 ? t0 : t1;
-        const target = vertex + endpoint;
-        positions.setXYZ(
-          target,
-          catmullRomCoordinate(face[p0 * 3], face[p1 * 3], face[p2 * 3], face[p3 * 3], t),
-          catmullRomCoordinate(face[p0 * 3 + 1], face[p1 * 3 + 1], face[p2 * 3 + 1], face[p3 * 3 + 1], t),
-          catmullRomCoordinate(face[p0 * 3 + 2], face[p1 * 3 + 2], face[p2 * 3 + 2], face[p3 * 3 + 2], t),
-        );
-      }
-    }
-  }
-  return segmentOffset + segmentCount * steps;
-}
-
-function writeEyeCurve(
-  positions: THREE.BufferAttribute,
-  face: Float32Array,
-  startSegment: number,
-  upperIndex: number,
-  lowerIndex: number,
-  halfWidth: number,
-): void {
-  const centerX = (face[upperIndex * 3] + face[lowerIndex * 3]) / 2;
-  const centerY = (face[upperIndex * 3 + 1] + face[lowerIndex * 3 + 1]) / 2;
-  const centerZ = (face[upperIndex * 3 + 2] + face[lowerIndex * 3 + 2]) / 2 + 0.006;
-  const halfHeight =
-    Math.hypot(
-      face[upperIndex * 3] - face[lowerIndex * 3],
-      face[upperIndex * 3 + 1] - face[lowerIndex * 3 + 1],
-    ) * 1.15;
-  const segments = EYE_CURVE_STEPS;
-  for (let segment = 0; segment < segments; segment++) {
-    for (let endpoint = 0; endpoint < 2; endpoint++) {
-      const angle = ((segment + endpoint) / segments) * Math.PI * 2;
-      const x = Math.cos(angle);
-      const y = Math.sin(angle);
-      positions.setXYZ(
-        (startSegment + segment) * 2 + endpoint,
-        centerX + x * halfWidth,
-        centerY + y * halfHeight * (0.68 + 0.32 * Math.abs(x)),
-        centerZ,
-      );
-    }
-  }
-}
 
 interface Bounds {
   minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number;
@@ -371,8 +280,6 @@ function poseHeadFallback(pose: Float32Array, head: Float32Array): void {
 }
 
 const NECK_LENGTH = 0.2;
-const NECK_RADIUS = 0.1;
-const NECK_SEGMENTS = 5;
 
 function solveFrame(
   ctx: SolveContext,
@@ -597,24 +504,6 @@ function solveSequence(
  * 4. 3D: FRAME SAMPLING
  * ========================================================================== */
 
-interface SampleState {
-  pose: Float32Array;
-  poseInit: Uint8Array;
-  hands: [Float32Array, Float32Array];
-  handValid: [Uint8Array, Uint8Array];
-  handInit: Uint8Array;
-  handAlpha: Float32Array;
-  face: Float32Array;
-  faceValid: Uint8Array;
-  faceInit: Uint8Array;
-  head: Float32Array;
-  headValid: boolean;
-  headInit: boolean;
-  facePresent: boolean;
-  hasPose: boolean;
-}
-export type SampleRef = { current: SampleState };
-
 function createSampleState(): SampleState {
   return {
     pose: new Float32Array(POSE_POINTS * 4),
@@ -742,57 +631,9 @@ function sampleFrame(
  * 5. 3D: SHARED THREE HELPERS
  * ========================================================================== */
 
-const _m = new THREE.Matrix4();
-const _q = new THREE.Quaternion();
 const _p = new THREE.Vector3();
-const _s = new THREE.Vector3();
 const _d = new THREE.Vector3();
-const _up = new THREE.Vector3(0, 1, 0);
 const _c = new THREE.Color();
-const _zero = new THREE.Matrix4().makeScale(0, 0, 0);
-const _sa = new Float32Array(3);
-const _sb = new Float32Array(3);
-
-let boneGeometry: THREE.CylinderGeometry | null = null;
-let jointGeometry: THREE.SphereGeometry | null = null;
-let headGeometry: THREE.SphereGeometry | null = null;
-const getBoneGeometry = () => (boneGeometry ??= new THREE.CylinderGeometry(0.78, 1, 1, 14, 1, false));
-const getJointGeometry = () => (jointGeometry ??= new THREE.SphereGeometry(1, 18, 14));
-const getHeadGeometry = () => (headGeometry ??= new THREE.SphereGeometry(1, 36, 26));
-
-function placeBone(
-  mesh: THREE.InstancedMesh, index: number,
-  A: ArrayLike<number>, ao: number, B: ArrayLike<number>, bo: number, radius: number,
-): void {
-  _d.set(B[bo] - A[ao], B[bo + 1] - A[ao + 1], B[bo + 2] - A[ao + 2]);
-  const length = _d.length();
-  if (length < 1e-5) {
-    mesh.setMatrixAt(index, _zero);
-    return;
-  }
-  _d.multiplyScalar(1 / length);
-  _q.setFromUnitVectors(_up, _d);
-  _p.set((A[ao] + B[bo]) / 2, (A[ao + 1] + B[bo + 1]) / 2, (A[ao + 2] + B[bo + 2]) / 2);
-  _s.set(radius, length, radius);
-  _m.compose(_p, _q, _s);
-  mesh.setMatrixAt(index, _m);
-}
-
-function placeJoint(
-  mesh: THREE.InstancedMesh, index: number, P: ArrayLike<number>, o: number, radius: number,
-): void {
-  _p.set(P[o], P[o + 1], P[o + 2]);
-  _q.identity();
-  _s.setScalar(radius);
-  _m.compose(_p, _q, _s);
-  mesh.setMatrixAt(index, _m);
-}
-
-function hideAll(mesh: THREE.InstancedMesh | null): void {
-  if (!mesh) return;
-  for (let i = 0; i < mesh.count; i++) mesh.setMatrixAt(i, _zero);
-  mesh.instanceMatrix.needsUpdate = true;
-}
 
 function initTint(mesh: THREE.InstancedMesh | null, colors?: THREE.Color[]): void {
   if (!mesh) return;
@@ -850,7 +691,7 @@ function BodyRig({ sampleRef, pairs }: { sampleRef: SampleRef; pairs: PairList }
       const a = pairs[i][0], b = pairs[i][1];
       const va = P[a * 4 + 3], vb = P[b * 4 + 3];
       if (!(va >= THRESH && vb >= THRESH)) {
-        bones.setMatrixAt(i, _zero);
+        bones.setMatrixAt(i, ZERO_MATRIX);
         continue;
       }
       placeBone(bones, i, P, a * 4, P, b * 4, radii[i]);
@@ -864,7 +705,7 @@ function BodyRig({ sampleRef, pairs }: { sampleRef: SampleRef; pairs: PairList }
       const idx = joints[i];
       const v = P[idx * 4 + 3];
       if (!(v >= THRESH)) {
-        jointMesh.setMatrixAt(i, _zero);
+        jointMesh.setMatrixAt(i, ZERO_MATRIX);
         continue;
       }
       placeJoint(jointMesh, i, P, idx * 4, bodyJointRadius(idx));
@@ -1025,259 +866,6 @@ function TorsoRig({
   );
 }
 
-function HeadRig({ sampleRef }: { sampleRef: SampleRef }) {
-  const headRef = useRef<THREE.Mesh>(null);
-  const neckRef = useRef<THREE.InstancedMesh>(null);
-  const neckStart = useRef(new Float32Array(3));
-  const neckEnd = useRef(new Float32Array(3));
-  const headMat = useMemo(
-    () =>
-      new THREE.MeshStandardMaterial({
-        color: "#172a47",
-        transparent: true,
-        opacity: 0.13,
-        roughness: 0.55,
-        metalness: 0.05,
-        depthWrite: false,
-      }),
-    [],
-  );
-  const neckMat = useMemo(
-    () => new THREE.MeshStandardMaterial({
-      color: "#5678bd",
-      metalness: 0.34,
-      roughness: 0.3,
-      emissive: "#10213f",
-      emissiveIntensity: 0.08,
-    }),
-    [],
-  );
-  useEffect(() => () => { headMat.dispose(); neckMat.dispose(); }, [headMat, neckMat]);
-  useLayoutEffect(() => hideAll(neckRef.current), []);
-
-  useFrame(() => {
-    const head = headRef.current;
-    const neck = neckRef.current;
-    if (!head || !neck) return;
-    const st = sampleRef.current;
-    head.visible = st.headValid && !st.facePresent;
-    if (!st.headValid) {
-      hideAll(neck);
-      return;
-    }
-    const H = st.head;
-    head.position.set(H[1], H[2], H[3]);
-    head.scale.set(H[4] / 2, H[5] / 2, H[6] / 2);
-    head.rotation.z = H[10];
-
-    const P = st.pose;
-    if (P[0 * 4 + 3] >= THRESH && P[1 * 4 + 3] >= THRESH) {
-      _sa[0] = (P[0] + P[4]) / 2;
-      _sa[1] = (P[1] + P[5]) / 2;
-      _sa[2] = (P[2] + P[6]) / 2;
-      _sb[0] = H[7]; _sb[1] = H[8]; _sb[2] = H[9];
-      const dx = _sb[0] - _sa[0];
-      const dy = _sb[1] - _sa[1];
-      const dz = _sb[2] - _sa[2];
-      for (let index = 0; index < NECK_SEGMENTS; index++) {
-        const start = (index + 0.08) / NECK_SEGMENTS;
-        const end = (index + 0.92) / NECK_SEGMENTS;
-        neckStart.current[0] = _sa[0] + dx * start;
-        neckStart.current[1] = _sa[1] + dy * start;
-        neckStart.current[2] = _sa[2] + dz * start;
-        neckEnd.current[0] = _sa[0] + dx * end;
-        neckEnd.current[1] = _sa[1] + dy * end;
-        neckEnd.current[2] = _sa[2] + dz * end;
-        placeBone(
-          neck,
-          index,
-          neckStart.current,
-          0,
-          neckEnd.current,
-          0,
-          NECK_RADIUS * (0.9 + 0.1 * Math.sin((index / (NECK_SEGMENTS - 1)) * Math.PI)),
-        );
-        neck.setColorAt(index, _c.set(index === 0 || index === NECK_SEGMENTS - 1 ? "#64cbd6" : "#274566"));
-      }
-    } else {
-      hideAll(neck);
-    }
-    neck.instanceMatrix.needsUpdate = true;
-    if (neck.instanceColor) neck.instanceColor.needsUpdate = true;
-  });
-
-  return (
-    <group>
-      <mesh
-        ref={headRef}
-        geometry={getHeadGeometry()}
-        material={headMat}
-        frustumCulled={false}
-        renderOrder={-1}
-        castShadow
-      />
-      <instancedMesh
-        ref={neckRef}
-        args={[getBoneGeometry(), neckMat, NECK_SEGMENTS]}
-        frustumCulled={false}
-        castShadow
-      />
-    </group>
-  );
-}
-
-function FaceRig({ sampleRef }: { sampleRef: SampleRef }) {
-  const linesRef = useRef<THREE.LineSegments>(null);
-  const keysRef = useRef<THREE.InstancedMesh>(null);
-  const eyeCenters = useMemo(() => new Float32Array(6), []);
-
-  const lineGeo = useMemo(() => {
-    const g = new THREE.BufferGeometry();
-    g.setAttribute(
-      "position",
-      new THREE.BufferAttribute(new Float32Array(FACE_SEGMENT_COUNT * 6), 3).setUsage(THREE.DynamicDrawUsage),
-    );
-    return g;
-  }, []);
-  const lineMat = useMemo(
-    () => new THREE.LineBasicMaterial({ color: "#59F4FF", transparent: true, opacity: 0.96 }),
-    [],
-  );
-  const keyMat = useMemo(
-    () => new THREE.MeshStandardMaterial({
-      color: "#BDFBFF",
-      emissive: "#38DDF0",
-      emissiveIntensity: 0.35,
-      roughness: 0.35,
-      metalness: 0.05,
-    }),
-    [],
-  );
-  useEffect(
-    () => () => { lineGeo.dispose(); lineMat.dispose(); keyMat.dispose(); },
-    [lineGeo, lineMat, keyMat],
-  );
-  useLayoutEffect(() => hideAll(keysRef.current), []);
-
-  useFrame(() => {
-    const lines = linesRef.current, keys = keysRef.current;
-    if (!lines || !keys) return;
-    const st = sampleRef.current;
-    lines.visible = st.facePresent;
-    keys.visible = st.facePresent;
-    const pos = lineGeo.getAttribute("position") as THREE.BufferAttribute;
-    const F = st.face;
-    let segmentOffset = 0;
-    for (const curve of FACE_CURVES) {
-      const segmentCount = (curve.closed ? curve.points.length : curve.points.length - 1) * curve.steps;
-      if (curve.points.every((point) => st.faceValid[point])) {
-        segmentOffset = writeFaceCurve(
-          pos,
-          F,
-          curve.points,
-          curve.closed,
-          curve.steps,
-          segmentOffset,
-        );
-      } else {
-        for (let segment = 0; segment < segmentCount; segment++) {
-          pos.setXYZ((segmentOffset + segment) * 2, 0, 0, 0);
-          pos.setXYZ((segmentOffset + segment) * 2 + 1, 0, 0, 0);
-        }
-        segmentOffset += segmentCount;
-      }
-    }
-    const eyesAvailable = [10, 11, 12, 13].every((index) => st.faceValid[index]);
-    let eyeGap = 0;
-    let leftAperture = 0;
-    let rightAperture = 0;
-    if (eyesAvailable) {
-      const leftX = (F[10 * 3] + F[11 * 3]) / 2;
-      const leftY = (F[10 * 3 + 1] + F[11 * 3 + 1]) / 2;
-      const rightX = (F[12 * 3] + F[13 * 3]) / 2;
-      const rightY = (F[12 * 3 + 1] + F[13 * 3 + 1]) / 2;
-      eyeGap = Math.hypot(rightX - leftX, rightY - leftY);
-      const halfWidth = THREE.MathUtils.clamp(eyeGap * 0.27, 0.008, 0.035);
-      leftAperture = Math.hypot(
-        F[10 * 3] - F[11 * 3],
-        F[10 * 3 + 1] - F[11 * 3 + 1],
-      );
-      rightAperture = Math.hypot(
-        F[12 * 3] - F[13 * 3],
-        F[12 * 3 + 1] - F[13 * 3 + 1],
-      );
-      writeEyeCurve(pos, F, segmentOffset, 10, 11, halfWidth);
-      writeEyeCurve(pos, F, segmentOffset + EYE_CURVE_STEPS, 12, 13, halfWidth);
-      segmentOffset += EYE_CURVE_STEPS * 2;
-
-      eyeCenters.set([
-        leftX,
-        leftY,
-        (F[10 * 3 + 2] + F[11 * 3 + 2]) / 2 + 0.012,
-        rightX,
-        rightY,
-        (F[12 * 3 + 2] + F[13 * 3 + 2]) / 2 + 0.012,
-      ]);
-      if (st.faceValid[14]) {
-        const noseX = F[14 * 3];
-        const noseY = F[14 * 3 + 1];
-        const noseZ = F[14 * 3 + 2] + 0.008;
-        const length = eyeGap * 0.12;
-        for (let segment = 0; segment < FACE_NOSE_SEGMENTS; segment++) {
-          const top = 1 - segment / FACE_NOSE_SEGMENTS;
-          const bottom = 1 - (segment + 1) / FACE_NOSE_SEGMENTS;
-          pos.setXYZ(
-            (segmentOffset + segment) * 2,
-            noseX,
-            noseY + length * top,
-            noseZ,
-          );
-          pos.setXYZ(
-            (segmentOffset + segment) * 2 + 1,
-            noseX,
-            noseY + length * bottom,
-            noseZ,
-          );
-        }
-      } else {
-        for (let segment = 0; segment < FACE_NOSE_SEGMENTS; segment++) {
-          pos.setXYZ((segmentOffset + segment) * 2, 0, 0, 0);
-          pos.setXYZ((segmentOffset + segment) * 2 + 1, 0, 0, 0);
-        }
-      }
-      segmentOffset += FACE_NOSE_SEGMENTS;
-    } else {
-      const emptySegments = EYE_CURVE_STEPS * 2 + FACE_NOSE_SEGMENTS;
-      for (let segment = 0; segment < emptySegments; segment++) {
-        pos.setXYZ((segmentOffset + segment) * 2, 0, 0, 0);
-        pos.setXYZ((segmentOffset + segment) * 2 + 1, 0, 0, 0);
-      }
-      segmentOffset += emptySegments;
-      eyeCenters.fill(0);
-    }
-    pos.needsUpdate = true;
-    for (let index = 0; index < 2; index++) {
-      if (eyesAvailable) {
-        const aperture = index === 0 ? leftAperture : rightAperture;
-        const eyeScale = eyeGap > 0
-          ? THREE.MathUtils.clamp(aperture / (eyeGap * 0.12), 0, 1)
-          : 0;
-        placeJoint(keys, index, eyeCenters, index * 3, 0.008 * eyeScale);
-      } else {
-        keys.setMatrixAt(index, _zero);
-      }
-    }
-    keys.instanceMatrix.needsUpdate = true;
-  });
-
-  return (
-    <group>
-      <lineSegments ref={linesRef} geometry={lineGeo} material={lineMat} frustumCulled={false} />
-      <instancedMesh ref={keysRef} args={[getJointGeometry(), keyMat, 2]} frustumCulled={false} />
-    </group>
-  );
-}
-
 function HandRig({ slot, color, sampleRef }: { slot: 0 | 1; color: string; sampleRef: SampleRef }) {
   const groupRef = useRef<THREE.Group>(null);
   const bonesRef = useRef<THREE.InstancedMesh>(null);
@@ -1404,12 +992,12 @@ function HandRig({ slot, color, sampleRef }: { slot: 0 | 1; color: string; sampl
     for (let i = 0; i < HAND_CONN.length; i++) {
       const c = HAND_CONN[i];
       if (valid[c[0]] && valid[c[1]]) placeBone(bones, i, pts, c[0] * 3, pts, c[1] * 3, HAND_BONE_RADIUS[i]);
-      else bones.setMatrixAt(i, _zero);
+      else bones.setMatrixAt(i, ZERO_MATRIX);
     }
     bones.instanceMatrix.needsUpdate = true;
     for (let j = 0; j < 21; j++) {
       if (valid[j]) placeJoint(joints, j, pts, j * 3, HAND_JOINT_RADIUS[j]);
-      else joints.setMatrixAt(j, _zero);
+      else joints.setMatrixAt(j, ZERO_MATRIX);
     }
     joints.instanceMatrix.needsUpdate = true;
 

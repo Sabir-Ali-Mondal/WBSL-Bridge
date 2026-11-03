@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
-import type { SampleRef } from "./LandmarkSimulation";
+import type { SampleRef } from "./HeadFaceRig";
 import { DHUTI_DROP, THRESH } from "./simulationConstants";
 
 const _m = new THREE.Matrix4();
