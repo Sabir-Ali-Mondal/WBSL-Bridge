@@ -226,16 +226,16 @@ export function DhutiRig({ sampleRef }: { sampleRef: SampleRef }) {
     if (!group || !motifs) return;
     const P = sampleRef.current.pose;
     const vis = (i: number) => P[i * 4 + 3] >= THRESH;
-    if (!(vis(23) && vis(24))) {
+    if (!(vis(6) && vis(7))) {
       group.visible = false;
       return;
     }
     group.visible = true;
 
-    const hipY = (P[23 * 4 + 1] + P[24 * 4 + 1]) / 2;
-    frame.cx = (P[23 * 4] + P[24 * 4]) / 2;
-    frame.cz = (P[23 * 4 + 2] + P[24 * 4 + 2]) / 2;
-    frame.hw = Math.max(Math.abs(P[24 * 4] - P[23 * 4]) / 2, 0.14) * 1.12;
+    const hipY = (P[6 * 4 + 1] + P[7 * 4 + 1]) / 2;
+    frame.cx = (P[6 * 4] + P[7 * 4]) / 2;
+    frame.cz = (P[6 * 4 + 2] + P[7 * 4 + 2]) / 2;
+    frame.hw = Math.max(Math.abs(P[7 * 4] - P[6 * 4]) / 2, 0.14) * 1.12;
     frame.waistY = hipY + 0.08;
 
     /* Fixed knee-length hem; leg motion never stretches it. */

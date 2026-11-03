@@ -40,15 +40,15 @@ export default function AdminDashboardPage() {
           <div className="text-[11px] font-mono text-text-secondary">Classes in model: {stats?.model_classes ?? "—"}</div>
         </div>
         <div className="p-5 rounded-lg bg-surface border border-border space-y-2">
-          <div className="text-xs font-mono uppercase text-text-muted">Approved Samples</div>
-          <div className="text-2xl font-bold text-accent-primary">{stats?.total_approved_samples ?? "—"}</div>
-          <div className="text-[11px] font-mono text-text-secondary">Dataset: {stats?.dataset_version ?? "—"}</div>
+          <div className="text-xs font-mono uppercase text-text-muted">Signs With Avatar Data</div>
+          <div className="text-2xl font-bold text-accent-primary">{stats?.avatar_classes ?? "—"}</div>
+          <div className="text-[11px] font-mono text-text-secondary">Replay assets bundled with the active model</div>
         </div>
         <div className="p-5 rounded-lg bg-surface border border-border space-y-2">
           <div className="text-xs font-mono uppercase text-text-muted">Active Model</div>
           <div className="text-lg font-bold text-text-primary truncate">{stats?.model_active ?? "—"}</div>
           <div className="text-[11px] font-mono text-text-secondary">
-            {stats?.contract?.feature_width ?? 126}-dim {stats?.contract?.kind ?? "model"} · {stats?.model_classes ?? "—"} classes
+            {stats?.contract?.feature_width ?? 98}-dim · {stats?.contract?.frames ?? 64} frames · {stats?.model_classes ?? "—"} classes
           </div>
         </div>
         <div className="p-5 rounded-lg bg-surface border border-border space-y-2">
@@ -60,9 +60,9 @@ export default function AdminDashboardPage() {
 
       {/* Quick Launch Action Panels */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Link
-          href="/admin/contributions"
-          className="p-6 rounded-lg bg-surface border border-border hover:border-accent-primary transition-all flex flex-col justify-between space-y-4"
+        <div
+          aria-disabled="true"
+          className="p-6 rounded-lg bg-surface border border-border opacity-50 cursor-not-allowed flex flex-col justify-between space-y-4"
         >
           <div>
             <div className="w-10 h-10 rounded bg-accent-primary/10 text-accent-primary flex items-center justify-center mb-3">
@@ -70,14 +70,13 @@ export default function AdminDashboardPage() {
             </div>
             <h3 className="font-semibold text-text-primary">Contribution Verification</h3>
             <p className="text-xs text-text-secondary mt-1">
-              Inspect coordinate trajectories, validation scores, and reviewer reasoning layers.
+              Planned future feature. Not currently active.
             </p>
           </div>
-          <div className="flex items-center space-x-1 text-xs font-mono text-accent-primary font-bold">
-            <span>Review Queue</span>
-            <ArrowUpRight size={14} />
+          <div className="flex items-center space-x-1 text-xs font-mono text-text-muted">
+            <span>Coming Soon</span>
           </div>
-        </Link>
+        </div>
 
         <Link
           href="/admin/dataset"
@@ -89,7 +88,7 @@ export default function AdminDashboardPage() {
             </div>
             <h3 className="font-semibold text-text-primary">Dataset Explorer</h3>
             <p className="text-xs text-text-secondary mt-1">
-              Browse the sign lexicon, filter by category and dialect, and inspect per-sign sample counts.
+              Browse the model vocabulary and inspect per-sign avatar availability.
             </p>
           </div>
           <div className="flex items-center space-x-1 text-xs font-mono text-accent-secondary font-bold">

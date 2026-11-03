@@ -1,62 +1,42 @@
-"""
-backend/streaming.py
-Per-session rolling landmark buffer for live continuous recognition.
-
-Why the buffer lives here and not in the browser:
-
-The client used to keep a ring buffer of 32 JPEGs and POST all of them every
-tick. That is ~32 uploads and 32 MediaPipe passes for every single prediction,
-and it makes the browser the owner of the recognition window -- so two tabs, or
-a reload, silently reset the state the model depends on.
-
-Here the client uploads ONE JPEG, the server appends ONE landmark vector, and the
-model runs when the buffer is deep enough. Upload cost per tick drops by 32x, the
-window survives a page reload, and the multi-scale windowing in
-``/api/stream/frame`` can read any length of history it wants out of one deque.
-
-Sessions are keyed by a client-generated id and never garbage collected: they are
-tiny (a 180x258 float32 deque is ~186 KB) and eviction would have to guess at
-liveness. A long-lived server with many visitors will accumulate them; the cap in
-``MAX_SESSIONS`` bounds that, dropping the least recently used.
-"""
+"""Per-session state for continuous sign detection."""
 
 from collections import OrderedDict, deque
 
 import numpy as np
 
-# ~6 s at 30 fps of client capture. Long enough that a 24- and a 32-frame window
-# can both be cut from it with room to spare, short enough that a stale sign
-# falls out of the buffer on its own.
-DEFAULT_WINDOW = 180
+from backend.extract import END_FRAMES, KEEP_TAIL, PRE_ROLL, TRIGGER_FRAMES
+
 MAX_SESSIONS = 64
+REFERENCE_FPS = 30.0
 
 
 class StreamSession:
-    """One client's rolling landmark history.
+    """State and buffered frames for one client's sign stream."""
 
-    The whole point is that misses do not create gaps: a frame where a hand was
-    not detected appends the previous vector, so the sequence the model sees is
-    always dense and the same length as the wall-clock window. A truly empty
-    buffer still appends a zero vector, which the network reads (via its
-    hand-presence channels) as "no hands" rather than as a sign.
-    """
+    def __init__(self):
+        self.reset()
 
-    def __init__(self, maxlen: int = DEFAULT_WINDOW):
-        self.buf: deque = deque(maxlen=maxlen)
-        self.last_infer: float = 0.0
-        # Consecutive frames with no landmarks. Bounded carry-forward (see
-        # /api/stream/frame): a short occlusion keeps the window dense, a long
-        # absence decays to zeros so a dropped hand cannot replay the last
-        # sign pose forever.
-        self.miss: int = 0
+    def reset(self, mode: str = "auto"):
+        self.mode = mode
+        self.state = "IDLE"
+        self.up_count = 0
+        self.down_count = 0
+        self.last_up_idx = 0
+        self.up_started_at = None
+        self.down_started_at = None
+        self.frame_index = 0
+        self.pre_roll = deque(maxlen=PRE_ROLL + TRIGGER_FRAMES)
+        self.frames = []
+        self.features = []
+        self.timestamps = []
+        self.miss = 0
+        self.manual_recording = False
 
 
-# Ordered so the oldest session is the one evicted when the cap is hit.
 SESSIONS: "OrderedDict[str, StreamSession]" = OrderedDict()
 
 
 def get_session(sid: str) -> StreamSession:
-    """Fetch (and touch) the session for ``sid``, creating it on first use."""
     sess = SESSIONS.get(sid)
     if sess is None:
         sess = StreamSession()
@@ -68,12 +48,86 @@ def get_session(sid: str) -> StreamSession:
     return sess
 
 
-def last_vector(sess: StreamSession, width: int) -> np.ndarray:
-    """The vector to carry forward when this frame yielded no landmarks."""
-    if sess.buf:
-        return sess.buf[-1]
-    return np.zeros(width, np.float32)
-
-
 def reset_session(sid: str) -> None:
     SESSIONS.pop(sid, None)
+
+
+def update_span_state(
+    sess: StreamSession,
+    any_hand_up: bool,
+    frame_data: dict | None,
+    feature_vec: np.ndarray,
+    is_complete: bool,
+    timestamp: float,
+) -> str:
+    """Advance the span state machine and return its current state."""
+    sess.frame_index += 1
+
+    if sess.state == "IDLE":
+        sess.pre_roll.append((frame_data, feature_vec, is_complete, timestamp))
+        pre_roll_window = (PRE_ROLL + TRIGGER_FRAMES - 1) / REFERENCE_FPS
+        while (
+            len(sess.pre_roll) > 1
+            and timestamp - sess.pre_roll[0][3] > pre_roll_window + 1e-6
+        ):
+            sess.pre_roll.popleft()
+        if any_hand_up:
+            if sess.up_started_at is None:
+                sess.up_started_at = timestamp
+            sess.up_count += 1
+            if timestamp - sess.up_started_at + 1e-6 >= (
+                TRIGGER_FRAMES - 1
+            ) / REFERENCE_FPS:
+                sess.state = "SIGN"
+                sess.down_count = 0
+                sess.frames = list(sess.pre_roll)
+                sess.features = [
+                    (i, features, complete)
+                    for i, (_, features, complete, _) in enumerate(sess.frames)
+                ]
+                sess.timestamps = [time for _, _, _, time in sess.pre_roll]
+                sess.last_up_idx = len(sess.frames) - 1
+                sess.up_started_at = None
+                return "SIGN"
+        else:
+            sess.up_count = 0
+            sess.up_started_at = None
+        return "IDLE"
+
+    sess.frames.append(frame_data)
+    rel_idx = len(sess.frames) - 1
+    sess.features.append((rel_idx, feature_vec, is_complete))
+    sess.timestamps.append(timestamp)
+
+    if any_hand_up:
+        sess.last_up_idx = rel_idx
+        sess.down_count = 0
+        sess.down_started_at = None
+    else:
+        if sess.down_started_at is None:
+            sess.down_started_at = timestamp
+        sess.down_count += 1
+        if timestamp - sess.down_started_at + 1e-6 >= (
+            END_FRAMES - 1
+        ) / REFERENCE_FPS:
+            tail_time = (
+                sess.timestamps[sess.last_up_idx]
+                + KEEP_TAIL / REFERENCE_FPS
+                + 1e-6
+            )
+            end_idx = max(
+                sess.last_up_idx,
+                min(
+                    int(np.searchsorted(sess.timestamps, tail_time, side="right")) - 1,
+                    rel_idx,
+                ),
+            )
+            sess.frames = sess.frames[:end_idx + 1]
+            sess.features = sess.features[:end_idx + 1]
+            sess.timestamps = sess.timestamps[:end_idx + 1]
+            sess.state = "IDLE"
+            sess.up_count = 0
+            sess.down_count = 0
+            sess.pre_roll.clear()
+            return "SPAN_COMPLETE"
+    return "SIGN"

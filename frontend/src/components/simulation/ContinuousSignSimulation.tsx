@@ -12,7 +12,7 @@ const API_BASE = "http://localhost:8200";
 interface LandmarkReplay {
   frames: number[][][];
   pose?: PosePoint[][];
-  face_mesh?: number[][][];
+  face_avatar?: number[][][];
   count: number;
   source: string;
 }
@@ -26,7 +26,7 @@ interface Segment {
 interface ReplaySequence {
   frames: number[][][];
   pose?: PosePoint[][];
-  faceMesh?: number[][][];
+  faceAvatar?: number[][][];
   segments: Segment[];
 }
 
@@ -57,10 +57,10 @@ async function fetchContinuousSequence(glosses: string[]): Promise<ReplaySequenc
   const replayByGloss = new Map(entries);
   const frames: number[][][] = [];
   const poses: PosePoint[][] = [];
-  const faceMesh: number[][][] = [];
+  const faceAvatar: number[][][] = [];
   const segments: Segment[] = [];
   let allHavePose = true;
-  let hasAnyFaceMesh = false;
+  let hasAnyFaceAvatar = false;
 
   for (const gloss of glosses) {
     const replay = replayByGloss.get(gloss);
@@ -76,18 +76,18 @@ async function fetchContinuousSequence(glosses: string[]): Promise<ReplaySequenc
       allHavePose = false;
     }
 
-    if (replay.face_mesh?.length === replay.frames.length) {
-      faceMesh.push(...replay.face_mesh);
-      hasAnyFaceMesh ||= replay.face_mesh.some((frame) => frame.length > 0);
+    if (replay.face_avatar?.length === replay.frames.length) {
+      faceAvatar.push(...replay.face_avatar);
+      hasAnyFaceAvatar ||= replay.face_avatar.some((frame) => frame.length > 0);
     } else {
-      faceMesh.push(...replay.frames.map(() => []));
+      faceAvatar.push(...replay.frames.map(() => []));
     }
   }
 
   return {
     frames,
     pose: allHavePose ? poses : undefined,
-    faceMesh: hasAnyFaceMesh ? faceMesh : undefined,
+    faceAvatar: hasAnyFaceAvatar ? faceAvatar : undefined,
     segments,
   };
 }
@@ -136,13 +136,12 @@ export function ContinuousSignSimulation({
       <div className="flex items-start justify-between gap-3 px-1 mb-1">
         <div className="flex items-center gap-2">
           <div className="inline-flex items-center px-2 py-0.5 rounded border border-border/80 bg-surface text-[10px] font-mono font-bold text-text-secondary uppercase tracking-wider w-fit">
-            {data ? `${data.segments.length} SIGNS` : `${normalizedGlosses.length} SIGNS`}
+            <span className="text-[10px] font-mono tabular-nums text-text-secondary">
+              {data ? `${activeSegment + 1}/${data.segments.length}` : "—"} SIGNS
+            </span>
           </div>
         </div>
         <div className="flex items-center gap-2 pt-0.5">
-          <span className="text-[10px] font-mono tabular-nums text-text-secondary">
-            {data ? `${activeSegment + 1}/${data.segments.length}` : "—"}
-          </span>
           <button
             type="button"
             onClick={onResetView}
@@ -150,8 +149,7 @@ export function ContinuousSignSimulation({
             aria-label="Reset simulation view"
             title="Reset simulation view"
           >
-            <RotateCcw size={11} />
-            Reset view
+            <RotateCcw size={15} />
           </button>
         </div>
       </div>
@@ -170,7 +168,7 @@ export function ContinuousSignSimulation({
             <LandmarkSimulation
               frames={data.frames}
               pose={data.pose}
-              faceMesh={data.faceMesh}
+              faceAvatar={data.faceAvatar}
               fps={15}
               minimal
               loop={false}

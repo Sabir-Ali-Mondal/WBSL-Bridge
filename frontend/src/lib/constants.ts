@@ -9,14 +9,5 @@ export const APP_CONFIG = {
 export const NAVIGATION_LINKS = [
   { label: "Text → Sign", href: "/text-to-sign" },
   { label: "Sign → Text", href: "/sign-to-text" },
-  { label: "Contribute", href: "/contribute" },
   { label: "About", href: "/about" },
 ];
-
-export const PIPELINE_STAGES = [
-  { id: "camera", label: "CAMERA" },
-  { id: "landmarks", label: "LANDMARKS" },
-  { id: "recognition", label: "RECOGNITION" },
-  { id: "nlg", label: "NLG" },
-  { id: "tts", label: "TTS" },
-] as const;

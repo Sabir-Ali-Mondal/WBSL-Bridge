@@ -2,52 +2,32 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
-import {
-  NmmThresholdPanel,
-  DEFAULT_ALL,
-  DEFAULT_MARKER_GATES,
-  COMMIT_STORAGE_KEY,
-  type AllThresholds,
-  type MarkerGates,
-} from "@/components/sign/NmmThresholdPanel";
 import { EmotionPanel } from "@/components/sign/EmotionPanel";
 import { CameraFramingGuide } from "@/components/camera/CameraFramingGuide";
 import { FramingWarningArea } from "@/components/camera/FramingWarningArea";
 import {
-  Camera,
   CameraOff,
   Volume2,
   Trash2,
   Loader2,
   Delete,
   Plus,
-  Activity,
   Sparkles,
   ShieldAlert,
-  Lock,
 } from "lucide-react";
 import { toast } from "sonner";
 import axios from "axios";
 
 const API_BASE = "http://localhost:8200";
+const MIN_CONFIDENCE = 0.5;
+const MIN_MARGIN = 0.15;
 
 interface Prediction {
   detected: boolean;
   label: string;
   confidence: number;
   top5: { label: string; confidence: number }[];
-  hands_detected: number;
-  nmm: {
-    question: boolean;
-    wh_question: boolean;
-    negation: boolean;
-    affirmation: boolean;
-    emphasis: boolean;
-    emotion?: EmotionResult | null;
-    metrics?: NmmMetrics | null;
-  };
   emotion?: EmotionResult | null;
-  metrics?: NmmMetrics | null;
 }
 
 interface EmotionResultShape {
@@ -58,30 +38,9 @@ interface EmotionResultShape {
 
 type EmotionResult = EmotionResultShape;
 
-interface NmmMetrics {
-  brow_ratio: number;
-  mouth_ratio: number;
-  shake_var: number;
-  nod_var: number;
-}
-
 interface DetectedSign {
   gloss: string;
-  question: boolean;
-  wh_question: boolean;
-  negation: boolean;
-  affirmation: boolean;
-  emphasis: boolean;
 }
-
-/**
- * [affirmation] and [emphasis] have no symbol in the LLM prompt's notation
- * guide, so they are never appended to the gloss string. They still travel in
- * the `nmm` metadata payload, where the model is told what they mean.
- *
- * Which markers can reach this point at all is decided server-side by the NMM
- * Controller's gates (backend/nmm.py MARKER_GATES), not here.
- */
 
 interface StreamResult {
   ready: boolean;
@@ -91,9 +50,9 @@ interface StreamResult {
   emotion?: EmotionResult | null;
   detail?: string;
   buffered?: number;
+  state?: string;
+  hands_detected?: number;
   top3?: { label: string; confidence: number }[];
-  /** The window's non-manual markers, captured on the frame being recognised. */
-  nmm?: Prediction["nmm"] & { emotion?: EmotionResult | null; metrics?: NmmMetrics | null };
 }
 
 interface CatalogSign {
@@ -132,19 +91,13 @@ export default function SignToTextPage() {
     sessionIdRef.current = newSessionId();
   }, []);
 
-  // Set once the streaming endpoint answers 404/405. From then on the tick uses
-  // the batch path, which posts a whole window to /api/predict/stream -- the
-  // only route a backend older than this page understands. Without this the page
-  // would spend every tick failing against an endpoint that is not there.
-  const [streamUnavailable, setStreamUnavailable] = useState(false);
-  const streamFallbackRef = useRef(false);
-
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [prediction, setPrediction] = useState<Prediction | null>(null);
   const [detectedHistory, setDetectedHistory] = useState<DetectedSign[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [backendOnline, setBackendOnline] = useState(false);
+  const [handsDetected, setHandsDetected] = useState(0);
 
   const [live, setLive] = useState<{
     label: string;
@@ -153,75 +106,21 @@ export default function SignToTextPage() {
   } | null>(null);
 
   const [autoDetect, setAutoDetect] = useState(true);
+  const autoDetectRef = useRef(autoDetect);
+  const [recognitionMode, setRecognitionMode] = useState<"auto" | "manual">("auto");
+  const recognitionModeRef = useRef(recognitionMode);
+  const [manualRecording, setManualRecording] = useState(false);
+  const manualRecordingRef = useRef(false);
+  const [streamState, setStreamState] = useState("IDLE");
+  const [recognitionNotice, setRecognitionNotice] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<CatalogSign[]>([]);
   const [pickSign, setPickSign] = useState("");
   const [emotion, setEmotion] = useState<EmotionResult | null>(null);
   const [emotionAvailable, setEmotionAvailable] = useState(true);
 
-  // The thresholds the panel last saved, read once on mount. Declared as an
-  // initialiser rather than a useEffect that calls setThresholds: restoring
-  // saved state in an effect body is a second render for data that was already
-  // available synchronously, and the lint rule against setState-in-effect is
-  // pointing at a real cost here, not a stylistic one.
-  const savedThresholds = React.useMemo<Partial<AllThresholds> | null>(() => {
-    if (typeof window === "undefined") return null;
-
-    try {
-      const raw = localStorage.getItem(COMMIT_STORAGE_KEY);
-
-      return raw ? (JSON.parse(raw) as Partial<AllThresholds>) : null;
-    } catch {
-      return null;
-    }
-  }, []);
-
-  const thresholdsRef = useRef<AllThresholds>(DEFAULT_ALL);
-
-  const [thresholds, setThresholds] = useState<AllThresholds>({
-    ...DEFAULT_ALL,
-    ...(savedThresholds ?? {}),
-  });
-  // Marker on/off gates, mirrored from the NMM Controller panel. Held here
-  // because the panel can be closed and the page still needs the current state
-  // to know what the server was last told.
-  const [markerGates, setMarkerGates] =
-    useState<MarkerGates>(DEFAULT_MARKER_GATES);
-
-  const [repeatBlocked, setRepeatBlocked] = useState(false);
   // How deep the SERVER's buffer is. The client does not track this itself: it
   // uploads one frame per tick and the server reports what it holds.
   const [buffered, setBuffered] = useState(0);
-
-  useEffect(() => {
-    thresholdsRef.current = thresholds;
-  }, [thresholds]);
-
-  // The gates live on the server, so the page must not invent its own default.
-  // Reading them back on mount is what stops the panel showing OFF while the
-  // detector is still emitting [negation] from a previous session.
-  useEffect(() => {
-    let cancelled = false;
-
-    axios
-      .get(`${API_BASE}/api/nmm/config`)
-      .then((res) => {
-        if (cancelled) return;
-
-        const serverGates = res.data?.marker_gates;
-
-        if (serverGates && typeof serverGates === "object") {
-          setMarkerGates((prev) => ({ ...prev, ...serverGates }));
-        }
-      })
-      .catch(() => {});
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const [nmmFlags, setNmmFlags] =
-    useState<Prediction["nmm"] | null>(null);
 
   const [bengaliOutput, setBengaliOutput] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -229,44 +128,20 @@ export default function SignToTextPage() {
   const [voiceId, setVoiceId] = useState<string>("1");
   const [ttsEngine, setTtsEngine] = useState<"free" | "elevenlabs">("free");
   const [showTtsPremiumModal, setShowTtsPremiumModal] = useState(false);
-  const [unifiedActive, setUnifiedActive] = useState(false);
-
-  const frameBufferRef = useRef<Blob[]>([]);
-  const candidateRef = useRef<{
-    label: string;
-    count: number;
-  } | null>(null);
-
-  const lastAppendRef = useRef<{
-    label: string;
-    at: number;
-  }>({
-    label: "",
-    at: 0,
-  });
-  const idleSinceRef = useRef<number | null>(null);
-
-  const [activeClasses, setActiveClasses] = useState(35);
-
   const [contract, setContract] = useState<{
-    kind: "static" | "temporal";
     frames: number;
-    endpoint: string;
-    // Which extractor the active graph needs: "two_hand" (126-dim) or
-    // "hands_pose" (258-dim). Only used to tell the user why a 258-dim run
-    // wants their full body in frame; recognition itself is unchanged.
     feature_width?: number | null;
-    feature_kind?: "two_hand" | "hands_pose" | null;
   }>({
-    kind: "static",
-    frames: 1,
-    endpoint: "/api/predict/frame",
+    frames: 64,
+    feature_width: 98,
   });
 
-  const [coverage, setCoverage] = useState<{
-    with_landmark_sequences: number;
-    total_classes: number;
-  } | null>(null);
+  useEffect(() => {
+    autoDetectRef.current = autoDetect;
+  }, [autoDetect]);
+  useEffect(() => {
+    recognitionModeRef.current = recognitionMode;
+  }, [recognitionMode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -277,19 +152,10 @@ export default function SignToTextPage() {
         if (cancelled) return;
 
         setBackendOnline(true);
-        setUnifiedActive(!!res.data.unified);
         setEmotionAvailable(!!res.data.emotion_available);
-
-        if (typeof res.data.vocabulary_classes === "number") {
-          setActiveClasses(res.data.vocabulary_classes);
-        }
 
         if (res.data.contract) {
           setContract(res.data.contract);
-        }
-
-        if (res.data.sequence_coverage) {
-          setCoverage(res.data.sequence_coverage);
         }
       })
       .catch(() => {
@@ -316,17 +182,40 @@ export default function SignToTextPage() {
     };
   }, []);
 
-  const isTemporal = contract.kind === "temporal";
+  const changeRecognitionMode = (mode: "auto" | "manual") => {
+    if (manualRecordingRef.current || isProcessingRef.current) return;
+    recognitionModeRef.current = mode;
+    setRecognitionMode(mode);
+    sessionIdRef.current = newSessionId();
+    setBuffered(0);
+    setStreamState("IDLE");
+    setLive(null);
+    setRecognitionNotice(null);
+  };
+
+  const toggleManualRecording = () => {
+    if (!cameraActive) return;
+    const next = !manualRecordingRef.current;
+    manualRecordingRef.current = next;
+    setManualRecording(next);
+    if (next) {
+      setPrediction(null);
+      setLive(null);
+      setBuffered(0);
+    }
+    setRecognitionNotice(null);
+  };
 
   const startCamera = async () => {
     setCameraError(null);
 
     try {
+      sessionIdRef.current = newSessionId();
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: "user",
-          width: 640,
-          height: 480,
+          width: { ideal: 640 },
+          height: { ideal: 480 },
         },
         audio: false,
       });
@@ -339,24 +228,10 @@ export default function SignToTextPage() {
 
       setCameraActive(true);
 
-      frameBufferRef.current = [];
-      candidateRef.current = null;
-      idleSinceRef.current = null;
-
       if (!intervalRef.current) {
-        // 100 ms = 10 uploads/s. The server throttles its own inference to every
-        // 250 ms and only keeps the newest frame in the buffer, so a faster tick
-        // costs bandwidth without buying resolution; anything slower than ~150 ms
-        // starts dropping frames out of the 30 fps capture the window assumes.
         intervalRef.current = setInterval(
-          // The tick choice is read on EVERY tick, not at setInterval creation:
-          // the 404 fallback flag can only flip after the first failed request,
-          // and a ternary evaluated here would freeze the wrong tick forever.
-          () => {
-            if (!isTemporal) return doCaptureAndPredict();
-            return streamFallbackRef.current ? doAutoDetectTick() : doStreamTick();
-          },
-          isTemporal ? 100 : 1000
+          () => void doStreamTick(performance.now() / 1000),
+          100
         );
       }
     } catch {
@@ -369,6 +244,10 @@ export default function SignToTextPage() {
   };
 
   const stopCamera = () => {
+    if (manualRecordingRef.current) {
+      setRecognitionNotice("Stop the manual recording before turning off the camera.");
+      return;
+    }
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
@@ -384,6 +263,9 @@ export default function SignToTextPage() {
     }
 
     setCameraActive(false);
+    sessionIdRef.current = newSessionId();
+    setBuffered(0);
+    setStreamState("IDLE");
   };
 
   useEffect(() => {
@@ -402,127 +284,7 @@ export default function SignToTextPage() {
 
   const buildGlossString = (history: DetectedSign[]) => {
     if (history.length === 0) return "";
-
-    // [?] belongs to the last sign of a question, BUT a question is only a
-    // question if something is actually being asked about: a WH-word, or a
-    // negated / affirmed clause. A bare head shake must not become "...?)".
-    const last = history[history.length - 1];
-    const questionAnchored = history.some(
-      (h) => h.wh_question || h.negation || h.affirmation || h.emphasis
-    );
-    const asksQuestion =
-      questionAnchored && (last.question || last.wh_question);
-
-    return history
-      .map((h, i) => {
-        let tok = `[${h.gloss.toLowerCase()}]`;
-
-        if (h.negation) {
-          tok += "[negation]";
-        }
-
-        if (asksQuestion && i === history.length - 1) {
-          tok += "[?]";
-        }
-
-        return tok;
-      })
-      .join(" + ");
-  };
-
-  const doCaptureAndPredict = async () => {
-    if (isProcessingRef.current) return;
-    if (isTemporal) return;
-
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-
-    if (!video || !canvas) return;
-
-    isProcessingRef.current = true;
-    setIsProcessing(true);
-
-    try {
-      canvas.width = video.videoWidth || 640;
-      canvas.height = video.videoHeight || 480;
-
-      const ctx = canvas.getContext("2d");
-
-      if (!ctx) return;
-
-      ctx.drawImage(video, 0, 0);
-
-      const blob = await new Promise<Blob | null>((resolve) =>
-        canvas.toBlob(resolve, "image/jpeg", 0.7)
-      );
-
-      if (!blob) return;
-
-      const formData = new FormData();
-
-      formData.append("file", blob, "frame.jpg");
-
-      const res = await axios.post<Prediction>(
-        `${API_BASE}/api/predict/frame`,
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
-
-      setPrediction(res.data);
-      setNmmFlags(res.data.nmm);
-      setEmotion(res.data.emotion ?? res.data.nmm?.emotion ?? null);
-
-      if (
-        res.data.detected &&
-        res.data.confidence > 0.5
-      ) {
-        const f = res.data.nmm;
-
-        setDetectedHistory((prev) => {
-          const last = prev[prev.length - 1];
-
-          if (last && last.gloss === res.data.label) {
-            const merged: DetectedSign = {
-              ...last,
-              question: last.question || f.question,
-              wh_question:
-                last.wh_question || f.wh_question,
-              negation: last.negation || f.negation,
-              affirmation:
-                last.affirmation || f.affirmation,
-              emphasis:
-                last.emphasis || f.emphasis,
-            };
-
-            return [
-              ...prev.slice(0, -1),
-              merged,
-            ];
-          }
-
-          return [
-            ...prev,
-            {
-              gloss: res.data.label,
-              question: f.question,
-              wh_question: f.wh_question,
-              negation: f.negation,
-              affirmation: f.affirmation,
-              emphasis: f.emphasis,
-            },
-          ];
-        });
-      }
-    } catch {
-      // Keep camera running.
-    } finally {
-      isProcessingRef.current = false;
-      setIsProcessing(false);
-    }
+    return history.map((sign) => `[${sign.gloss.toLowerCase()}]`).join(" + ");
   };
 
   const handleStreamAndSpeak = async () => {
@@ -550,13 +312,7 @@ export default function SignToTextPage() {
           headers: {
             "Content-Type": "application/json",
           },
-          // NMM + affect travel alongside the gloss so the LLM is not left
-          // guessing at the question / negation / emotion context.
-          body: JSON.stringify({
-            gloss,
-            nmm,
-            emotion,
-          }),
+          body: JSON.stringify({ gloss, emotion }),
         }
       );
 
@@ -699,38 +455,8 @@ export default function SignToTextPage() {
     }
   };
 
-  const appendGloss = (
-    gloss: string,
-    nmm?: DetectedSign
-  ) => {
-    // The markers are whatever the detector reported for the window this sign
-    // came from. Nothing is merged in from the UI: the manual marker buttons
-    // were removed, and inventing a marker the detector never saw is exactly
-    // what made the old panel untrustworthy.
-    const applied: DetectedSign = {
-      gloss,
-      question: !!nmm?.question,
-      wh_question: !!nmm?.wh_question,
-      negation: !!nmm?.negation,
-      affirmation: !!nmm?.affirmation,
-      emphasis: !!nmm?.emphasis,
-    };
-
-    setDetectedHistory((prev) => [...prev, applied]);
-  };
-
-  /**
-   * Everything the recognition stage knows but the gloss string cannot show.
-   * This is what makes the questions block an OPTION rather than a blind rule:
-   * the LLM only marks a question when the detector actually reported one -- and
-   * only for markers whose gate is open in the NMM Controller.
-   */
-  const nmm = {
-    question: !!prediction?.nmm?.question,
-    wh_question: !!prediction?.nmm?.wh_question,
-    negation: !!prediction?.nmm?.negation,
-    affirmation: !!prediction?.nmm?.affirmation,
-    emphasis: !!prediction?.nmm?.emphasis,
+  const appendGloss = (gloss: string) => {
+    setDetectedHistory((prev) => [...prev, { gloss }]);
   };
 
   const handleBackspace = () => {
@@ -742,10 +468,6 @@ export default function SignToTextPage() {
       prev.slice(0, -1)
     );
 
-    // The dropped sign's markers leave with it. Nothing is restored, because
-    // markers are no longer something the UI holds on the user's behalf -- they
-    // come from the detector on the frame that is being recognised, and a
-    // marker that has passed is a marker that has passed.
     setBengaliOutput("");
   };
 
@@ -759,20 +481,11 @@ export default function SignToTextPage() {
   const handleClear = () => {
     setDetectedHistory([]);
     setPrediction(null);
-    setNmmFlags(null);
     setBengaliOutput("");
     setLive(null);
-    setRepeatBlocked(false);
-
-    candidateRef.current = null;
-    idleSinceRef.current = null;
-
-    lastAppendRef.current = {
-      label: "",
-      at: 0,
-    };
-
-    frameBufferRef.current = [];
+    setRecognitionNotice(null);
+    manualRecordingRef.current = false;
+    setManualRecording(false);
 
     // The recognition window lives on the server now, so clearing the sequence
     // has to clear it there too. A fresh session id is the cheapest correct
@@ -782,271 +495,79 @@ export default function SignToTextPage() {
     sessionIdRef.current = newSessionId();
 
     setBuffered(0);
+    setStreamState("IDLE");
   };
 
-  /**
-   * Legacy batch tick: fills a 32-frame client buffer and posts it to
-   * /api/predict/stream.
-   *
-   * Kept because it is the only path that works if the page is served against a
-   * backend without /api/stream/frame, and because it is a useful reference for
-   * what the server-side windowing replaced. All recognition policy now lives in
-   * commitFromStream, so the two ticks cannot disagree about when a sign counts.
-   */
-  const doAutoDetectTick = async () => {
-    if (
-      isProcessingRef.current ||
-      !isTemporal
-    ) {
-      return;
-    }
-
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-
-    if (
-      !video ||
-      !canvas ||
-      !video.videoWidth
-    ) {
-      return;
-    }
-
-    const nFrames =
-      contract.frames || 32;
-
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    const ctx = canvas.getContext("2d");
-
-    if (!ctx) return;
-
-    ctx.drawImage(video, 0, 0);
-
-    const blob =
-      await new Promise<Blob | null>(
-        (resolve) =>
-          canvas.toBlob(
-            resolve,
-            "image/jpeg",
-            0.7
-          )
-      );
-
-    if (!blob) return;
-
-    const buf =
-      frameBufferRef.current;
-
-    buf.push(blob);
-
-    while (buf.length > nFrames) {
-      buf.shift();
-    }
-
-    if (buf.length < nFrames) {
-      setPrediction(null);
-      return;
-    }
-
-    isProcessingRef.current = true;
-    setIsProcessing(true);
-
-    try {
-      const fd = new FormData();
-
-      buf.forEach((frame, i) => {
-        fd.append(
-          "files",
-          frame,
-          `f${i}.jpg`
-        );
-      });
-
-      const res =
-        await axios.post<StreamResult>(
-          `${API_BASE}/api/predict/stream`,
-          fd,
-          {
-            headers: {
-              "Content-Type":
-                "multipart/form-data",
-            },
-            timeout: 15000,
-          }
-        );
-
-      commitFromStream(res.data);
-    } catch (err) {
-      // Keep camera and buffer alive.
-      console.warn(
-        "recognition tick failed:",
-        err
-      );
-    } finally {
-      isProcessingRef.current = false;
-      setIsProcessing(false);
-    }
-  };
-
-  /**
-   * Everything that happens once the server has recognised a window.
-   *
-   * Shared by the single-frame streaming tick and the legacy batch tick, so the
-   * commit policy exists in exactly one place: confidence and margin must clear
-   * the panel's thresholds, the same label must repeat ``stable_windows`` times,
-   * and a repeat inside the cooldown is reported rather than swallowed.
-   *
-   * The window's NMM / affect belongs to the SIGN being recognised, not to the
-   * previous one, so it is read here -- from the payload that carried the
-   * prediction -- and not from whatever the last frame happened to report.
-   */
+  /** Apply one completed span returned by the server's state machine. */
   const commitFromStream = (data: StreamResult) => {
-    const label = data.label;
-    const incomingEmotion = data.emotion ?? data.nmm?.emotion ?? null;
-    if (incomingEmotion) setEmotion(incomingEmotion);
+    setStreamState(data.state ?? "IDLE");
+    setRecognitionNotice(
+      data.detail === "incomplete_span" ? "Hands not clear, try again." : null
+    );
+    setEmotion(data.emotion ?? null);
 
-    const markIdle = () => {
-      candidateRef.current = null;
-      if (!lastAppendRef.current.label) return;
-
-      const now = Date.now();
-      idleSinceRef.current ??= now;
-      if (
-        now - idleSinceRef.current >=
-        thresholdsRef.current.repeat_cooldown_ms
-      ) {
-        lastAppendRef.current = { label: "", at: 0 };
-        idleSinceRef.current = null;
-        setRepeatBlocked(false);
-      }
-    };
-
-    if (!data.ready || !label) {
+    if (!data.ready || !data.label) {
       setLive(null);
-      const detail = data.detail?.toLowerCase() ?? "";
-      if (detail === "idle" || detail.includes("no hands")) {
-        markIdle();
-      } else if (detail !== "throttled" && detail !== "filling") {
-        candidateRef.current = null;
-      }
       return;
     }
 
+    const label = data.label;
     const confidence = data.confidence ?? 0;
     const margin = data.margin ?? 0;
     const top3 = data.top3 ?? [];
-
-    const nn = data.nmm ?? {
-      question: false,
-      wh_question: false,
-      negation: false,
-      affirmation: false,
-      emphasis: false,
-    };
-
-    const emo = (incomingEmotion ?? null) as EmotionResult | null;
+    const isSign = !["NOT_SURE", "NONE", "BACKGROUND"].includes(label);
 
     setPrediction({
-      detected: true,
+      detected: isSign,
       label,
       confidence,
       top5: top3.map((t) => ({ label: t.label, confidence: t.confidence })),
-      hands_detected: 1,
-      nmm: nn,
-      emotion: emo,
-      metrics: (data.nmm?.metrics ?? null) as NmmMetrics | null,
+      emotion: data.emotion ?? null,
     });
 
-    const T = thresholdsRef.current;
-    const decisive = confidence >= T.min_confidence && margin >= T.min_margin;
-    // The background class is an answer, not a sign: showing it in the live
-    // readout is useful, committing it to the gloss sequence is not. Without
-    // this guard an idle signer accumulates [NONE] chips every cooldown.
-    const isBackground = label === "NONE" || label === "BACKGROUND";
-    setLive(isBackground ? null : { label, confidence, margin });
-
-    if (isBackground) {
-      markIdle();
-      return;
-    }
-
-    idleSinceRef.current = null;
-
-    if (!decisive) {
-      candidateRef.current = null;
-      return;
-    }
-
-    const cand = candidateRef.current;
-    const count = cand && cand.label === label ? cand.count + 1 : 1;
-
-    candidateRef.current = { label, count };
-
-    if (count < Math.max(1, Math.round(T.stable_windows))) return;
-
-    const now = Date.now();
-    const last = lastAppendRef.current;
-
-    if (last.label === label) {
-      setRepeatBlocked(true);
-      candidateRef.current = null;
-      return;
-    }
-
-    candidateRef.current = null;
-    setRepeatBlocked(false);
-
-    // "Clear" is the one thing that resets the server's window: the model would
-    // otherwise keep reading the previous signer state after the user wiped the
-    // sequence and started over.
-    if (autoDetect) {
-      lastAppendRef.current = { label, at: now };
-      appendGloss(label, { gloss: label, ...nn });
+    const confident = confidence >= MIN_CONFIDENCE && margin >= MIN_MARGIN;
+    setLive(isSign ? { label, confidence, margin } : null);
+    if (isSign && confident && autoDetectRef.current) {
+      appendGloss(label);
     }
   };
 
   /**
    * One JPEG in, one buffered landmark out.
    *
-   * This replaces the old tick that pushed a JPEG into a client-side ring buffer
-   * and uploaded all 32 of them every time. The browser never holds the window
-   * now: it sends the newest frame and the server appends it to that session's
-   * history and runs the model on its own schedule. Upload cost per tick drops
-   * by the window length, and latency stops depending on how fast the client can
-   * serialise 32 blobs.
+   * The browser sends the newest frame; the server tracks the sign span and
+   * selects the model input when that span completes.
    */
-  const doStreamTick = async () => {
-    if (isProcessingRef.current || !isTemporal) return;
+  const doStreamTick = async (captureTime: number) => {
+    if (isProcessingRef.current) return;
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
 
     if (!video || !canvas || !video.videoWidth) return;
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    const ctx = canvas.getContext("2d");
-
-    if (!ctx) return;
-
-    ctx.drawImage(video, 0, 0);
-
-    const blob = await new Promise<Blob | null>((r) =>
-      canvas.toBlob(r, "image/jpeg", 0.7)
-    );
-
-    if (!blob) return;
-
     isProcessingRef.current = true;
     setIsProcessing(true);
 
     try {
+      const scale = Math.min(1, 640 / video.videoWidth);
+      canvas.width = Math.round(video.videoWidth * scale);
+      canvas.height = Math.round(video.videoHeight * scale);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Could not create the camera frame.");
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, "image/jpeg", 0.7)
+      );
+      if (!blob) throw new Error("Could not encode the camera frame.");
+
       const fd = new FormData();
 
       fd.append("file", blob, "f.jpg");
+      fd.append("mode", recognitionModeRef.current);
+      fd.append("recording", String(manualRecordingRef.current));
+      fd.append("capture_time", String(captureTime));
 
       const res = await axios.post<StreamResult>(
         `${API_BASE}/api/stream/frame?session_id=${sessionIdRef.current}`,
@@ -1061,43 +582,21 @@ export default function SignToTextPage() {
       );
 
       setBuffered(res.data.buffered ?? 0);
-
-      if (!res.data.ready || !res.data.label) {
-        setLive(null);
-        if (res.data.emotion || res.data.nmm?.emotion) {
-          commitFromStream(res.data);
-        } else if (
-          res.data.detail?.toLowerCase() === "idle" ||
-          res.data.detail?.toLowerCase().includes("no hands")
-        ) {
-          commitFromStream(res.data);
-        }
-        return;
-      }
-
+      setHandsDetected(res.data.hands_detected ?? 0);
       commitFromStream(res.data);
     } catch (err) {
-      // A backend without /api/stream/frame 404s on every tick, which is not a
-      // transient network blip -- falling back is the only way the page can work
-      // against it. Any other failure keeps the single-frame path, because a
-      // dropped frame is exactly what server-side buffering is designed to
-      // absorb.
-      const status = (err as { response?: { status?: number } })?.response?.status;
-
-      if (status === 404 || status === 405) {
-        streamFallbackRef.current = true;
-        setStreamUnavailable(true);
-        return;
-      }
+      console.warn("Recognition stream request failed:", err);
+      const detail = axios.isAxiosError(err)
+        ? err.response?.data?.detail || err.message
+        : err instanceof Error
+          ? err.message
+          : "Recognition request failed.";
+      setRecognitionNotice(`Recognition unavailable: ${detail}`);
     } finally {
       isProcessingRef.current = false;
       setIsProcessing(false);
     }
   };
-
-  const anyQuestion = detectedHistory.some(
-    (h) => h.question || h.wh_question
-  );
 
   const glossPreview = detectedHistory.length
     ? buildGlossString(detectedHistory)
@@ -1123,13 +622,7 @@ export default function SignToTextPage() {
               Camera Feed
             </span>
             <span className="text-[10px] font-mono uppercase tracking-wider text-text-muted">
-              {cameraActive
-                ? isTemporal
-                  ? streamUnavailable
-                    ? "BATCH MODE"
-                    : `${buffered}/${contract.frames * 6} BUFFER`
-                  : "POLLING 1S"
-                : "STANDBY"}
+              {cameraActive ? `${buffered} BUFFERED` : "STANDBY"}
             </span>
           </div>
 
@@ -1193,8 +686,8 @@ export default function SignToTextPage() {
           {/* Framing Warning Guidance Area */}
           <FramingWarningArea
             cameraActive={cameraActive}
-            handsDetected={prediction?.hands_detected ?? (live ? 1 : 0)}
-            hasFace={Boolean(prediction?.nmm?.metrics || prediction?.detected)}
+            handsDetected={handsDetected}
+            hasFace={Boolean(emotion)}
             detected={Boolean(prediction?.detected)}
             confidence={prediction?.confidence ?? 0}
           />
@@ -1209,7 +702,9 @@ export default function SignToTextPage() {
 
               <button
                 onClick={stopCamera}
-                className="px-2.5 py-1 rounded-lg bg-status-error/15 border border-status-error/40 text-status-error text-[10px] font-mono font-bold hover:bg-status-error/25 transition-colors"
+                disabled={manualRecording}
+                title={manualRecording ? "Stop the recording before stopping the camera" : undefined}
+                className="px-2.5 py-1 rounded-lg bg-status-error/15 border border-status-error/40 text-status-error text-[10px] font-mono font-bold hover:bg-status-error/25 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 STOP CAMERA
               </button>
@@ -1227,37 +722,72 @@ export default function SignToTextPage() {
             <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-text-muted select-none font-semibold">
               Live Recognition
             </span>
-
-            <div className="flex items-center gap-2">
-              {isTemporal && (
-                <label className="flex items-center gap-1.5 cursor-pointer text-text-secondary text-[9px] font-mono">
-                  <span>Auto-append</span>
-                  <input
-                    type="checkbox"
-                    checked={autoDetect}
-                    onChange={(e) => setAutoDetect(e.target.checked)}
-                    className="w-3.5 h-3.5 accent-[var(--accent-primary)] rounded cursor-pointer"
-                  />
-                </label>
-              )}
-
-              <NmmThresholdPanel
-                values={thresholds}
-                onChange={setThresholds}
-                gates={markerGates}
-                onGatesChange={setMarkerGates}
-                variant="header"
-              />
-            </div>
+            <span className="text-[9px] font-mono text-text-muted">
+              {streamState} · {buffered} FRAMES
+            </span>
           </div>
+
+          <div className="flex items-center justify-between gap-2 rounded-xl bg-background/50 p-2">
+            <div className="flex items-center gap-1">
+              {(["auto", "manual"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => changeRecognitionMode(mode)}
+                  disabled={isProcessing || manualRecording}
+                  className={`px-2.5 py-1 rounded-lg text-[9px] font-mono font-bold uppercase transition-colors disabled:opacity-40 ${
+                    recognitionMode === mode
+                      ? "bg-accent-primary/20 text-accent-primary border border-accent-primary/40"
+                      : "text-text-muted hover:text-text-secondary"
+                  }`}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
+            {recognitionMode === "auto" && (
+              <label className="flex items-center gap-1.5 cursor-pointer text-text-secondary text-[9px] font-mono">
+                <span>Auto-append</span>
+                <input
+                  type="checkbox"
+                  checked={autoDetect}
+                  onChange={(e) => setAutoDetect(e.target.checked)}
+                  className="w-3.5 h-3.5 accent-[var(--accent-primary)] rounded cursor-pointer"
+                />
+              </label>
+            )}
+          </div>
+
+          {recognitionMode === "manual" && (
+            <div className="flex items-center justify-between gap-2 rounded-xl bg-background/50 p-2.5">
+              <span className="text-[9px] font-mono text-text-muted">
+                Record one complete sign, then stop to recognize it.
+              </span>
+              <button
+                type="button"
+                onClick={toggleManualRecording}
+                disabled={!cameraActive || isProcessing}
+                className={`shrink-0 px-3 py-1.5 rounded-lg text-[9px] font-mono font-bold disabled:opacity-40 ${
+                  manualRecording
+                    ? "bg-status-error/20 text-status-error border border-status-error/40"
+                    : "bg-accent-primary text-black"
+                }`}
+              >
+                {manualRecording ? "STOP & RECOGNIZE" : "START RECORDING"}
+              </button>
+            </div>
+          )}
 
           {/* Recognition Result Card */}
           <div className="rounded-xl bg-background/50 p-3 flex flex-col gap-2.5 min-w-0">
+            {recognitionNotice && (
+              <div className="flex items-center gap-2 rounded-lg border border-status-error/30 bg-status-error/10 px-2.5 py-2 text-[10px] font-mono text-status-error">
+                <ShieldAlert size={13} className="shrink-0" />
+                <span>{recognitionNotice}</span>
+              </div>
+            )}
             {live && (
               <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-surface-elevated border border-border text-[9px] font-mono">
-                <span className="uppercase text-text-muted">
-                  {repeatBlocked ? "WAIT FOR RELEASE" : "HOLDING"}
-                </span>
                 <span className="text-accent-secondary font-bold truncate">
                   {live.label} · {Math.round(live.confidence * 100)}%
                 </span>
@@ -1302,6 +832,20 @@ export default function SignToTextPage() {
                   ))}
                 </div>
               </div>
+            ) : prediction?.label === "NOT_SURE" ? (
+              <div className="py-3 text-center">
+                <span className="text-sm font-mono font-bold text-status-pending">
+                  Not sure — try a clearer sign
+                </span>
+                <div className="mt-2 space-y-1">
+                  {prediction.top5.slice(0, 3).map((item) => (
+                    <div key={item.label} className="flex justify-between text-[10px] font-mono text-text-secondary">
+                      <span>{item.label}</span>
+                      <span>{Math.round(item.confidence * 100)}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             ) : (
               <div className="py-4 flex flex-col items-center justify-center text-center">
                 <Sparkles size={16} className="text-text-muted mb-1.5" />
@@ -1315,48 +859,18 @@ export default function SignToTextPage() {
             )}
           </div>
 
-          {/* Facial Expression & Non-Manual Markers (NMM) Badge Group */}
-          <div className="bg-background/50 rounded-xl p-3 flex flex-col gap-2">
-            <div className="text-[9px] font-mono uppercase tracking-wider text-text-muted">
-              Non-Manual Markers
-            </div>
-
-            <div className="flex flex-wrap gap-1.5">
-              {[
-                { key: "wh_question", label: "WH-Question", active: nmm.wh_question },
-                { key: "question", label: "Question", active: nmm.question },
-                { key: "negation", label: "Negation", active: nmm.negation },
-                { key: "affirmation", label: "Affirmation", active: nmm.affirmation },
-                { key: "emphasis", label: "Emphasis", active: nmm.emphasis },
-              ].map((m) => (
-                <span
-                  key={m.key}
-                  className={`px-2 py-1 rounded-md border text-[9px] font-mono font-bold transition-all ${
-                    m.active
-                      ? "bg-accent-secondary/20 border-accent-secondary text-accent-secondary shadow-sm"
-                      : "bg-surface-elevated border-border text-text-muted opacity-60"
-                  }`}
-                >
-                  {m.label}
-                </span>
-              ))}
-            </div>
-          </div>
-
           {/* Pipeline Specifications Info Box */}
           <div className="bg-background/50 rounded-xl p-2.5 flex flex-col gap-0.5 text-[9px] font-mono text-text-muted">
             <div className="flex justify-between">
               <span>Pipeline:</span>
               <span className="text-text-secondary font-medium">
-                {isTemporal ? `${contract.frames}-frame temporal sequence` : "Static frame recognition"}
+                {contract.frames}-frame temporal sequence
               </span>
             </div>
-            {contract.feature_kind === "hands_pose" && (
-              <div className="flex justify-between">
-                <span>Features:</span>
-                <span className="text-text-secondary font-medium">hands + body pose (258-dim)</span>
-              </div>
-            )}
+            <div className="flex justify-between">
+              <span>Features:</span>
+              <span className="text-text-secondary font-medium">{contract.feature_width ?? 98}-dim shoulder-box</span>
+            </div>
             <div className="flex justify-between">
               <span>Affect Input:</span>
               <span className="text-accent-secondary font-medium">{emotion?.dominant ?? "—"}</span>
@@ -1418,13 +932,7 @@ export default function SignToTextPage() {
                         setBengaliOutput("");
                       }}
                       title="Click to remove signs from here"
-                      className={`px-2 py-0.5 rounded-md border font-mono text-[9px] font-bold hover:brightness-110 transition-all ${
-                        s.negation
-                          ? "border-status-error/60 bg-status-error/10 text-status-error"
-                          : idx === detectedHistory.length - 1 && anyQuestion
-                          ? "border-status-pending/60 bg-status-pending/10 text-status-pending"
-                          : "border-border bg-surface-elevated text-accent-primary"
-                      }`}
+                      className="px-2 py-0.5 rounded-md border border-border bg-surface-elevated font-mono text-[9px] font-bold text-accent-primary hover:brightness-110 transition-all"
                     >
                       {s.gloss}
                     </button>
@@ -1433,9 +941,8 @@ export default function SignToTextPage() {
               )}
             </div>
 
-            {/* Quick Vocabulary Picker (for temporal testing) */}
-            {isTemporal && (
-              <div className="flex gap-2">
+            {/* Quick vocabulary picker */}
+            <div className="flex gap-2">
                 <select
                   value={pickSign}
                   onChange={(e) => setPickSign(e.target.value)}
@@ -1456,8 +963,7 @@ export default function SignToTextPage() {
                   <Plus size={11} />
                   Add
                 </button>
-              </div>
-            )}
+            </div>
 
             <div className="text-[8px] font-mono text-text-muted truncate pt-0.5">
               NLG: <span className="text-text-secondary font-medium">{glossPreview}</span>

@@ -7,7 +7,6 @@ import { usePathname } from "next/navigation";
 import {
   ChevronLeft,
   ChevronRight,
-  Heart,
   Info,
   Languages,
   Shield,
@@ -20,7 +19,6 @@ import { SystemDiagnostics } from "./SystemDiagnostics";
 const navigationIcons: Record<string, LucideIcon> = {
   "/text-to-sign": Languages,
   "/sign-to-text": Video,
-  "/contribute": Heart,
   "/about": Info,
 };
 

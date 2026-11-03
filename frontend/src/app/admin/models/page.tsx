@@ -29,13 +29,7 @@ type RegistryResponse = {
   error: string | null;
 };
 
-/**
- * The two feature vectors the backend can actually produce (backend/extract.py):
- * 126 is the two-hand landmark block, 258 adds the 33x4 pose block that the
- * daily-conversation LSTM is trained on. Anything else cannot be fed, so the
- * backend refuses it -- this mirror only greys the button out first.
- */
-const SERVABLE_WIDTHS = [126, 258];
+const SERVABLE_WIDTHS = [98];
 
 /** A model is servable when the backend has an extractor for its input width. */
 const canActivate = (m: ModelEntry) =>
@@ -43,9 +37,8 @@ const canActivate = (m: ModelEntry) =>
 
 /** Human name for the extractor an input width selects. */
 const featureLabel = (m: ModelEntry) => {
-  if (m.temporal) return "LSTM temporal";
-  if (m.input_width === 258) return "MLP static \u00b7 hands+pose 258";
-  return `MLP static \u00b7 input ${m.input_width ?? "?"}`;
+  if (m.temporal) return "BiLSTM temporal \u00b7 98-dim shoulder box";
+  return `input ${m.input_width ?? "?"}-dim`;
 };
 
 export default function AdminModelsPage() {
@@ -161,7 +154,7 @@ export default function AdminModelsPage() {
                 {!servable && (
                   <span
                     className="px-2 py-0.5 rounded text-[10px] font-mono bg-status-pending/20 text-status-pending"
-                    title="The backend has no extractor for this input width (it emits 126-dim two-hand or 258-dim hands+pose vectors)"
+                    title="The backend requires a temporal model with 64 frames of 98-dim shoulder-box features."
                   >
                     INCOMPATIBLE
                   </span>

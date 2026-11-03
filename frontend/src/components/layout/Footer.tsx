@@ -12,7 +12,7 @@ export function Footer() {
           </div>
           <p className="text-sm text-text-secondary leading-relaxed max-w-md">
             West Bengal Sign Language Translation & Computational Research Framework.
-            Bridging Deaf communication through landmark-based computer vision, NMM parsing, and native Bengali NLG.
+            Bridging Deaf communication through landmark-based computer vision, emotion recognition, and Bengali NLG.
           </p>
           <div className="text-xs font-mono text-text-muted">
             Department of Computer Science & Engineering • Research Prototype
@@ -26,7 +26,6 @@ export function Footer() {
           <ul className="space-y-1.5 text-sm">
             <li><Link href="/sign-to-text" className="hover:text-text-primary transition-colors">Sign → Bengali</Link></li>
             <li><Link href="/text-to-sign" className="hover:text-text-primary transition-colors">Bengali → Sign</Link></li>
-            <li><Link href="/contribute" className="hover:text-text-primary transition-colors">Signer Contribution</Link></li>
             <li><Link href="/demo" className="hover:text-text-primary transition-colors">Demo Mode</Link></li>
           </ul>
         </div>

@@ -1,10 +1,10 @@
 "use client";
-import React, { useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import React from "react";
+import { useParams } from "next/navigation";
 import { LandmarkSimulation } from "@/components/simulation/LandmarkSimulation";
 import { datasetService } from "@/services/dataset";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, Video, CheckCircle, Clock } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import axios from "axios";
 
@@ -19,9 +19,7 @@ export default function AdminSignDetailPage() {
     queryFn: () => datasetService.getSignById(signId),
   });
 
-  // Real extracted landmark sequence for this sign (no synthetic fallback).
-  // A 258-dim run also returns `pose`, which the canvas draws as the violet
-  // body layer; a 126-dim recording leaves it undefined.
+  // Load the active model's per-sign avatar data for replay.
   const { data: sim } = useQuery({
     queryKey: ["sim-frames", sign?.label],
     queryFn: async () =>
@@ -67,15 +65,6 @@ export default function AdminSignDetailPage() {
           </div>
         </div>
 
-        <div className="flex gap-2">
-          <Link
-            href={`/contribute`}
-            className="flex items-center space-x-1.5 px-4 py-2 rounded bg-accent-primary text-black font-mono text-xs uppercase font-bold hover:bg-accent-primary/90"
-          >
-            <Video size={14} />
-            <span>Contribute Sample</span>
-          </Link>
-        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-mono text-xs">
@@ -96,8 +85,7 @@ export default function AdminSignDetailPage() {
         <LandmarkSimulation
           frames={sim?.frames}
           pose={sim?.pose}
-          faceMesh={sim?.face_mesh}
-          faceMeshError={sim?.face_mesh_error}
+          faceAvatar={sim?.face_avatar}
           fps={15}
           title={sim?.source}
         />
