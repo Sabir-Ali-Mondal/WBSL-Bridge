@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
@@ -11,21 +10,22 @@ import { THRESH, TORSO_WORLD } from "./simulationConstants";
 // DESIGN CONTROLS
 // ============================================================
 
-export const DEFAULT_TOP_Y_OFFSET = 0.08;
-export const DEFAULT_TOP_WIDTH_SCALE = 0.55;
-export const DEFAULT_BOTTOM_WIDTH_SCALE = 0.68;
+export const DEFAULT_TOP_Y_OFFSET = 0.12;
+export const DEFAULT_TOP_WIDTH_SCALE = 0.68;
+export const DEFAULT_BOTTOM_WIDTH_SCALE = 0.70;
 
 const RINGS = 32;
 const SEGMENTS = 48;
+const MAX_TORSO_LEAN = THREE.MathUtils.degToRad(6);
+const ABS_BANDS = 4;
 
-// PREMIUM ROBOT COLOURS
+// ORIGINAL PALETTE: warm ivory ceramic + charcoal + amber accents
 const COLORS = {
-  pearl: new THREE.Color("#E8F0F5"),
-  pearlDark: new THREE.Color("#AEBFCC"),
-  navy: new THREE.Color("#102344"),
-  navyLight: new THREE.Color("#25466E"),
-  cyan: new THREE.Color("#19EBD0"),
-  black: new THREE.Color("#101D30"),
+  ivory: new THREE.Color("#EDE6DA"),
+  ivoryDark: new THREE.Color("#BDB3A2"),
+  charcoal: new THREE.Color("#2A2A2E"),
+  graphite: new THREE.Color("#45454D"),
+  amber: new THREE.Color("#FF9F1C"),
 };
 
 const TORSO_INDICES = (() => {
@@ -120,98 +120,76 @@ export function TorsoRig({
   }, []);
 
   // ============================================================
-  // PREMIUM PEARL METALLIC MATERIAL
+  // SOFT CERAMIC / MATTE MATERIAL
   // ============================================================
 
   const material = useMemo(
     () =>
       new THREE.MeshStandardMaterial({
         vertexColors: true,
-        metalness: 0.48,
-        roughness: 0.27,
+        metalness: 0.2,
+        roughness: 0.55,
         side: THREE.DoubleSide,
       }),
     [],
   );
 
   // ============================================================
-  // CHEST REACTOR
+  // CHEST PIECE: vertical light bar in a charcoal housing
   // ============================================================
 
   const reactor = useMemo(() => {
     const group = new THREE.Group();
 
-    const bezelMaterial = new THREE.MeshStandardMaterial({
-      color: "#183653",
-      metalness: 0.85,
-      roughness: 0.2,
+    const housingMaterial = new THREE.MeshStandardMaterial({
+      color: "#2A2A2E",
+      metalness: 0.6,
+      roughness: 0.35,
     });
 
-    const ringMaterial = new THREE.MeshStandardMaterial({
-      color: "#19EBD0",
-      emissive: "#00BFA9",
-      emissiveIntensity: 2.2,
-      metalness: 0.5,
-      roughness: 0.2,
+    const barMaterial = new THREE.MeshStandardMaterial({
+      color: "#FFD08A",
+      emissive: "#FF9F1C",
+      emissiveIntensity: 2.6,
+      metalness: 0.1,
+      roughness: 0.3,
     });
 
-    const coreMaterial = new THREE.MeshStandardMaterial({
-      color: "#BFFFF7",
-      emissive: "#13EBD0",
-      emissiveIntensity: 3.5,
-      metalness: 0.25,
-      roughness: 0.15,
-    });
-
-    // Dark mechanical outer housing
+    // Housing plate
     const housing = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.052, 0.052, 0.018, 48),
-      bezelMaterial,
+      new THREE.BoxGeometry(0.05, 0.12, 0.016),
+      housingMaterial,
     );
-    housing.rotation.x = Math.PI / 2;
     group.add(housing);
 
-    // Cyan luminous outer ring
-    const outerRing = new THREE.Mesh(
-      new THREE.TorusGeometry(0.043, 0.005, 12, 48),
-      ringMaterial,
+    // Main light bar
+    const bar = new THREE.Mesh(
+      new THREE.BoxGeometry(0.012, 0.088, 0.006),
+      barMaterial,
     );
-    outerRing.position.z = 0.014;
-    group.add(outerRing);
+    bar.position.z = 0.011;
+    group.add(bar);
 
-    // Inner energy ring
-    const innerRing = new THREE.Mesh(
-      new THREE.TorusGeometry(0.029, 0.0025, 8, 48),
-      ringMaterial,
-    );
-    innerRing.position.z = 0.018;
-    group.add(innerRing);
-
-    // Glowing central reactor
-    const orb = new THREE.Mesh(
-      new THREE.SphereGeometry(0.025, 32, 24),
-      coreMaterial,
-    );
-    orb.scale.set(1, 1, 0.38);
-    orb.position.z = 0.018;
-    group.add(orb);
-
-    // Small mechanical screws
-    for (let i = 0; i < 4; i++) {
-      const angle = (i / 4) * Math.PI * 2;
-
-      const screw = new THREE.Mesh(
-        new THREE.SphereGeometry(0.003, 8, 8),
-        bezelMaterial,
+    // Three small indicator dots beside the bar
+    for (let i = 0; i < 3; i++) {
+      const dot = new THREE.Mesh(
+        new THREE.SphereGeometry(0.0038, 12, 12),
+        barMaterial,
       );
+      dot.position.set(0.017, 0.03 - i * 0.03, 0.01);
+      group.add(dot);
+    }
 
-      screw.position.set(
-        Math.cos(angle) * 0.048,
-        Math.sin(angle) * 0.048,
-        0.014,
-      );
-
-      group.add(screw);
+    // Corner rivets
+    for (let sx = -1; sx <= 1; sx += 2) {
+      for (let sy = -1; sy <= 1; sy += 2) {
+        const rivet = new THREE.Mesh(
+          new THREE.SphereGeometry(0.0025, 8, 8),
+          housingMaterial,
+        );
+        rivet.position.set(sx * 0.021, sy * 0.053, 0.009);
+        group.add(rivet);
+      }
     }
 
     return group;
@@ -273,21 +251,21 @@ export function TorsoRig({
       (P[2] + P[6]) / 2,
     );
 
-    const hipL = new THREE.Vector3(
-      P[24],
-      P[25] - 0.18,
-      P[26],
-    );
-
-    const hipR = new THREE.Vector3(
-      P[28],
-      P[29] - 0.18,
-      P[30],
-    );
+    const hipL = new THREE.Vector3(P[24], P[25] - 0.18, P[26]);
+    const hipR = new THREE.Vector3(P[28], P[29] - 0.18, P[30]);
 
     const hipCenter = new THREE.Vector3()
       .addVectors(hipL, hipR)
       .multiplyScalar(0.5);
+
+    const torsoAxis = new THREE.Vector3().subVectors(shoulderCenter, hipCenter);
+    const horizontalLength = Math.hypot(torsoAxis.x, torsoAxis.z);
+    const maxHorizontalOffset = Math.abs(torsoAxis.y) * Math.tan(MAX_TORSO_LEAN);
+    if (horizontalLength > maxHorizontalOffset && horizontalLength > 0) {
+      const correction = maxHorizontalOffset / horizontalLength;
+      shoulderCenter.x = hipCenter.x + torsoAxis.x * correction;
+      shoulderCenter.z = hipCenter.z + torsoAxis.z * correction;
+    }
 
     // ANATOMICAL AXES
 
@@ -295,8 +273,7 @@ export function TorsoRig({
       .subVectors(shoulderCenter, hipCenter)
       .normalize();
 
-    let right = new THREE.Vector3()
-      .subVectors(shoulderR, shoulderL);
+    let right = new THREE.Vector3().subVectors(shoulderR, shoulderL);
 
     right.addScaledVector(up, -right.dot(up)).normalize();
 
@@ -304,9 +281,7 @@ export function TorsoRig({
       right.set(1, 0, 0);
     }
 
-    const forward = new THREE.Vector3()
-      .crossVectors(right, up)
-      .normalize();
+    const forward = new THREE.Vector3().crossVectors(right, up).normalize();
 
     if (forward.z < 0) {
       forward.negate();
@@ -319,13 +294,8 @@ export function TorsoRig({
       ? 1
       : 1 + Math.sin(idleTime.current * 1.35) * 0.003;
 
-    const pos = geometry.getAttribute(
-      "position",
-    ) as THREE.BufferAttribute;
-
-    const vertexColors = geometry.getAttribute(
-      "color",
-    ) as THREE.BufferAttribute;
+    const pos = geometry.getAttribute("position") as THREE.BufferAttribute;
+    const vertexColors = geometry.getAttribute("color") as THREE.BufferAttribute;
 
     // ============================================================
     // VERTEX GENERATION
@@ -345,35 +315,17 @@ export function TorsoRig({
 
       if (t < 0.2) {
         const st = t / 0.2;
-
-        widthRatio = THREE.MathUtils.lerp(
-          topWidth,
-          topWidth * 1.25,
-          st,
-        );
-
+        widthRatio = THREE.MathUtils.lerp(topWidth, topWidth * 1.25, st);
         depthRatio = THREE.MathUtils.lerp(0.42, 0.52, st);
-      } else if (t < 0.70) {
+      } else if (t < 0.7) {
         const mt = (t - 0.2) / 0.5;
         const peak = bottomWidth * 1.52;
-
-        widthRatio = THREE.MathUtils.lerp(
-          topWidth * 1.25,
-          peak,
-          mt,
-        );
-
+        widthRatio = THREE.MathUtils.lerp(topWidth * 1.25, peak, mt);
         depthRatio = THREE.MathUtils.lerp(0.52, 0.68, mt);
       } else {
-        const wt = (t - 0.70) / 0.30;
+        const wt = (t - 0.7) / 0.3;
         const peak = bottomWidth * 1.52;
-
-        widthRatio = THREE.MathUtils.lerp(
-          peak,
-          bottomWidth,
-          wt,
-        );
-
+        widthRatio = THREE.MathUtils.lerp(peak, bottomWidth, wt);
         depthRatio = THREE.MathUtils.lerp(0.68, 0.46, wt);
       }
 
@@ -395,10 +347,7 @@ export function TorsoRig({
           yLift = (topYOffset + arch * 0.03) * fade;
 
           if (sin > 0 && Math.abs(cos) < 0.35) {
-            yLift -=
-              0.02 *
-              (1 - Math.abs(cos) / 0.35) *
-              fade;
+            yLift -= 0.02 * (1 - Math.abs(cos) / 0.35) * fade;
           }
         }
 
@@ -406,46 +355,33 @@ export function TorsoRig({
         let effectiveWidth = halfW;
 
         // --------------------------------------------------------
-        // CHEST ARMOUR
+        // CHEST: broad, flat breastplate with a shallow center ridge
         // --------------------------------------------------------
 
         if (t >= 0.14 && t <= 0.42 && sin > 0.05) {
-          const chestT = Math.sin(
-            ((t - 0.14) / 0.28) * Math.PI,
-          );
+          const chestT = Math.sin(((t - 0.14) / 0.28) * Math.PI);
 
-          const sternum =
-            Math.abs(cos) < 0.16
-              ? -0.012 * (1 - Math.abs(cos) / 0.16)
+          const plate = 0.014 * chestT * sin;
+          const ridge =
+            Math.abs(cos) < 0.1
+              ? 0.006 * (1 - Math.abs(cos) / 0.1) * chestT
               : 0;
 
-          const pec =
-            Math.sin(
-              Math.min(Math.PI, Math.abs(cos) * 2.8),
-            ) *
-            0.02 *
-            chestT *
-            sin;
-
-          depth += pec + sternum;
+          depth += plate + ridge;
         }
 
         // --------------------------------------------------------
-        // FIVE SCULPTED ABDOMINAL ARMOUR LAYERS
+        // ABDOMEN: four rounded bands separated by recessed grooves
         // --------------------------------------------------------
 
         if (t > 0.42 && t <= 0.82) {
-          const progress = (t - 0.42) / 0.40;
-          const phase = (progress * 5) % 1;
+          const progress = (t - 0.42) / 0.4;
+          const phase = (progress * ABS_BANDS) % 1;
 
-          const bevel = Math.sin(phase * Math.PI) * 0.014;
+          const band = Math.sin(phase * Math.PI) * 0.01;
+          const groove = phase < 0.1 ? -0.008 : 0;
 
-          depth += bevel * Math.max(0.2, sin);
-
-          if (Math.abs(cos) > 0.65) {
-            effectiveWidth +=
-              Math.sin(phase * Math.PI * 2) * 0.007;
-          }
+          depth += (band + groove) * Math.max(0.2, sin);
         }
 
         // --------------------------------------------------------
@@ -463,73 +399,63 @@ export function TorsoRig({
         pos.setXYZ(index, vert.x, vert.y, vert.z);
 
         // --------------------------------------------------------
-        // PREMIUM COLOUR DESIGN
+        // COLOUR DESIGN
         // --------------------------------------------------------
 
-        let colour = COLORS.pearl.clone();
+        const colour = COLORS.ivory.clone();
 
-        // Dark navy mechanical shoulders
+        // Graphite shoulder caps
         if (t < 0.12) {
-          colour.copy(COLORS.navyLight);
+          colour.copy(COLORS.graphite);
         }
 
-        // Navy side armour
+        // Amber collar line
+        if (t < 0.03) {
+          colour.copy(COLORS.amber);
+        }
+
+        // Charcoal side panels
         if (Math.abs(cos) > 0.88 && t < 0.78) {
-          colour.copy(COLORS.navy);
+          colour.copy(COLORS.charcoal);
         }
 
-        // Darker chest sternum detail
-        if (
-          t >= 0.14 &&
-          t <= 0.42 &&
-          Math.abs(cos) < 0.055 &&
-          sin > 0.2
-        ) {
-          colour.copy(COLORS.navyLight);
+        // Thin amber seam where side panels meet the front
+        if (Math.abs(cos) > 0.84 && Math.abs(cos) <= 0.88 && t > 0.14 && t < 0.78) {
+          colour.copy(COLORS.amber);
         }
 
-        // Dark blue separation between abdominal plates
+        // Dark grooves between abdominal bands
         if (t > 0.42 && t <= 0.82) {
-          const phase = (((t - 0.42) / 0.40) * 5) % 1;
+          const phase = (((t - 0.42) / 0.4) * ABS_BANDS) % 1;
 
-          if (phase < 0.075 && sin > 0.3) {
-            colour.copy(COLORS.navyLight);
+          if (phase < 0.1 && Math.abs(cos) <= 0.84) {
+            colour.copy(COLORS.charcoal);
           }
         }
 
-        // Dark mechanical bottom edge
+        // Worn lower edge
         if (t > 0.94) {
-          colour.copy(COLORS.pearlDark);
+          colour.copy(COLORS.ivoryDark);
         }
 
-        // Subtle lighting variation across curved surface
+        // Subtle shading across the curved surface
         const shade = 0.96 + Math.max(0, sin) * 0.06;
         colour.multiplyScalar(shade);
 
-        vertexColors.setXYZ(
-          index,
-          colour.r,
-          colour.g,
-          colour.b,
-        );
+        vertexColors.setXYZ(index, colour.r, colour.g, colour.b);
       }
     }
 
     // Bottom cap
     const bottomCap = RINGS * SEGMENTS;
 
-    pos.setXYZ(
-      bottomCap,
-      hipCenter.x,
-      hipCenter.y,
-      hipCenter.z,
-    );
+    pos.setXYZ(bottomCap, hipCenter.x, hipCenter.y, hipCenter.z);
 
     vertexColors.setXYZ(
       bottomCap,
-      COLORS.navy.r,
-      COLORS.navy.g,
-      COLORS.navy.b,
+      COLORS.charcoal.r,
+      COLORS.charcoal.g,
+      COLORS.charcoal.b,
     );
 
     pos.needsUpdate = true;
@@ -538,7 +464,7 @@ export function TorsoRig({
     geometry.computeVertexNormals();
 
     // ============================================================
-    // CHEST REACTOR POSITION AND ORIENTATION
+    // CHEST PIECE POSITION AND ORIENTATION
     // ============================================================
 
     const reactorPosition = new THREE.Vector3().lerpVectors(
@@ -549,19 +475,18 @@ export function TorsoRig({
 
     const reactorWidth = refScale * topWidth * 1.25;
 
-    reactorPosition.addScaledVector(
-      forward,
-      reactorWidth * 0.52,
-    );
-
+    reactorPosition.addScaledVector(forward, reactorWidth * 0.52);
     reactorPosition.addScaledVector(up, -0.005);
 
     reactorGroup.position.copy(reactorPosition);
 
-    reactorGroup.quaternion.setFromUnitVectors(
-      new THREE.Vector3(0, 0, 1),
+    // Align the housing's long axis with the torso's up direction
+    const basis = new THREE.Matrix4().makeBasis(
+      new THREE.Vector3().crossVectors(up, forward).normalize(),
+      up,
       forward,
     );
+    reactorGroup.quaternion.setFromRotationMatrix(basis);
 
     reactorGroup.scale.setScalar(TORSO_WORLD * 0.38);
   });
@@ -578,10 +503,7 @@ export function TorsoRig({
         receiveShadow
       />
 
-      <primitive
-        ref={reactorRef}
-        object={reactor}
-      />
+      <primitive ref={reactorRef} object={reactor} />
     </group>
   );
 }

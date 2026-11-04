@@ -169,7 +169,9 @@ export function ContinuousSignSimulation({
               frames={data.frames}
               pose={data.pose}
               faceAvatar={data.faceAvatar}
-              fps={15}
+              fps={30}
+              defaultCameraDistanceScale={0.92}
+              defaultCameraVerticalOffset={0.06}
               minimal
               loop={false}
               autoPlay={playing}

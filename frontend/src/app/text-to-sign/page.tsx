@@ -6,7 +6,6 @@ import { ContinuousSignSimulation } from "@/components/simulation/ContinuousSign
 import {
   AlertTriangle,
   ArrowRight,
-  Check,
   Cpu,
   Loader2,
   Mic,
@@ -330,7 +329,7 @@ export default function TextToSignPage() {
   const [playingSeq, setPlayingSeq] = useState(false);
   const [seqNonce, setSeqNonce] = useState(0);
   const [viewResetToken, setViewResetToken] = useState(0);
-  const [useLlm, setUseLlm] = useState(true);
+  const [useLlm, setUseLlm] = useState(false);
 
   // Fetch active vocabulary for dynamic samples
   useEffect(() => {
@@ -948,8 +947,8 @@ export default function TextToSignPage() {
     <PageContainer className="w-full max-w-[1600px] px-3 sm:px-6 lg:px-8 py-4 lg:py-6">
       <div className="grid grid-cols-1 lg:grid-cols-[30%_70%] gap-4 lg:gap-6 items-stretch">
         {/* LEFT PANEL: INPUT & CONTROLS */}
-        <section className="flex flex-col justify-between rounded-2xl border border-border/80 bg-surface/50 p-4 sm:p-5 backdrop-blur-sm gap-3.5 h-full">
-          {/* Top row: Label + STT Engine Selector + VAD Mode + Language Switcher + Clear */}
+        <section className={`flex flex-col justify-between rounded-2xl border border-border/80 bg-surface/50 p-4 sm:p-5 backdrop-blur-sm gap-3.5 h-full ${showVadSettings ? "relative z-20" : ""}`}>
+          {/* Top row: STT Engine Selector + VAD Mode */}
           <div className="flex flex-col gap-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
@@ -993,68 +992,6 @@ export default function TextToSignPage() {
                   </button>
                 </div>
 
-                {/* Silero VAD Indicator & Configuration (for local capture) */}
-                {sttEngine === "local" && (
-                  <div
-                    className="hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-lg bg-surface/80 border border-border/80"
-                    role="group"
-                    aria-label="VAD Configuration"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setShowVadSettings((v) => !v)}
-                      aria-label="VAD Configuration"
-                      className={`p-1 rounded text-text-muted hover:text-text-primary transition-colors ${
-                        showVadSettings ? "bg-surface-elevated text-accent-secondary" : ""
-                      }`}
-                      title="Configure Silero VAD thresholds & padding"
-                    >
-                      <Sliders size={11} />
-                    </button>
-                  </div>
-                )}
-              </div>
-              <br/>
-              <div className="flex items-center gap-2">
-                {/* Language Selector */}
-                <div
-                  className="flex items-center gap-0.5 p-0.5 rounded-lg bg-surface/80 border border-border/80 shrink-0"
-                  role="group"
-                  aria-label="Input Language"
-                >
-                  {([
-                    { key: "auto", label: "AUTO" },
-                    { key: "bn", label: "বাংলা" },
-                    { key: "en", label: "ENGLISH" },
-                  ] as const).map((opt) => (
-                    <button
-                      key={opt.key}
-                      type="button"
-                      onClick={() => setSttLanguage(opt.key)}
-                      aria-pressed={sttLanguage === opt.key}
-                      className={`px-2.5 py-1 rounded text-[10px] font-mono font-bold uppercase tracking-wider transition-colors ${
-                        sttLanguage === opt.key
-                          ? "bg-accent-secondary text-white shadow-sm"
-                          : "text-text-muted hover:text-text-secondary"
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-
-                {inputText && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setInputText("");
-                      setResult(null);
-                    }}
-                    className="text-[10px] font-mono text-text-muted hover:text-text-primary transition-colors ml-1"
-                  >
-                    Clear
-                  </button>
-                )}
               </div>
             </div>
 
@@ -1075,96 +1012,6 @@ export default function TextToSignPage() {
               </div>
             )}
 
-            {/* Expandable VAD Settings Panel */}
-            {showVadSettings && sttEngine === "local" && (
-              <div className="p-3 rounded-xl bg-surface border border-border/80 flex flex-col gap-2.5 text-xs font-mono">
-                <div className="flex items-center justify-between pb-1 border-b border-border/50">
-                  <span className="font-bold text-[11px] text-text-primary flex items-center gap-1.5">
-                    <Sliders size={12} className="text-accent-secondary" />
-                    Silero VAD Parameters
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSilenceThreshold(0.5);
-                      setMinSilenceMs(500);
-                      setSpeechPadMs(400);
-                      setMaxSegmentS(15.0);
-                      toast.info("VAD parameters reset to defaults.");
-                    }}
-                    className="text-[9px] text-text-muted hover:text-text-primary underline"
-                  >
-                    Reset Defaults
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px]">
-                  <div className="flex flex-col gap-1">
-                    <div className="flex justify-between text-text-secondary">
-                      <span>Silence Threshold:</span>
-                      <span className="text-accent-secondary font-bold">{silenceThreshold}</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="0.1"
-                      max="0.9"
-                      step="0.05"
-                      value={silenceThreshold}
-                      onChange={(e) => setSilenceThreshold(parseFloat(e.target.value))}
-                      className="w-full h-1 bg-surface-elevated rounded accent-accent-secondary cursor-pointer"
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1">
-                    <div className="flex justify-between text-text-secondary">
-                      <span>Min Silence (ms):</span>
-                      <span className="text-accent-secondary font-bold">{minSilenceMs}ms</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="200"
-                      max="2000"
-                      step="50"
-                      value={minSilenceMs}
-                      onChange={(e) => setMinSilenceMs(parseInt(e.target.value, 10))}
-                      className="w-full h-1 bg-surface-elevated rounded accent-accent-secondary cursor-pointer"
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1">
-                    <div className="flex justify-between text-text-secondary">
-                      <span>Speech Padding (ms):</span>
-                      <span className="text-accent-secondary font-bold">{speechPadMs}ms</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="100"
-                      max="800"
-                      step="50"
-                      value={speechPadMs}
-                      onChange={(e) => setSpeechPadMs(parseInt(e.target.value, 10))}
-                      className="w-full h-1 bg-surface-elevated rounded accent-accent-secondary cursor-pointer"
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1">
-                    <div className="flex justify-between text-text-secondary">
-                      <span>Max Segment (s):</span>
-                      <span className="text-accent-secondary font-bold">{maxSegmentS}s</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="5"
-                      max="30"
-                      step="1"
-                      value={maxSegmentS}
-                      onChange={(e) => setMaxSegmentS(parseFloat(e.target.value))}
-                      className="w-full h-1 bg-surface-elevated rounded accent-accent-secondary cursor-pointer"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
 
 {/* Premium Warning Modal */}
@@ -1218,12 +1065,24 @@ export default function TextToSignPage() {
 )}
 
           {/* Multiline Textarea with inline unmapped word highlighting and locked height */}
-          <div className="relative w-full flex-1 min-h-[340px] lg:min-h-[420px] rounded-xl bg-background/50 border border-border/80 focus-within:ring-1 focus-within:ring-accent-secondary/50 focus-within:border-accent-secondary/60 transition-all flex flex-col overflow-hidden">
+          <div className="relative w-full flex-1 min-h-[340px] lg:min-h-[420px] rounded-xl bg-background/50 border border-blue-500 focus-within:ring-1 focus-within:ring-accent-secondary/50 focus-within:border-accent-secondary/60 transition-all flex flex-col overflow-hidden">
+            {inputText && (
+              <button
+                type="button"
+                onClick={() => {
+                  setInputText("");
+                  setResult(null);
+                }}
+                className="absolute top-3 right-2 z-20 rounded-md border border-red-500 px-2 py-1 text-[10px] font-mono leading-none text-text-muted hover:text-text-primary transition-colors"
+              >
+                Clear
+              </button>
+            )}
             <div className="relative flex-1 w-full h-full min-h-[280px]">
               {/* Highlight backdrop overlay (mirrors textarea font, padding, word wrap) */}
               <div
                 aria-hidden="true"
-                className="pointer-events-none absolute inset-0 p-4 font-bengali text-base whitespace-pre-wrap break-words overflow-hidden select-none leading-relaxed text-transparent"
+                className="pointer-events-none absolute inset-0 p-4 pt-6 font-bengali text-base whitespace-pre-wrap break-words overflow-hidden select-none leading-relaxed text-transparent"
               >
                 {renderHighlightedText(inputText, effectiveUnmappedWords)}
               </div>
@@ -1239,7 +1098,7 @@ export default function TextToSignPage() {
                   }
                 }}
                 placeholder="বাংলা বাক্য লিখুন"
-                className="relative z-10 w-full h-full p-4 bg-transparent text-text-primary font-bengali text-base placeholder:text-text-muted/50 focus:outline-none resize-none leading-relaxed"
+                className="relative z-10 w-full h-full p-4 pt-6 bg-transparent text-text-primary font-bengali text-base placeholder:text-text-muted/50 focus:outline-none resize-none leading-relaxed"
               />
             </div>
           </div>
@@ -1254,7 +1113,7 @@ export default function TextToSignPage() {
 
           {/* Continuous Voice Splitter Control */}
           <div
-            className={`w-full rounded-xl border p-2.5 sm:p-3 flex flex-col gap-2 transition-all ${
+            className={`w-full rounded-xl border p-4 flex flex-col gap-2 transition-all ${
               isRecording
                 ? "bg-status-error/15 border-status-error/40 text-status-error shadow-sm"
                 : voiceStatus === "finalizing"
@@ -1266,97 +1125,211 @@ export default function TextToSignPage() {
                 : "bg-surface/50 border-border/70"
             }`}
           >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3 min-w-0">
-                <button
-                  type="button"
-                  disabled={voiceStatus === "finalizing"}
-                  onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
-                  title={
-                    voiceStatus === "finalizing"
-                      ? "Finalizing transcription..."
-                      : isRecording
-                      ? "Stop recording"
-                      : "Record voice (continuous stream)"
-                  }
-                  className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+              <button
+                type="button"
+                disabled={voiceStatus === "finalizing"}
+                onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
+                title={
+                  voiceStatus === "finalizing"
+                    ? "Finalizing transcription..."
+                    : isRecording
+                    ? "Stop recording"
+                    : "Record voice"
+                }
+                aria-label={
+                  isRecording ? "Stop voice recording" : "Start voice recording"
+                }
+                className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
+                  isRecording
+                    ? "bg-status-error text-white shadow-md animate-pulse"
+                    : voiceStatus === "finalizing"
+                    ? "bg-accent-secondary text-white shadow-sm"
+                    : "bg-accent-secondary/20 text-accent-secondary hover:bg-accent-secondary/30"
+                }`}
+              >
+                {voiceStatus === "finalizing" ? (
+                  <Loader2 size={17} className="animate-spin" />
+                ) : isRecording ? (
+                  <Square size={14} fill="currentColor" />
+                ) : (
+                  <Mic size={18} />
+                )}
+              </button>
+
+              <div className="flex w-[58px] min-w-0 shrink flex-col">
+                <span
+                  className={`whitespace-nowrap text-[9px] font-sans font-semibold tracking-wide leading-3 ${
                     isRecording
-                      ? "bg-status-error text-white shadow-md animate-pulse"
+                      ? "text-status-error"
                       : voiceStatus === "finalizing"
-                      ? "bg-accent-secondary text-white shadow-sm"
-                      : "bg-accent-secondary/20 text-accent-secondary hover:bg-accent-secondary/30"
+                      ? "text-accent-secondary"
+                      : voiceStatus === "complete"
+                      ? "text-status-success"
+                      : voiceStatus === "warning"
+                      ? "text-status-warning"
+                      : "text-text-primary"
                   }`}
                 >
-                  {voiceStatus === "finalizing" ? (
-                    <Loader2 size={16} className="animate-spin" />
-                  ) : isRecording ? (
-                    <Square size={13} fill="currentColor" />
-                  ) : (
-                    <Mic size={16} />
-                  )}
-                </button>
-
-                <div className="flex flex-col min-w-0">
-                  <span
-                    className={`text-xs font-mono font-bold tracking-wider leading-tight flex items-center gap-2 ${
-                      isRecording
-                        ? "text-status-error"
-                        : voiceStatus === "finalizing"
-                        ? "text-accent-secondary"
-                        : voiceStatus === "complete"
-                        ? "text-status-success"
-                        : voiceStatus === "warning"
-                        ? "text-status-warning"
-                        : "text-text-primary"
-                    }`}
-                  >
-                    {isRecording && "LISTENING"}
-                    {voiceStatus === "finalizing" && (
-                      <span className="flex items-center gap-1.5">
-                        <Loader2 size={12} className="animate-spin" />
-                        FINALIZING TRANSCRIPTION
-                      </span>
-                    )}
-                    {voiceStatus === "complete" && (
-                      <span className="flex items-center gap-1 text-status-success">
-                        <Check size={12} />
-                        TRANSCRIPTION COMPLETE
-                      </span>
-                    )}
-                    {voiceStatus === "warning" && (
-                      <span className="flex items-center gap-1 text-status-warning">
-                        <AlertTriangle size={12} />
-                        PARTIAL SPEECH NOT DETECTED
-                      </span>
-                    )}
-                    {voiceStatus === "idle" && "VOICE"}
-                    {isRecording && inFlightCount > 0 && (
-                      <span className="flex items-center gap-1 text-[9px] font-normal text-accent-secondary">
-                        <Loader2 size={10} className="animate-spin" />
-                        transcribing split...
-                      </span>
-                    )}
-                  </span>
-                  <span className="text-[8px] font-mono text-text-muted leading-tight mt-0.5">
-                    {isRecording
+                  {isRecording
+                    ? "LISTENING"
+                    : voiceStatus === "finalizing"
+                    ? "FINALIZING"
+                    : voiceStatus === "complete"
+                    ? "COMPLETE"
+                    : voiceStatus === "warning"
+                    ? "NO SPEECH"
+                    : "VOICE"}
+                </span>
+                {(isRecording || voiceStatus === "finalizing" || inFlightCount > 0) && (
+                  <span className="mt-0.5 max-w-[72px] break-words text-[8px] font-sans leading-tight text-text-secondary">
+                    {inFlightCount > 0
+                      ? `Transcribing ${inFlightCount} segment${inFlightCount === 1 ? "" : "s"}`
+                      : isRecording
                       ? sttEngine === "elevenlabs"
-                        ? `Next slice in ${sliceRemainingSec.toFixed(1)}s`
-                        : `Segmenting every ${recordingDuration}s`
-                      : voiceStatus === "finalizing"
-                      ? "Transcribing remaining audio..."
-                      : sttEngine === "elevenlabs"
-                      ? "ElevenLabs Scribe"
-                      : "Silero VAD"}
+                        ? `${sliceRemainingSec.toFixed(1)}s to next slice`
+                        : `Every ${recordingDuration}s`
+                      : "Transcribing audio"}
                   </span>
-                </div>
+                )}
               </div>
 
-              {/* VAD Status Indicator */}
-              <div className="flex items-center gap-1.5 shrink-0 bg-surface rounded-lg p-0.5 border border-border">
-                <span className="font-mono text-[10px] text-accent-secondary px-2 py-1 font-semibold flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-accent-secondary animate-pulse" />
-                  Silero VAD
-                </span>
+              </div>
+
+              <div className="flex shrink-0 items-center gap-2">
+              {/* Language Selector */}
+              <div
+                className="flex shrink-0 items-center gap-0.5 rounded-xl bg-surface/80 p-1"
+                role="group"
+                aria-label="Input Language"
+              >
+                {([
+                  { key: "auto", label: "AUTO" },
+                  { key: "bn", label: "বাংলা" },
+                  { key: "en", label: "ENGLISH" },
+                ] as const).map((opt) => (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    onClick={() => setSttLanguage(opt.key)}
+                    aria-pressed={sttLanguage === opt.key}
+                    className={`rounded-lg px-2 py-1.5 text-[10px] font-sans font-semibold tracking-wide transition-colors ${
+                      sttLanguage === opt.key
+                        ? "bg-accent-secondary text-white shadow-sm"
+                        : "text-text-secondary hover:bg-surface-elevated hover:text-text-primary"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="relative">
+                {sttEngine === "local" && (
+                  <button
+                    type="button"
+                    onClick={() => setShowVadSettings((v) => !v)}
+                    aria-label="VAD Configuration"
+                    aria-expanded={showVadSettings}
+                    className={`flex h-10 w-10 items-center justify-center rounded-xl bg-surface/80 text-text-secondary hover:text-text-primary transition-colors ${
+                      showVadSettings ? "bg-surface-elevated text-accent-secondary" : ""
+                    }`}
+                    title="Configure Silero VAD thresholds & padding"
+                  >
+                    <Sliders size={12} />
+                  </button>
+                )}
+                {showVadSettings && sttEngine === "local" && (
+                  <div className="absolute bottom-full left-1/2 z-30 mb-3 w-[min(26rem,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border border-border/80 bg-surface p-4 shadow-xl flex flex-col gap-3 text-xs font-mono">
+                    <div className="flex items-center justify-between pb-1 border-b border-border/50">
+                      <span className="font-bold text-[11px] text-text-primary flex items-center gap-1.5">
+                        <Sliders size={12} className="text-accent-secondary" />
+                        Silero VAD Parameters
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSilenceThreshold(0.5);
+                          setMinSilenceMs(500);
+                          setSpeechPadMs(400);
+                          setMaxSegmentS(15.0);
+                          toast.info("VAD parameters reset to defaults.");
+                        }}
+                        className="text-[9px] text-text-muted hover:text-text-primary underline"
+                      >
+                        Reset Defaults
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 text-[10px]">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex justify-between text-text-secondary">
+                          <span className="whitespace-nowrap">Silence Threshold:</span>
+                          <span className="text-accent-secondary font-bold">{silenceThreshold}</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0.1"
+                          max="0.9"
+                          step="0.05"
+                          value={silenceThreshold}
+                          onChange={(e) => setSilenceThreshold(parseFloat(e.target.value))}
+                          className="w-full h-1 bg-surface-elevated rounded accent-accent-secondary cursor-pointer"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1">
+                        <div className="flex justify-between text-text-secondary">
+                          <span className="whitespace-nowrap">Min Silence (ms):</span>
+                          <span className="text-accent-secondary font-bold">{minSilenceMs}ms</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="200"
+                          max="2000"
+                          step="50"
+                          value={minSilenceMs}
+                          onChange={(e) => setMinSilenceMs(parseInt(e.target.value, 10))}
+                          className="w-full h-1 bg-surface-elevated rounded accent-accent-secondary cursor-pointer"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1">
+                        <div className="flex justify-between text-text-secondary">
+                          <span className="whitespace-nowrap">Speech Padding (ms):</span>
+                          <span className="text-accent-secondary font-bold">{speechPadMs}ms</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="100"
+                          max="800"
+                          step="50"
+                          value={speechPadMs}
+                          onChange={(e) => setSpeechPadMs(parseInt(e.target.value, 10))}
+                          className="w-full h-1 bg-surface-elevated rounded accent-accent-secondary cursor-pointer"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1">
+                        <div className="flex justify-between text-text-secondary">
+                          <span className="whitespace-nowrap">Max Segment (s):</span>
+                          <span className="text-accent-secondary font-bold">{maxSegmentS}s</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="5"
+                          max="30"
+                          step="1"
+                          value={maxSegmentS}
+                          onChange={(e) => setMaxSegmentS(parseFloat(e.target.value))}
+                          className="w-full h-1 bg-surface-elevated rounded accent-accent-secondary cursor-pointer"
+                        />
+                      </div>
+                    </div>
+                    </div>
+                    )}
+                </div>
               </div>
             </div>
 
