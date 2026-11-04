@@ -2,7 +2,7 @@
 
 > Compact project architecture followed by relevant source and configuration files.
 
-**Included files:** `74`  
+**Included files:** `69`  
 **Maximum source file size:** `2 MB`
 
 ---
@@ -13,10 +13,10 @@
 WBSL Bridge
 ├── backend
 │   ├── __init__.py
+│   ├── emotion_engine.py
 │   ├── extract.py
 │   ├── llm_engine.py
 │   ├── main.py
-│   ├── nmm.py
 │   ├── pose.py
 │   ├── streaming.py
 │   ├── stt_engine.py
@@ -34,14 +34,11 @@ WBSL Bridge
 │   │   │   │   ├── settings
 │   │   │   │   │   └── page.tsx
 │   │   │   │   ├── signs
+│   │   │   │   ├── training-data
+│   │   │   │   │   └── page.tsx
 │   │   │   │   ├── videos
 │   │   │   │   │   └── page.tsx
 │   │   │   │   ├── layout.tsx
-│   │   │   │   └── page.tsx
-│   │   │   ├── contribute
-│   │   │   │   ├── session
-│   │   │   │   │   └── [id]
-│   │   │   │   │       └── page.tsx
 │   │   │   │   └── page.tsx
 │   │   │   ├── demo
 │   │   │   │   └── page.tsx
@@ -68,25 +65,24 @@ WBSL Bridge
 │   │   │   │   └── SystemDiagnostics.tsx
 │   │   │   ├── media
 │   │   │   ├── pipeline
-│   │   │   │   └── PipelineStatus.tsx
 │   │   │   ├── recording
-│   │   │   │   ├── PrivacyGate.tsx
-│   │   │   │   └── UploadRecovery.tsx
 │   │   │   ├── sign
-│   │   │   │   ├── EmotionPanel.tsx
-│   │   │   │   └── NmmThresholdPanel.tsx
+│   │   │   │   └── EmotionPanel.tsx
 │   │   │   ├── simulation
 │   │   │   │   ├── AlpanaStage.tsx
 │   │   │   │   ├── ContinuousSignSimulation.tsx
 │   │   │   │   ├── DhutiRig.tsx
+│   │   │   │   ├── HandRig.tsx
+│   │   │   │   ├── HeadFaceRig.tsx
 │   │   │   │   ├── LandmarkSimulation.tsx
-│   │   │   │   └── simulationConstants.ts
+│   │   │   │   ├── RigUtils.ts
+│   │   │   │   ├── simulationConstants.ts
+│   │   │   │   ├── SimulationRoom.tsx
+│   │   │   │   └── TorsoRig.tsx
 │   │   │   ├── verification
-│   │   │   │   └── EvidencePanel.tsx
 │   │   │   └── skeletons.tsx
 │   │   ├── hooks
 │   │   │   ├── useCamera.ts
-│   │   │   ├── useRecording.ts
 │   │   │   └── useSystemStatus.ts
 │   │   ├── lib
 │   │   │   ├── constants.ts
@@ -97,12 +93,9 @@ WBSL Bridge
 │   │   ├── services
 │   │   │   ├── api.ts
 │   │   │   ├── auth.ts
-│   │   │   ├── contributions.ts
-│   │   │   ├── dataset.ts
 │   │   │   ├── nlg.ts
 │   │   │   └── stats.ts
 │   │   └── store
-│   │       └── recording-store.ts
 │   ├── AGENTS.md
 │   ├── CLAUDE.md
 │   ├── dev-framing.log
@@ -136,7 +129,6 @@ WBSL Bridge
 ├── README.md
 ├── requirements-training.txt
 ├── requirements.txt
-├── Screenshot 2026-10-15 183557.png
 └── start.ps1
 ```
 
@@ -145,10 +137,10 @@ WBSL Bridge
 # Included Files
 
 - `backend\__init__.py`
+- `backend\emotion_engine.py`
 - `backend\extract.py`
 - `backend\llm_engine.py`
 - `backend\main.py`
-- `backend\nmm.py`
 - `backend\pose.py`
 - `backend\streaming.py`
 - `backend\stt_engine.py`
@@ -165,9 +157,8 @@ WBSL Bridge
 - `frontend\src\app\admin\models\page.tsx`
 - `frontend\src\app\admin\page.tsx`
 - `frontend\src\app\admin\settings\page.tsx`
+- `frontend\src\app\admin\training-data\page.tsx`
 - `frontend\src\app\admin\videos\page.tsx`
-- `frontend\src\app\contribute\page.tsx`
-- `frontend\src\app\contribute\session\[id]\page.tsx`
 - `frontend\src\app\demo\page.tsx`
 - `frontend\src\app\globals.css`
 - `frontend\src\app\layout.tsx`
@@ -183,20 +174,19 @@ WBSL Bridge
 - `frontend\src\components\layout\Footer.tsx`
 - `frontend\src\components\layout\PageContainer.tsx`
 - `frontend\src\components\layout\SystemDiagnostics.tsx`
-- `frontend\src\components\pipeline\PipelineStatus.tsx`
-- `frontend\src\components\recording\PrivacyGate.tsx`
-- `frontend\src\components\recording\UploadRecovery.tsx`
 - `frontend\src\components\sign\EmotionPanel.tsx`
-- `frontend\src\components\sign\NmmThresholdPanel.tsx`
 - `frontend\src\components\simulation\AlpanaStage.tsx`
 - `frontend\src\components\simulation\ContinuousSignSimulation.tsx`
 - `frontend\src\components\simulation\DhutiRig.tsx`
+- `frontend\src\components\simulation\HandRig.tsx`
+- `frontend\src\components\simulation\HeadFaceRig.tsx`
 - `frontend\src\components\simulation\LandmarkSimulation.tsx`
+- `frontend\src\components\simulation\RigUtils.ts`
 - `frontend\src\components\simulation\simulationConstants.ts`
+- `frontend\src\components\simulation\SimulationRoom.tsx`
+- `frontend\src\components\simulation\TorsoRig.tsx`
 - `frontend\src\components\skeletons.tsx`
-- `frontend\src\components\verification\EvidencePanel.tsx`
 - `frontend\src\hooks\useCamera.ts`
-- `frontend\src\hooks\useRecording.ts`
 - `frontend\src\hooks\useSystemStatus.ts`
 - `frontend\src\lib\constants.ts`
 - `frontend\src\lib\pose.ts`
@@ -205,11 +195,8 @@ WBSL Bridge
 - `frontend\src\lib\utils.ts`
 - `frontend\src\services\api.ts`
 - `frontend\src\services\auth.ts`
-- `frontend\src\services\contributions.ts`
-- `frontend\src\services\dataset.ts`
 - `frontend\src\services\nlg.ts`
 - `frontend\src\services\stats.ts`
-- `frontend\src\store\recording-store.ts`
 - `frontend\tailwind.config.ts`
 - `model_training_zone\avatar_extract.py`
 - `model_training_zone\extract.py`
@@ -231,53 +218,209 @@ WBSL Bridge
 
 ---
 
+# FILE: `backend\emotion_engine.py`
+
+```python
+"""Emotion classification using the optional ViT ONNX model."""
+
+import logging
+from pathlib import Path
+
+import cv2
+import numpy as np
+import onnxruntime as ort
+
+from backend.extract import _suppress_c_stderr
+
+logger = logging.getLogger(__name__)
+
+ROOT = Path(__file__).resolve().parent.parent
+VIT_PATH = ROOT / "models" / "emotion" / "vit_emotion.onnx"
+
+_vit_session = None
+_vit_input_name = None
+if VIT_PATH.exists():
+    try:
+        _vit_session = ort.InferenceSession(
+            str(VIT_PATH), providers=["CPUExecutionProvider"]
+        )
+        _vit_input_name = _vit_session.get_inputs()[0].name
+    except Exception:
+        logger.exception("Could not load ViT emotion model at %s", VIT_PATH)
+
+_face_mesh = None
+if _vit_session is not None:
+    try:
+        import mediapipe as mp
+
+        with _suppress_c_stderr():
+            _face_mesh = mp.solutions.face_mesh.FaceMesh(
+                static_image_mode=False,
+                max_num_faces=1,
+                refine_landmarks=True,
+                min_detection_confidence=0.5,
+                min_tracking_confidence=0.5,
+            )
+    except Exception:
+        logger.exception("Could not initialize MediaPipe FaceMesh for emotion detection")
+
+EMOTION_LABELS = ["angry", "disgust", "fear", "happy", "neutral", "sad", "surprise"]
+NORM_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+NORM_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+EMOTION_MIN_CONFIDENCE = 0.35
+
+_last_emotion = {"dominant": "neutral", "confidence": 1.0, "scores": {"neutral": 1.0}}
+_frame_counter = 0
+
+
+def _neutral_emotion() -> dict:
+    return {"dominant": "neutral", "confidence": 1.0, "scores": {"neutral": 1.0}}
+
+
+def predict_emotion(face_bgr: np.ndarray) -> dict:
+    """Classify a face crop, returning neutral when the model cannot classify it."""
+    if _vit_session is None or face_bgr is None or face_bgr.size == 0:
+        return _neutral_emotion()
+    try:
+        image = cv2.resize(face_bgr, (224, 224))
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
+        image = (image - NORM_MEAN) / NORM_STD
+        image = np.transpose(image, (2, 0, 1))[np.newaxis]
+        outputs = _vit_session.run(None, {_vit_input_name: image})
+        logits = outputs[0][0]
+        exp_logits = np.exp(logits - np.max(logits))
+        probabilities = exp_logits / exp_logits.sum()
+        scores = {
+            EMOTION_LABELS[i]: round(float(probabilities[i]), 3)
+            for i in range(len(EMOTION_LABELS))
+        }
+        index = int(np.argmax(probabilities))
+        dominant = EMOTION_LABELS[index]
+        confidence = float(probabilities[index])
+        if dominant != "neutral" and confidence < EMOTION_MIN_CONFIDENCE:
+            dominant = "neutral"
+        return {
+            "dominant": dominant,
+            "confidence": round(confidence, 3),
+            "scores": scores,
+        }
+    except Exception:
+        logger.exception("ViT emotion inference failed")
+        return _neutral_emotion()
+
+
+def detect_emotion_from_frame(frame_bgr: np.ndarray) -> dict:
+    """Run emotion inference every fourth frame, retrying continuously when neutral."""
+    global _frame_counter, _last_emotion
+
+    if _vit_session is None or _face_mesh is None:
+        return _neutral_emotion()
+
+    _frame_counter += 1
+    if _frame_counter % 4 != 0 and _last_emotion.get("dominant") != "neutral":
+        return _last_emotion
+
+    try:
+        height, width = frame_bgr.shape[:2]
+        rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+        results = _face_mesh.process(rgb)
+        if not results.multi_face_landmarks:
+            _last_emotion = _neutral_emotion()
+            return _last_emotion
+
+        landmarks = results.multi_face_landmarks[0].landmark
+        xs = [landmark.x for landmark in landmarks]
+        ys = [landmark.y for landmark in landmarks]
+        min_x = max(0, int(min(xs) * width) - 10)
+        max_x = min(width, int(max(xs) * width) + 10)
+        min_y = max(0, int(min(ys) * height) - 10)
+        max_y = min(height, int(max(ys) * height) + 10)
+        if max_x <= min_x or max_y <= min_y:
+            _last_emotion = _neutral_emotion()
+            return _last_emotion
+
+        _last_emotion = predict_emotion(frame_bgr[min_y:max_y, min_x:max_x])
+    except Exception:
+        logger.exception("Emotion detection failed for frame")
+        _last_emotion = _neutral_emotion()
+    return _last_emotion
+
+
+def emotion_available() -> bool:
+    return _vit_session is not None and _face_mesh is not None
+
+
+def reset_emotion_state() -> None:
+    global _last_emotion
+    _last_emotion = _neutral_emotion()
+```
+
+---
+
 # FILE: `backend\extract.py`
 
 ```python
 """
-backend/extract.py
-Reuses the exact extract_two_hands() from phase2a_all_in_one.py.
-DO NOT change normalization logic — it is tested and verified.
+98-dim feature extraction for the temporal sign-recognition model.
 
-Consistency rules (from MVT 2A Section 8):
-1. Never flip the frame BEFORE MediaPipe processing.
-2. Use identical extract_two_hands() in all stages.
-3. Always use right-wrist-preferred reference and same scale normalization.
-4. Keep handedness slotting identical (Left block first, Right block second).
-
-Two feature contracts are served here, and the layer that trains an artefact
-must use the same one the serving layer will use:
-
-    HANDS_DIM = 126   two hands (2 x 21 x 3), right-wrist reference
-    HOLISTIC_DIM = 258  HANDS_DIM + pose (33 x 4 incl. visibility)
-
-The 258-dim vector is what ``train_daily6.py`` learns for the daily-conversation
-LSTM: it is never re-scaled on the way in, so the graph's declared input width
-tells the registry which extractor to feed it. Running the MediaPipe Pose graph
-costs real time per frame, so it is built lazily -- a project that only ever
-serves 126-dim models never pays for it.
+The feature math mirrors model_training_zone/extract.py. The model accepts
+raw (batch, 64, 98) float32 features; standardization is part of the ONNX graph.
 """
 
 import contextlib
 import ctypes
+import logging
+import math
 import os
 import sys
 import time
-import logging
 
 os.environ["GLOG_minloglevel"] = "2"
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 os.environ["ABSL_MIN_LOG_LEVEL"] = "2"
+os.environ.setdefault("MEDIAPIPE_DISABLE_LOGGING", "1")
 logging.getLogger("absl").setLevel(logging.ERROR)
+
+import numpy as np
+import mediapipe as mp
+
+from backend.pose import (
+    POSE_INDICES,
+    P_LSH,
+    P_RSH,
+    P_LEL,
+    P_REL,
+    P_LWR,
+    P_RWR,
+    P_LHIP,
+    P_RHIP,
+    VIS_MIN,
+)
+
+N_FEATURES = 98
+N_FRAMES = 64
+HAND_IDX = [0, 1, 4, 5, 8, 9, 12, 13, 16, 17, 20]
+H_MID_BASE, H_INDEX_BASE, H_PINKY_BASE = 5, 3, 9
+HAND_MARGIN_SW = 0.05
+REST_SHOULDER_FACTOR = 1.3
+RESCUE_MAX_DIST = 0.30
+
+AVATAR_FACE = [
+    10, 152, 234, 454, 70, 105, 107, 300, 334, 336,
+    159, 145, 386, 374, 1, 61, 291, 0, 17,
+]
+FACE_CACHE_IDX = AVATAR_FACE + [13, 14]
+FI = {idx: k for k, idx in enumerate(FACE_CACHE_IDX)}
+
+TRIGGER_FRAMES = 3
+PRE_ROLL = 8
+END_FRAMES = 10
+KEEP_TAIL = 2
+MAX_GAP = 5
 
 
 @contextlib.contextmanager
 def _suppress_c_stderr():
-    """
-    Temporarily redirect native C runtime stderr to NUL during MediaPipe graph initialization.
-    Silences unpreventable C++ logs from TensorFlow Lite delegate creation and Abseil
-    inference feedback manager without affecting Python loggers or normal terminal output.
-    """
     old_fd = None
     stderr_file = None
     ucrt = None
@@ -289,7 +432,6 @@ def _suppress_c_stderr():
             iob_func.argtypes = [ctypes.c_uint]
             stderr_file = iob_func(2)
             old_fd = os.dup(2)
-
             ucrt.freopen.restype = ctypes.c_void_p
             ucrt.freopen.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_void_p]
             ucrt.freopen(b"NUL", b"w", stderr_file)
@@ -300,7 +442,6 @@ def _suppress_c_stderr():
             os.close(devnull)
     except Exception:
         pass
-
     try:
         yield
     finally:
@@ -319,164 +460,266 @@ def _suppress_c_stderr():
             pass
 
 
-import numpy as np
-import mediapipe as mp
-
-from backend.pose import POSE_DIM, pose_from_landmarks
-
-HANDS_DIM = 126
-# 126 hands + 132 pose. The pose half is defined in backend/pose.py so the
-# trainer and the server cannot drift apart on what the pose block contains.
-HOLISTIC_DIM = HANDS_DIM + POSE_DIM
-
-# Initialize ONCE at module load (not per request)
 with _suppress_c_stderr():
-    _hands = mp.solutions.hands.Hands(
+    _holistic = mp.solutions.holistic.Holistic(
+        static_image_mode=False,
+        model_complexity=1,
+        smooth_landmarks=True,
+        refine_face_landmarks=False,
+        min_detection_confidence=0.5,
+        min_tracking_confidence=0.5,
+    )
+    _hands_det = mp.solutions.hands.Hands(
+        static_image_mode=True,
         max_num_hands=2,
-        min_detection_confidence=0.6,
+        min_detection_confidence=0.5,
     )
 
-# Built on first use only (see module docstring).
-_holistic = None
+
+def _lm(landmarks, idx_list):
+    return np.array(
+        [(landmarks[i].x, landmarks[i].y, landmarks[i].z) for i in idx_list],
+        np.float32,
+    )
 
 
-def _get_holistic():
-    """Lazily build the Holistic graph that supplies the pose half of a 258-vector.
+def frame_in_use(pose: np.ndarray, W: int, H: int) -> np.ndarray:
+    """Return whether each wrist is raised above the signer's rest line."""
+    out = np.zeros(2, bool)
+    sl = pose[P_LSH, :2].astype(np.float64) * [W, H]
+    sr = pose[P_RSH, :2].astype(np.float64) * [W, H]
+    if not (np.isfinite(sl).all() and np.isfinite(sr).all()):
+        return out
+    sw = float(np.linalg.norm(sl - sr))
+    if sw < 1e-6:
+        return out
+    if pose[P_LHIP, 3] >= VIS_MIN and pose[P_RHIP, 3] >= VIS_MIN:
+        rest_y = (pose[P_LHIP, 1] + pose[P_RHIP, 1]) / 2.0 * H
+    else:
+        rest_y = (sl[1] + sr[1]) / 2.0 + REST_SHOULDER_FACTOR * sw
+    for h, wi in enumerate((P_LWR, P_RWR)):
+        y = pose[wi, 1]
+        if np.isfinite(y):
+            out[h] = (rest_y - y * H) > HAND_MARGIN_SW * sw
+    return out
 
-    ``static_image_mode=False`` and the same 0.5 detection confidence as
-    ``train_daily6.py`` keep inference identical to training.
-    """
-    global _holistic
-    if _holistic is None:
-        with _suppress_c_stderr():
-            _holistic = mp.solutions.holistic.Holistic(
-                static_image_mode=False,
-                min_detection_confidence=0.5,
+
+def process_holistic_frame(frame_bgr: np.ndarray) -> dict | None:
+    """Run Holistic once and return the frame's raw pose, hand, and face landmarks."""
+    import cv2
+
+    H_img, W_img = frame_bgr.shape[:2]
+    rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+    rgb.flags.writeable = False
+    res = _holistic.process(rgb)
+    if not res.pose_landmarks:
+        return None
+
+    pose = np.full((8, 4), np.nan, np.float32)
+    pose[:, 3] = 0.0
+    landmarks = res.pose_landmarks.landmark
+    for k, i in enumerate(POSE_INDICES):
+        pose[k] = (
+            landmarks[i].x,
+            landmarks[i].y,
+            landmarks[i].z,
+            landmarks[i].visibility,
+        )
+
+    hands = np.full((2, 21, 3), np.nan, np.float32)
+    for h, hand_landmarks in enumerate(
+        (res.left_hand_landmarks, res.right_hand_landmarks)
+    ):
+        if hand_landmarks:
+            hands[h] = _lm(hand_landmarks.landmark, range(21))
+
+    in_use = frame_in_use(pose, W_img, H_img)
+    missing = [h for h in (0, 1) if in_use[h] and np.isnan(hands[h, 0, 0])]
+    if missing:
+        rescued = _hands_det.process(rgb)
+        if rescued.multi_hand_landmarks:
+            best = {}
+            for hand_landmarks in rescued.multi_hand_landmarks:
+                points = _lm(hand_landmarks.landmark, range(21))
+                for wrist_index in (P_LWR, P_RWR):
+                    wrist = pose[wrist_index, :2]
+                    if np.isfinite(wrist).all():
+                        distance = float(
+                            np.hypot(
+                                points[0, 0] - wrist[0],
+                                points[0, 1] - wrist[1],
+                            )
+                        )
+                        hand_index = 0 if wrist_index == P_LWR else 1
+                        if hand_index in missing and distance < RESCUE_MAX_DIST:
+                            if hand_index not in best or distance < best[hand_index][0]:
+                                best[hand_index] = (distance, points)
+            for hand_index, (_, points) in best.items():
+                hands[hand_index] = points
+
+    face = np.full((len(FACE_CACHE_IDX), 3), np.nan, np.float32)
+    face_ok = bool(res.face_landmarks)
+    if face_ok:
+        face = _lm(res.face_landmarks.landmark, FACE_CACHE_IDX)
+
+    return {
+        "pose": pose,
+        "hands": hands,
+        "face": face,
+        "face_ok": face_ok,
+        "W": W_img,
+        "H": H_img,
+    }
+
+
+def frame_features(pose, hands21, face, in_use, W, H, duration) -> np.ndarray:
+    """Build the training-compatible 98-value feature vector for one frame."""
+    sl = pose[P_LSH, :2].astype(np.float64) * [W, H]
+    sr = pose[P_RSH, :2].astype(np.float64) * [W, H]
+    origin = (sl + sr) / 2.0
+    sw = float(np.linalg.norm(sl - sr))
+    if not np.isfinite(sw) or sw < 1.0:
+        return np.zeros(N_FEATURES, np.float32)
+    xax = (sl - sr) / sw
+    yax = np.array([xax[1], -xax[0]])
+
+    def box_xy(xy_norm):
+        d = np.asarray(xy_norm, np.float64) * [W, H] - origin
+        return np.array([d @ xax, d @ yax]) / sw
+
+    def box_pts(pts):
+        d = pts[:, :2].astype(np.float64) * [W, H] - origin
+        return np.stack(
+            [
+                d @ xax / sw,
+                d @ yax / sw,
+                -pts[:, 2].astype(np.float64) * W / sw,
+            ],
+            1,
+        )
+
+    forehead = box_xy(face[FI[10], :2])
+    mouth = box_xy((face[FI[13], :2] + face[FI[14], :2]) / 2.0)
+    chin = box_xy(face[FI[152], :2])
+    face_box = (forehead, mouth, chin)
+
+    handshape = np.zeros((2, 11, 3))
+    palm_direction = np.zeros((2, 6))
+    wrist_position = np.zeros((2, 2))
+    wrist_face_distance = np.zeros((2, 3))
+    hand_flags = np.zeros(2)
+
+    for h in (0, 1):
+        if not in_use[h]:
+            continue
+        points = hands21[h][HAND_IDX]
+        if np.isnan(points).any():
+            continue
+        box = box_pts(points)
+        relative = box - box[0]
+        middle_base = relative[H_MID_BASE]
+        palm = float(np.linalg.norm(middle_base)) + 1e-9
+        phi = math.atan2(middle_base[0], middle_base[1])
+        c, s = math.cos(phi), math.sin(phi)
+        rotated = relative / palm
+        handshape[h] = np.stack(
+            [
+                rotated[:, 0] * c - rotated[:, 1] * s,
+                rotated[:, 0] * s + rotated[:, 1] * c,
+                rotated[:, 2],
+            ],
+            1,
+        )
+        palm_direction[h, :3] = middle_base / palm
+        normal = np.cross(relative[H_INDEX_BASE], relative[H_PINKY_BASE])
+        if h == 0:
+            normal = -normal
+        palm_direction[h, 3:] = normal / (np.linalg.norm(normal) + 1e-9)
+        wrist_position[h] = box[0, :2]
+        for k in range(3):
+            wrist_face_distance[h, k] = np.linalg.norm(
+                box[0, :2] - face_box[k]
             )
-    return _holistic
+        hand_flags[h] = 1.0
+
+    elbows = np.concatenate(
+        [box_xy(pose[P_LEL, :2]), box_xy(pose[P_REL, :2])]
+    )
+    head_vector = forehead - chin
+    head = np.array(
+        [
+            mouth[0],
+            mouth[1],
+            math.atan2(head_vector[0], head_vector[1])
+            if np.linalg.norm(head_vector) > 1e-6
+            else 0.0,
+        ]
+    )
+    features = np.concatenate(
+        [
+            handshape.ravel(),
+            palm_direction.ravel(),
+            wrist_position.ravel(),
+            elbows,
+            wrist_face_distance.ravel(),
+            head,
+            hand_flags,
+            [duration],
+        ]
+    )
+    assert features.shape[0] == N_FEATURES
+    return features.astype(np.float32)
 
 
-def extract_two_hands(res) -> np.ndarray | None:
-    """
-    Identical logic to phase2a_all_in_one.py extract_two_hands().
-    Right-wrist-preferred reference. Left block first, Right block second.
-    Returns 126-dim float32 vector or None if no hands detected.
-    """
-    if not res.multi_hand_landmarks:
+def complete_mask_single(pose, hands, face_ok, in_use, W, H) -> bool:
+    """Return whether all landmarks needed for this frame were detected."""
+    if not face_ok:
+        return False
+    visibility = pose[:4, 3]
+    if not (np.isfinite(visibility).all() and (visibility >= VIS_MIN).all()):
+        return False
+    left_shoulder = pose[P_LSH, :2].astype(np.float64) * [W, H]
+    right_shoulder = pose[P_RSH, :2].astype(np.float64) * [W, H]
+    shoulder_width = float(np.linalg.norm(left_shoulder - right_shoulder))
+    if not np.isfinite(shoulder_width) or shoulder_width <= 1.0:
+        return False
+    for h in (0, 1):
+        if in_use[h]:
+            if not np.isfinite(hands[h]).all():
+                return False
+            palm = np.linalg.norm(
+                (hands[h, 9, :2] - hands[h, 0, :2]) * [W, H]
+            )
+            if not np.isfinite(palm) or palm <= 1.0:
+                return False
+    return True
+
+
+def select_frames_from_span(features_with_idx: list) -> np.ndarray | None:
+    """Select 64 evenly spaced complete frames from one sign span."""
+    frame_count = len(features_with_idx)
+    if frame_count == 0:
         return None
 
-    left = None
-    right = None
+    complete = np.array([frame[2] for frame in features_with_idx], dtype=bool)
+    next_complete = np.empty(frame_count, int)
+    current = -1
+    for i in range(frame_count - 1, -1, -1):
+        if complete[i]:
+            current = i
+        next_complete[i] = current
 
-    for hlm, handedness in zip(res.multi_hand_landmarks, res.multi_handedness):
-        label = handedness.classification[0].label
-        pts = np.array(
-            [[p.x, p.y, p.z] for p in hlm.landmark],
-            dtype=np.float32
-        )
-        if label == "Left" and left is None:
-            left = pts
-        elif label == "Right" and right is None:
-            right = pts
+    positions = np.floor(
+        np.arange(N_FRAMES) * (frame_count - 1) / (N_FRAMES - 1) + 0.5
+    ).astype(int)
+    chosen = []
+    for position in positions:
+        complete_index = next_complete[position]
+        if complete_index < 0 or complete_index - position > MAX_GAP:
+            return None
+        chosen.append(complete_index)
 
-    ref_hand = right if right is not None else left
-    if ref_hand is None:
-        return None
-
-    ref = ref_hand[0]
-    scale = np.linalg.norm(ref_hand[9] - ref_hand[0]) + 1e-6
-
-    out_left = (left - ref) / scale if left is not None else np.zeros((21, 3), np.float32)
-    out_right = (right - ref) / scale if right is not None else np.zeros((21, 3), np.float32)
-
-    return np.concatenate([out_left.flatten(), out_right.flatten()])
-
-
-def extract_holistic_frame(frame_bgr: np.ndarray) -> np.ndarray | None:
-    """Hands (2x21x3) + pose (33x4) in the right-wrist frame -> (258,) float32.
-
-    Byte-for-byte the same geometry as ``train_daily6.extract_frame_vector``, so
-the daily-conversation LSTM sees at serving time what it saw while training.
-
-    Returns ``None`` unless BOTH hands and the pose are present: the pose block
-    is 132 of the 258 columns, and a zero-filled half would shift every column
-    the network learned. A miss is therefore reported as a miss and the caller
-    carries the previous vector forward, exactly as extraction does.
-    """
-    import cv2
-    rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-    res = _get_holistic().process(rgb)
-    if (not res.left_hand_landmarks or not res.right_hand_landmarks
-            or res.pose_landmarks is None):
-        return None
-    lh = np.array([[p.x, p.y, p.z] for p in res.left_hand_landmarks.landmark], np.float32)
-    rh = np.array([[p.x, p.y, p.z] for p in res.right_hand_landmarks.landmark], np.float32)
-    pose = pose_from_landmarks(res.pose_landmarks)
-    ref = rh[0]
-    scale = np.linalg.norm(rh[9] - rh[0]) + 1e-6
-    lh = (lh - ref) / scale
-    rh = (rh - ref) / scale
-    pose[:, :3] = (pose[:, :3] - ref) / scale
-    return np.concatenate([lh.flatten(), rh.flatten(), pose.flatten()]).astype(np.float32)
-
-
-def process_bgr_frame(
-    frame_bgr: np.ndarray,
-    width: int = HANDS_DIM,
-) -> np.ndarray | None:
-    """
-    Takes a BGR numpy frame (from cv2.imdecode),
-    returns a ``width``-dim landmark vector or None.
-
-    ``width`` is the feature contract the target graph declares: 126 for the
-two-hand vector, 258 for the holistic one. Any other value is a bug in the
-caller, so it fails loudly rather than feeding a wrongly-shaped tensor.
-    """
-    import cv2
-    if width == HOLISTIC_DIM:
-        # Holistic already runs the hand sub-model internally; running Hands as
-        # well would double the per-frame cost for the same answer.
-        return extract_holistic_frame(frame_bgr)
-    if width != HANDS_DIM:
-        raise ValueError(
-            f"No feature extractor emits {width}-dim vectors "
-            f"(supported: {HANDS_DIM} two-hand landmarks, "
-            f"{HOLISTIC_DIM} hands+pose holistic)."
-        )
-    rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-    results = _hands.process(rgb)
-    return extract_two_hands(results)
-
-
-def process_bgr_frames(frames_bgr: list) -> list:
-    """Vectorised batch form of :func:`process_bgr_frame`.
-
-    Live sign detection walks a sliding window of ~32 frames every tick, so
-    this exists to keep the per-frame bookkeeping in one place and to state
-    plainly what a window costs: one MediaPipe call per frame. The Hands graph
-    is built with ``max_num_hands=2`` and no face or pose sub-model, so it is the
-    cheapest graph available -- but it is still one call per frame.
-
-    Only the 126-dim contract is served here: it is the cheaper graph (no pose
-    sub-model). A 258-dim target goes through ``process_bgr_frame``, whose
-    Holistic graph adds the pose half the daily LSTM was trained on.
-
-    Neither path is genuinely batched. The graph rejects a list outright, and
-    passing one as ``image`` raises ``'list' object has no attribute 'shape'``:
-    the MediaPipe Python binding exposes no per-frame fan-out it will walk for us,
-    so a window costs one call per frame whichever contract is in use.
-
-    Frames are returned in order, one entry each, ``None`` where no hand was
-    found. The caller decides how to fill those gaps; this function deliberately
-    does not carry a previous vector forward, so that a gap is still visible as
-    \"the signer's hands left the frame\" rather than being papered over.
-    """
-    import cv2
-
-    if not frames_bgr:
-        return []
-    rgb_imgs = [cv2.cvtColor(f, cv2.COLOR_BGR2RGB) for f in frames_bgr]
-    return [extract_two_hands(_hands.process(img)) for img in rgb_imgs]
+    return np.stack([features_with_idx[i][1] for i in chosen])
 ```
 
 ---
@@ -510,9 +753,6 @@ def _load_dotenv():
 
 _load_dotenv()
 
-DEFAULT_BASE_URL = "https://api.openai.com/v1"
-DEFAULT_MODEL_NAME = "gpt-4o-mini"
-
 _KEYLESS_HOSTS = ("localhost", "127.0.0.1", "0.0.0.0", "::1")
 
 
@@ -528,20 +768,35 @@ def _env(name: str, default: str = "") -> str:
 
 
 def get_ai_config() -> dict:
-    configured_url = _env("AI_BASE_URL")
-    base_url = configured_url or DEFAULT_BASE_URL
-    is_local = any(h in base_url for h in _KEYLESS_HOSTS)
+    mode = _env("AI_MODE", "offline").lower()
+    if mode not in ("online", "offline"):
+        raise ValueError(f"AI_MODE must be 'online' or 'offline', got '{mode}'")
 
-    api_key = _env("AI_API_KEY")
+    if mode == "online":
+        base_url = _env("AI_ONLINE_BASE_URL")
+        api_key = _env("AI_ONLINE_API_KEY")
+        model = _env("AI_ONLINE_MODEL_NAME")
+    else:
+        base_url = _env("AI_OFFLINE_BASE_URL")
+        api_key = _env("AI_OFFLINE_API_KEY")
+        model = _env("AI_OFFLINE_MODEL_NAME")
+
+    if not base_url:
+        raise ValueError(f"AI_{mode.upper()}_BASE_URL is empty. Set it in .env.")
+    if not model:
+        raise ValueError(f"AI_{mode.upper()}_MODEL_NAME is empty. Set it in .env.")
+
+    is_local = urlparse(base_url).hostname in _KEYLESS_HOSTS
     if not api_key:
         api_key = "no-key-required" if is_local else ""
 
     return {
         "base_url": base_url.rstrip("/"),
         "api_key": api_key,
-        "model": _env("AI_MODEL_NAME", DEFAULT_MODEL_NAME),
+        "model": model,
         "is_local": is_local,
         "provider": "local" if is_local else "cloud",
+        "mode": mode,
         "configured": bool(api_key),
         "stream": _env_bool("AI_STREAM", True),
         "reasoning": _env_bool("AI_REASONING", True),
@@ -572,21 +827,6 @@ def build_user_message(gloss_text: str, meta: dict | None = None) -> str:
     meta = meta or {}
     lines: list[str] = []
 
-    nmm = meta.get("nmm") or {}
-    if isinstance(nmm, dict):
-        if nmm.get("negation"):
-            lines.append("- NEGATION: head shake detected. The signer negated it.")
-        if nmm.get("affirmation"):
-            lines.append("- AFFIRMATION: deliberate head nod detected.")
-        if nmm.get("wh_question"):
-            lines.append("- WH-QUESTION: brow furrow detected. Marked tokens are WH-questions.")
-        if nmm.get("question"):
-            lines.append(
-                "- POLAR QUESTION: eyebrow raise detected. Marked tokens are yes/no questions."
-            )
-        if nmm.get("emphasis"):
-            lines.append("- EMPHASIS: mouth opening detected on the marked token(s).")
-
     gloss_with_affect = gloss_text
     emotion = meta.get("emotion")
     if isinstance(emotion, dict):
@@ -607,11 +847,11 @@ def build_user_message(gloss_text: str, meta: dict | None = None) -> str:
     if hand:
         lines.append(f"- DOMINANT HAND: {hand}.")
 
-    if not lines and gloss_with_affect == gloss_text:
-        return gloss_text
+    if not lines:
+        return gloss_with_affect
 
     return (
-        "SIGN METADATA (detected non-manual markers and affect):\n"
+        "SIGN METADATA (affect and sign context):\n"
         + "\n".join(lines)
         + "\n\nGLOSS:\n"
         + gloss_with_affect
@@ -657,6 +897,7 @@ def _base_result(cfg: dict, **extra) -> dict:
         "status": "success",
         "engine": cfg["model"],
         "provider": cfg["provider"],
+        "mode": cfg.get("mode", "offline"),
         "endpoint": cfg["base_url"],
         "tokens_used": 0,
     }
@@ -664,7 +905,7 @@ def _base_result(cfg: dict, **extra) -> dict:
     return result
 
 
-def _offline_result(status: str, error: str, tokens: int = 0) -> dict:
+def _error_result(status: str, error: str, tokens: int = 0) -> dict:
     return _base_result(
         get_ai_config(), status=status, tokens_used=tokens, error=error
     )
@@ -825,10 +1066,10 @@ def stream_bengali(
 ) -> Iterator[dict]:
     cfg = get_ai_config()
     if not cfg["configured"]:
-        yield _offline_result(
+        yield _error_result(
             "llm_not_configured",
-            "No AI provider configured. Set AI_API_KEY (and AI_BASE_URL / "
-            "AI_MODEL_NAME) in .env -- see .env.example.",
+            f"No AI provider configured for AI_MODE={cfg['mode']}. "
+            "Configure the selected provider in the root .env.",
         ) | {"type": "error"}
         return
 
@@ -878,11 +1119,11 @@ def stream_bengali(
         )
 
     except httpx.TimeoutException:
-        yield _offline_result(
+        yield _error_result(
             "timeout", "LLM generation timed out. Try a shorter gloss."
         ) | {"type": "error"}
     except Exception as e:
-        yield _offline_result("error", str(e)) | {"type": "error"}
+        yield _error_result("error", str(e)) | {"type": "error"}
 
 
 def generate_bengali(
@@ -895,10 +1136,10 @@ def generate_bengali(
 ) -> dict:
     cfg = get_ai_config()
     if not cfg["configured"]:
-        return _offline_result(
+        return _error_result(
             "llm_not_configured",
-            "No AI provider configured. Set AI_API_KEY (and AI_BASE_URL / "
-            "AI_MODEL_NAME) in .env -- see .env.example.",
+            f"No AI provider configured for AI_MODE={cfg['mode']}. "
+            "Configure the selected provider in the root .env.",
         )
 
     if stream is None:
@@ -915,7 +1156,7 @@ def generate_bengali(
         ):
             if event["type"] in ("done", "error"):
                 final = event
-        final = dict(final or _offline_result("error", "Empty stream"))
+        final = dict(final or _error_result("error", "Empty stream"))
         final.pop("type", None)
         return final
 
@@ -947,11 +1188,11 @@ def generate_bengali(
         )
 
     except httpx.TimeoutException:
-        return _offline_result(
+        return _error_result(
             "timeout", "LLM generation timed out. Try a shorter gloss."
         )
     except Exception as e:
-        return _offline_result("error", str(e))
+        return _error_result("error", str(e))
 
 
 def generate_bengali_with_uncertainty(
@@ -1133,9 +1374,8 @@ def break_into_glosses(text: str, vocab: list[str]) -> dict:
 """
 backend/main.py
 Complete FastAPI backend for WBSL Bridge.
-Loads the active run from models/onnx_models/ via the registry, serves predictions,
-NMM, TTS, NLG, model-bundled landmark simulations, and community ingestion
-(uploaded video -> landmarks -> .npy + manifest).
+Loads the active 98-dim temporal model and serves sign recognition, avatar
+simulation, TTS, STT, and Bengali NLG.
 
 Run:
     cd "d:\\Download\\Projects\\WBSL Bridge"
@@ -1143,8 +1383,9 @@ Run:
 """
 
 import os
-import sys
 import logging
+import math
+import time
 
 # Suppress noisy C++/native logging from TensorFlow Lite, MediaPipe, and Abseil
 os.environ["GLOG_minloglevel"] = "2"
@@ -1155,10 +1396,7 @@ logging.getLogger("absl").setLevel(logging.ERROR)
 import difflib
 import json
 import re
-import tempfile
-import time
 import unicodedata
-import uuid
 from pathlib import Path
 
 import cv2
@@ -1170,9 +1408,20 @@ from fastapi.responses import FileResponse, Response, StreamingResponse
 from pydantic import BaseModel
 
 # Local imports
-from backend.extract import process_bgr_frame, HANDS_DIM, HOLISTIC_DIM
-from backend.nmm import detect_nmm, reset_nmm_state, emotion_available
-from backend.streaming import get_session, last_vector
+from backend.extract import (
+    N_FEATURES,
+    N_FRAMES,
+    complete_mask_single,
+    frame_features,
+    frame_in_use,
+    process_holistic_frame,
+    select_frames_from_span,
+)
+from backend.emotion_engine import detect_emotion_from_frame, emotion_available
+from backend.streaming import (
+    get_session,
+    update_span_state,
+)
 from backend.llm_engine import (
     generate_bengali,
     generate_bengali_with_uncertainty,
@@ -1185,13 +1434,7 @@ from backend.llm_engine import (
 # ─────────────────────────────────────────────
 # PATHS
 # ─────────────────────────────────────────────
-# ONNX Runtime refuses any graph input tensor above ``session.max_graph_input_size``
-# (1 GiB by default). ``/api/predict/clip`` packs a whole T-frame clip into ONE
-# tensor: 32 frames x 126 features x 4 bytes is only ~16 KB, so the clip route
-# itself is fine -- but the limit is the kind that only trips on the biggest
-# uploads, producing a 500 that reads as "the model detected nothing". Raise it
-# once, centrally, so no route has to think about it. Declared here because the
-# model registry below loads graphs at import time.
+# Bound ONNX Runtime's graph input memory for the active temporal model.
 _ORT_OPTIONS = ort.SessionOptions()
 _ORT_OPTIONS.add_session_config_entry(
     "session.max_graph_input_size", "4294967296")  # 4 GiB
@@ -1199,57 +1442,15 @@ _ORT_OPTIONS.add_session_config_entry(
 ROOT = Path(__file__).resolve().parent.parent
 MODELS_DIR = ROOT / "models"
 RUNS_DIR = MODELS_DIR / "onnx_models"
-MODEL_PATH = MODELS_DIR / "sign_mlp.onnx"          # legacy default (may not exist)
-CLASSES_PATH = MODELS_DIR / "sign_classes.json"    # legacy default (may not exist)
 TTS_DIR = ROOT / "backend" / "tts_output"
 TTS_DIR.mkdir(exist_ok=True)
 
 # ─────────────────────────────────────────────
-# COMMUNITY DATASET STORAGE (manifest + npy)
-# ─────────────────────────────────────────────
-DATASET_DIR = ROOT / "backend" / "data" / "community_dataset"
-SAMPLES_DIR = DATASET_DIR / "samples"
-SAMPLES_DIR.mkdir(parents=True, exist_ok=True)
-MANIFEST_PATH = DATASET_DIR / "manifest.jsonl"
-TRAINING_DATA_DIR = ROOT / "model_training_zone" / "dataset"
-
-
-def _load_manifest():
-    items = []
-    if MANIFEST_PATH.exists():
-        for line in MANIFEST_PATH.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if line:
-                try:
-                    items.append(json.loads(line))
-                except json.JSONDecodeError:
-                    continue
-    return items
-
-
-def _write_manifest(items):
-    with open(MANIFEST_PATH, "w", encoding="utf-8") as f:
-        for r in items:
-            f.write(json.dumps(r, ensure_ascii=False) + "\n")
-
-
-# ─────────────────────────────────────────────
 # MODEL REGISTRY (auto-discovery + admin selection)
 # ─────────────────────────────────────────────
-# Every training run writes its artefacts into  models/onnx_models/<run>/
-#   * temporal : LSTM / unified / video runs  -> artefact name says so
-#   * static   : frame classifier, input width probed from the graph
-#   * classes  : <name>_classes.json (sibling), else sign_classes.json
-# Non-.onnx files (e.g. the .gguf LLM) are ignored. The newest run wins at
-# startup. The admin panel can override the choice; the override is stored in
-# models/active_model.json and survives restarts.
-#
-# Each model bundle includes replay sequences for the classes it can emit.
-SEQ_T = 32
+SEQ_T = N_FRAMES
+FEATURE_WIDTH = N_FEATURES
 NON_SIGN_CLASSES = {"NONE", "BACKGROUND"}
-# Feature widths the serving layer can actually feed. Both are produced by
-# backend/extract.py; the graph's declared input width picks between them.
-SERVABLE_WIDTHS = (HANDS_DIM, HOLISTIC_DIM)
 ACTIVE_MODEL_PATH = MODELS_DIR / "active_model.json"
 
 
@@ -1306,31 +1507,10 @@ def _discover_models():
                     classes = json.loads(classes_file.read_text(encoding="utf-8"))
                 except Exception:
                     classes = []
-            missing_sequences = [
-                label for label in classes
-                if label not in NON_SIGN_CLASSES
-                and not (folder / "npy" / f"{label}.npy").is_file()
-            ]
-            if missing_sequences:
-                print(
-                    f"[WBSL Backend] Skipping {onnx_file}: missing bundled "
-                    f"sequences for {', '.join(missing_sequences[:5])}"
-                )
-                continue
-            # A static classifier is only usable if it takes a frame vector this
-            # layer can produce (126 hands, or 258 hands+pose); temporal runs
-            # ingest a (T, width) sequence. Both are probed, so a run with no
-            # classes or an unloadable graph is dropped rather than silently
-            # winning the "newest" race.
-            #
-            # The probe reads BOTH the rank and the middle axis. Width alone is
-            # ambiguous: a static [N,126] and a temporal [N,32,126] both end in
-            # 126, so a width-only check can never tell them apart (this was the
-            # root cause of a temporal model silently failing on a single frame).
             name = onnx_file.stem
             input_width = None
             input_rank = None
-            frames = 1
+            frames = None
             try:
                 probe = ort.InferenceSession(
                     str(onnx_file), providers=["CPUExecutionProvider"])
@@ -1338,47 +1518,27 @@ def _discover_models():
                 input_rank = len(shape)
                 input_width = shape[-1] if isinstance(shape[-1], int) else None
                 if input_rank >= 3 and isinstance(shape[-2], int):
-                    frames = shape[-2]          # the declared clip length
+                    frames = shape[-2]
             except Exception as exc:                   # noqa: BLE001
                 print(f"[WBSL Backend] Skipping unloadable graph {onnx_file}: {exc}")
                 continue
-            invalid_sequence = None
-            bundled_width = None
-            for label in classes:
-                if label in NON_SIGN_CLASSES:
-                    continue
-                sequence_path = folder / "npy" / f"{label}.npy"
-                try:
-                    sequence = np.load(sequence_path, mmap_mode="r", allow_pickle=False)
-                except (OSError, ValueError) as exc:
-                    invalid_sequence = f"{label}: {exc}"
-                    break
-                sequence_width = sequence.shape[-1] if sequence.ndim in (2, 3) else None
-                if (
-                    sequence_width not in SERVABLE_WIDTHS
-                    or (input_width is not None and sequence_width != input_width)
-                    or (bundled_width is not None and sequence_width != bundled_width)
-                ):
-                    invalid_sequence = (
-                        f"{label} has shape {sequence.shape}; expected "
-                        f"a 126- or 258-wide landmark sequence matching the graph"
-                    )
-                    break
-                bundled_width = sequence_width
-            if invalid_sequence:
+            if input_rank != 3 or frames != SEQ_T:
                 print(
-                    f"[WBSL Backend] Skipping {onnx_file}: invalid bundled "
-                    f"landmark sequence ({invalid_sequence})"
+                    f"[WBSL Backend] Skipping {onnx_file}: expected rank-3 "
+                    f"input with {SEQ_T} frames, got rank={input_rank}, frames={frames}"
                 )
                 continue
-            if input_width is None:
-                input_width = bundled_width
-            # The graph's own shape is the authority. The filename heuristic is
-            # kept only as a tie-breaker for graphs whose sequence axis is
-            # dynamic (rare here, but a run named *_lstm with a symbolic T is
-            # still temporal, just unpinnable to a frame count).
-            name_says_temporal = any(k in name for k in ("lstm", "unified", "video"))
-            is_temporal = input_rank >= 3 or (input_rank == 2 and name_says_temporal)
+            if input_width != FEATURE_WIDTH:
+                print(
+                    f"[WBSL Backend] Skipping {onnx_file}: input width "
+                    f"{input_width} != {FEATURE_WIDTH}"
+                )
+                continue
+            avatar_dir = folder / "avatar"
+            has_avatar = avatar_dir.is_dir()
+            if not classes:
+                print(f"[WBSL Backend] Skipping {onnx_file}: no class list found")
+                continue
             try:
                 mtime = onnx_file.stat().st_mtime
             except OSError:
@@ -1391,12 +1551,14 @@ def _discover_models():
                 "path": str(onnx_file),
                 "classes_path": str(classes_file) if classes_file else None,
                 "classes": len(classes),
-                "temporal": is_temporal,
+                "temporal": True,
                 "input_width": input_width,
                 "input_rank": input_rank,
                 "frames": frames,
-                # The endpoint a request must hit for this graph to be usable.
-                "endpoint": "/api/predict/clip" if is_temporal else "/api/predict/frame",
+                "endpoint": "/api/stream/frame",
+                "has_avatar": has_avatar,
+                "report": {},
+                "confusion": {},
                 "has_external_data": external.exists(),
                 "size_mb": round(onnx_file.stat().st_size / (1024 * 1024), 2)
                 if onnx_file.exists() else 0.0,
@@ -1419,26 +1581,6 @@ def _discover_models():
     return [d for d in found if d["classes"] > 0]
 
 
-def _preferred_model(registry):
-    """Resolve which discovered model to activate."""
-    wanted = None
-    if ACTIVE_MODEL_PATH.exists():
-        try:
-            wanted = json.loads(ACTIVE_MODEL_PATH.read_text(encoding="utf-8")).get("path")
-        except Exception:
-            wanted = None
-    if wanted:
-        for d in registry:
-            if d["path"] == wanted:
-                return d
-        print(f"[WBSL Backend] Configured model missing, falling back to newest: {wanted}")
-    # prefer the newest temporal model, else the newest of anything
-    for d in registry:
-        if d["temporal"]:
-            return d
-    return registry[0]
-
-
 class ModelRegistry:
     """Holds the discovered artefacts and the currently loaded model.
 
@@ -1448,12 +1590,14 @@ class ModelRegistry:
     def __init__(self):
         self.models = []
         self.active = None
-        self.session = None           # static 126-landmark MLP
+        self.session = None
         self.input_name = None
         self.classes = []
-        self.temporal_session = None  # unified LSTM (None for static models)
+        self.temporal_session = None
         self.temporal_input = None
         self.temporal_classes = []
+        self.report = {}
+        self.confusion = {}
         self.error = None
         self.reload()
 
@@ -1498,6 +1642,21 @@ class ModelRegistry:
             self.input_name = self.session.get_inputs()[0].name
             self.classes = json.loads(
                 Path(target["classes_path"]).read_text(encoding="utf-8"))
+            report_file = Path(target["path"]).parent / "daily_report.json"
+            confusion_file = Path(target["path"]).parent / "confusion_matrix.json"
+            self.report = {}
+            self.confusion = {}
+            for path, key in ((report_file, "report"), (confusion_file, "confusion")):
+                if path.exists():
+                    try:
+                        value = json.loads(path.read_text(encoding="utf-8"))
+                    except (OSError, json.JSONDecodeError) as exc:
+                        print(f"[WBSL Backend] Could not load {path.name}: {exc}")
+                    else:
+                        if key == "report":
+                            self.report = value
+                        else:
+                            self.confusion = value
             self.temporal_session = None
             self.temporal_input = None
             self.temporal_classes = []
@@ -1552,18 +1711,6 @@ ACTIVE_MODEL = REGISTRY.active
 ACTIVE_CLASSES = REGISTRY.active_classes
 
 
-def _active_width() -> int:
-    """Feature width the active graph declares, defaulting to the two-hand vector.
-
-    Every prediction route needs this before it can call an extractor: 126 and
-    258 are different tensors, not the same tensor padded. Routing on the
-    graph's own shape keeps the 126-dim MLP runs working unchanged while letting
-    a 258-dim run (train_daily6) be fed what it was trained on.
-    """
-    width = (REGISTRY.active or {}).get("input_width")
-    return width if width in SERVABLE_WIDTHS else HANDS_DIM
-
-
 def _active_run_dir():
     """Return the bundle directory for the currently selected ONNX model."""
     active = REGISTRY.active
@@ -1572,92 +1719,22 @@ def _active_run_dir():
     return Path(active["path"]).parent
 
 
-def _model_sequence_path(label: str):
-    """Resolve a sequence only from the active model's bundled training data."""
-    normalized = label.upper().replace(" ", "_")
-    if normalized == "NONE" or normalized not in REGISTRY.active_classes:
-        return None
-    run_dir = _active_run_dir()
-    if run_dir is None:
-        return None
-    path = run_dir / "npy" / f"{normalized}.npy"
-    return path if path.is_file() else None
-
-
 def _available_model_classes():
-    """Vocabulary that the active model can both recognize and replay."""
+    """Return sign labels in the active model vocabulary."""
     return [
         label for label in REGISTRY.active_classes
-        if label not in NON_SIGN_CLASSES and _model_sequence_path(label) is not None
+        if label not in NON_SIGN_CLASSES
     ]
 
-
-def resample_feature_width(seq: np.ndarray, width: int) -> np.ndarray:
-    """Re-widen a stored landmark clip to the width the active graph expects.
-
-    Community recordings store the 126-dim two-hand vector, so a 258-dim graph
-    cannot be fed one as-is. Only the pose
-    block (columns 126:258) is missing; the hand block and its normalization are
-    already shared, so the pose columns are zero-padded rather than recomputed
-    from video that is no longer on hand. The model then sees a sign performed
-    with the body out of frame -- lossy, and deliberately so: the alternative is
-    refusing to serve every stored clip once a holistic model is active.
-    """
-    if seq.shape[-1] == width:
-        return seq
-    if width == HOLISTIC_DIM and seq.shape[-1] == HANDS_DIM:
-        pad = np.zeros((*seq.shape[:-1], HOLISTIC_DIM - HANDS_DIM), np.float32)
-        return np.concatenate([seq.astype(np.float32), pad], axis=-1)
-    if width == HANDS_DIM and seq.shape[-1] == HOLISTIC_DIM:
-        return seq[..., :HANDS_DIM].astype(np.float32)
-    raise ValueError(
-        f"Stored clip is {seq.shape[-1]}-wide and cannot be served to a "
-        f"{width}-wide graph."
-    )
 
 # ─────────────────────────────────────────────
 # FASTAPI APP
 # ─────────────────────────────────────────────
 
-# ─────────────────────────────────────────────
-# IN-MEMORY STATE
-# ─────────────────────────────────────────────
-def _sample_counts_by_label():
-    counts = {}
-    for record in _load_manifest():
-        label = record.get("label")
-        if not label:
-            continue
-        status = record.get("verification")
-        count_key = {
-            "accepted": "approved_samples",
-            "pending": "pending_samples",
-            "needs_review": "pending_samples",
-            "rejected": "rejected_samples",
-        }.get(status)
-        if count_key:
-            totals = counts.setdefault(label, {
-                "approved_samples": 0,
-                "pending_samples": 0,
-                "rejected_samples": 0,
-            })
-            totals[count_key] += 1
-    return counts
-
-
-def _refresh_catalog_sample_counts():
-    counts = _sample_counts_by_label()
-    for sign in sign_catalog:
-        sign.update(counts.get(sign["label"], {
-            "approved_samples": 0,
-            "pending_samples": 0,
-            "rejected_samples": 0,
-        }))
-
-
 def _build_catalog():
-    sample_counts = _sample_counts_by_label()
     classes = _available_model_classes()
+    run_dir = _active_run_dir()
+    avatar_dir = run_dir / "avatar" if run_dir else None
     catalog = [
         {
             "id": str(i),
@@ -1665,12 +1742,8 @@ def _build_catalog():
             "bengali_meaning": c.replace("_", " ").title(),
             "category": "Alphabet" if len(c) == 1 and c.isalpha() else "Word",
             "type": "word",
-            "has_landmarks": True,
-            **sample_counts.get(c, {
-                "approved_samples": 0,
-                "pending_samples": 0,
-                "rejected_samples": 0,
-            }),
+            "has_landmarks": bool(avatar_dir and (avatar_dir / c).is_dir()),
+            "has_avatar": bool(avatar_dir and (avatar_dir / c).is_dir()),
             "language": "ISL",
         }
         for i, c in enumerate(classes)
@@ -1679,13 +1752,23 @@ def _build_catalog():
 
 
 def _coverage_summary():
-    """Report classes bundled with replayable sequences for the active model."""
-    available = set(_available_model_classes())
+    """Report avatar-data coverage for the active model vocabulary."""
     recognized = [c for c in REGISTRY.active_classes if c not in NON_SIGN_CLASSES]
+    run_dir = _active_run_dir()
+    avatar_dir = run_dir / "avatar" if run_dir else None
+    available = (
+        {folder.name.upper() for folder in avatar_dir.iterdir() if folder.is_dir()}
+        if avatar_dir and avatar_dir.is_dir()
+        else set()
+    )
+    covered = [label for label in recognized if label in available]
+    missing = [label for label in recognized if label not in available]
     return {
         "total_classes": len(recognized),
-        "with_landmark_sequences": len(available),
-        "missing_sequences": [c for c in recognized if c not in available],
+        "with_avatar_data": len(covered),
+        "missing_avatar_data": missing,
+        "with_landmark_sequences": len(covered),
+        "missing_sequences": missing,
     }
 
 
@@ -1723,88 +1806,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ─────────────────────────────────────────────
-# NMM / AFFECT SENSITIVITY CONFIGURATION
-# ─────────────────────────────────────────────
-from backend.nmm import get_nmm_config, update_marker_gates, update_nmm_thresholds
-
-
-@app.get("/api/nmm/config")
-def get_nmm_settings():
-    return get_nmm_config()
-
-
-@app.post("/api/nmm/config")
-def set_nmm_settings(payload: dict):
-    """Update sensitivity thresholds and/or the per-marker enable gates.
-
-    One endpoint for both because the panel edits them together and a single
-    POST is what keeps the two in step. ``marker_gates`` is nested rather than
-    flattened because a marker name like ``negation`` is both a gate and a flag
-    in the detection output, and keeping the gates in their own object means a
-    future non-boolean threshold can never collide with one.
-    """
-    gates = payload.pop("marker_gates", None)
-    if isinstance(gates, dict):
-        update_marker_gates(gates)
-    if payload:
-        update_nmm_thresholds(payload)
-    return get_nmm_config()
-
-
 def _check_model_available(path):
-    """Guards against activating a graph the serving layer cannot feed.
-
-    There are two servable contracts, and they are distinguished by RANK, not
-    by width:
-
-      * static   ``[N, 126]`` / ``[N, 258]``  fed by ``/api/predict/frame`` (one frame)
-      * temporal ``[N, T, 126]`` / ``[N, T, 258]``  fed by ``/api/predict/clip``
-
-    The two widths are the two feature extractors in ``backend/extract.py``:
-    126 is the two-hand landmark vector, 258 adds the 33x4 pose block that
-    ``train_daily6.py`` learns. Rank is what separates a frame classifier from a
-    clip classifier -- width alone cannot, because both end in the same number.
-
-    Returns an error string, or None when the model is safe to activate."""
+    """Ensure the selected graph matches the active 64x98 feature contract."""
     desc = next((m for m in REGISTRY.models if m["path"] == path), None)
     if desc is None:
         return f"Model not in registry: {path}"
-    try:
-        classes = json.loads(Path(desc["classes_path"]).read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        return f"Cannot read the class list for '{desc['name']}': {exc}"
-    run_dir = Path(desc["path"]).parent
-    missing_sequences = [
-        label for label in classes
-        if label not in NON_SIGN_CLASSES
-        and not (run_dir / "npy" / f"{label}.npy").is_file()
-    ]
-    if missing_sequences:
-        preview = ", ".join(missing_sequences[:5])
-        suffix = "..." if len(missing_sequences) > 5 else ""
-        return (
-            f"'{desc['name']}' is missing bundled landmark sequences for "
-            f"{preview}{suffix}. Re-train it with the current training pipeline."
-        )
-    # Both contracts are servable: the frame route handles rank 2, the clip
-    # route handles rank 3. What is NOT servable is a graph whose last axis is
-    # not one of the feature vectors this layer emits -- feed it anything else
-    # and the run() raises a shape error the user reads as "detected nothing".
-    if desc.get("input_width") in SERVABLE_WIDTHS:
+    if (
+        desc.get("input_rank") == 3
+        and desc.get("frames") == SEQ_T
+        and desc.get("input_width") == FEATURE_WIDTH
+    ):
         return None
-    if desc.get("input_width") is None:
-        return (
-            f"'{desc['name']}' declares an open-ended final input axis, so its "
-            f"feature width cannot be verified against the extractors this "
-            f"backend serves. Re-export the graph with a fixed feature "
-            f"dimension."
-        )
     return (
-        f"'{desc['name']}' expects {desc['input_width']}-wide inputs, but the "
-        f"feature extractors in this project emit either a "
-        f"{HANDS_DIM}-dim two-hand landmark vector or a {HOLISTIC_DIM}-dim "
-        f"hands+pose holistic vector."
+        f"'{desc['name']}' does not match the required "
+        f"(batch, {SEQ_T}, {FEATURE_WIDTH}) model input."
     )
 
 
@@ -1812,20 +1827,17 @@ def _check_model_available(path):
 def health(response: Response):
     ai = get_ai_config()
     active = REGISTRY.active or {}
-    # This probes the LLM provider, which is a deliberate round trip that costs
-    # real time when the provider is absent. Every page fetches it on mount just
-    # to learn which prediction route is valid, so let the browser reuse the
-    # answer for a few seconds instead of re-probing on every navigation.
     response.headers["Cache-Control"] = "public, max-age=5"
     return {
         "api": True,
-        "model": True,
+        "model": REGISTRY.session is not None,
         "tts": True,
         "llm": is_llm_available(),
         "inference_mode": ai["provider"],
+        "ai_mode": ai["mode"],
         "llm_model": ai["model"],
         "dataset_version": "v0.1",
-        "model_version": "LSTM-unified" if REGISTRY.temporal_session else "MLP-static",
+        "model_version": active.get("name", "unavailable"),
         "unified": REGISTRY.temporal_session is not None,
         "active_classes": len(REGISTRY.active_classes),
         "vocabulary_classes": len(_available_model_classes()),
@@ -1833,22 +1845,15 @@ def health(response: Response):
         "model_run": REGISTRY.active["run"] if REGISTRY.active else None,
         "model_path": REGISTRY.active_id(),
         "model_error": REGISTRY.error,
-        # The contract, published so the UI knows which button to enable BEFORE
-        # the user clicks. A temporal model needs a 32-frame clip; a static one
-        # needs a single frame. Getting this wrong is what made the LSTM runs
-        # look like they "detected nothing".
+        # Publish the temporal model contract so clients can match their stream
+        # buffers to the exact input expected by the active model.
         "contract": {
-            "kind": "temporal" if active.get("temporal") else "static",
+            "kind": "temporal",
             "input_rank": active.get("input_rank"),
-            "frames": active.get("frames", 1),
+            "frames": active.get("frames", SEQ_T),
             "feature_width": active.get("input_width"),
-            # The extractor this width selects. Published for the same reason as
-            # the endpoint: a 258-dim graph needs hands AND pose in frame, and a
-            # client that knows that can tell the user to step back.
-            "feature_kind": ("two_hand" if active.get("input_width") == HANDS_DIM
-                             else "hands_pose" if active.get("input_width") == HOLISTIC_DIM
-                             else None),
-            "endpoint": active.get("endpoint", "/api/predict/frame"),
+            "feature_kind": "shoulder_box_98",
+            "endpoint": active.get("endpoint", "/api/stream/frame"),
         },
         "sequence_coverage": _coverage_summary(),
         "emotion_available": emotion_available(),
@@ -1901,432 +1906,380 @@ def admin_activate_model(payload: ModelSelectRequest):
             "models": REGISTRY.public_models()}
 
 
-# ─────────────────────────────────────────────
-# DATASET / SIGNS
-# ─────────────────────────────────────────────
-@app.get("/api/dataset/signs")
-def get_signs(
+@app.get("/api/admin/model/report")
+def admin_model_report():
+    return REGISTRY.report or {}
+
+
+@app.get("/api/admin/model/confusion")
+def admin_model_confusion():
+    return REGISTRY.confusion or {}
+
+
+@app.get("/api/admin/model/avatar-list")
+def admin_avatar_list():
+    run_dir = _active_run_dir()
+    avatar_dir = run_dir / "avatar" if run_dir else None
+    if not avatar_dir or not avatar_dir.is_dir():
+        return {"glosses": []}
+    return {
+        "glosses": sorted(folder.name for folder in avatar_dir.iterdir() if folder.is_dir())
+    }
+
+
+@app.get("/api/admin/model/training-data")
+def admin_training_data(
     page: int = 1,
-    limit: int = 20,
+    limit: int = 12,
     search: str = "",
     category: str = "",
-    language: str = "",
+    dialect: str = "",
 ):
-    filtered = sign_catalog
-    if search:
-        q = search.lower()
-        filtered = [
-            s for s in filtered
-            if q in s["label"].lower() or q in s["bengali_meaning"]
-        ]
-    if category:
-        filtered = [s for s in filtered if s["category"].lower() == category.lower()]
-    if language:
-        filtered = [s for s in filtered if s["language"] == language]
+    """Paginate the training clips archived with the active model."""
+    if category and category.lower() not in {"alphabet", "word"}:
+        raise HTTPException(422, "category must be 'Alphabet' or 'Word'.")
+    run_dir = _active_run_dir()
+    feature_dir = run_dir / "training_data" / "features" if run_dir else None
+    metadata_file = feature_dir / "extract_report.json" if feature_dir else None
+    metadata = {}
+    if metadata_file and metadata_file.is_file():
+        try:
+            metadata = json.loads(metadata_file.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            logging.exception("Could not read archived extraction report %s", metadata_file)
+            raise HTTPException(500, "Could not read the active model's training-data metadata.") from exc
 
-    total = len(filtered)
+    dataset_name = re.split(r"[\\/]", str(metadata.get("dataset", "")))[-1]
+    dataset_dialect = (
+        dataset_name[:-6]
+        if dataset_name.upper().endswith("_VIDEO")
+        else dataset_name or "Unspecified"
+    )
+    clips_by_gloss = {}
+    for source in metadata.get("videos", []):
+        if source.get("status") != "kept":
+            continue
+        gloss = source.get("gloss")
+        if not gloss:
+            continue
+        clips_by_gloss.setdefault(gloss, []).append({
+            "row": source.get("row"),
+            "source_video": source.get("path"),
+            "dialect": source.get("dialect") or dataset_dialect,
+        })
+
+    available = []
+    if feature_dir and feature_dir.is_dir():
+        for gloss in _available_model_classes():
+            path = feature_dir / f"{gloss}.npy"
+            if not path.is_file():
+                continue
+            try:
+                clips = np.load(path, mmap_mode="r", allow_pickle=False)
+            except (OSError, ValueError) as exc:
+                logging.exception("Could not read archived training data %s", path)
+                raise HTTPException(500, f"Could not read archived training data for {gloss}.") from exc
+            if clips.ndim != 3 or clips.shape[1:] != (N_FRAMES, N_FEATURES):
+                raise HTTPException(500, f"Archived training data for {gloss} has an invalid shape.")
+            sign_category = "Alphabet" if len(gloss) == 1 and gloss.isalpha() else "Word"
+            gloss_dialects = sorted({
+                source["dialect"] for source in clips_by_gloss.get(gloss, [])
+            }) or [dataset_dialect]
+            if (
+                search.lower() in gloss.lower()
+                and (not category or sign_category.lower() == category.lower())
+                and (not dialect or dialect in gloss_dialects)
+            ):
+                available.append({
+                    "gloss": gloss,
+                    "category": sign_category,
+                    "dialects": gloss_dialects,
+                    "clip_count": int(clips.shape[0]),
+                })
+
+    available_dialects = sorted({
+        source["dialect"]
+        for sources in clips_by_gloss.values()
+        for source in sources
+    }) or [dataset_dialect]
+    if dialect and dialect not in available_dialects:
+        raise HTTPException(422, "dialect must match a dialect available in the active model's training data.")
+    total = len(available)
+    page = max(1, page)
+    limit = max(1, min(limit, 1000))
     start = (page - 1) * limit
-    end = start + limit
     return {
-        "items": filtered[start:end],
+        "items": available[start : start + limit],
         "total": total,
         "page": page,
         "limit": limit,
         "total_pages": max(1, (total + limit - 1) // limit),
+        "model_id": run_dir.name if run_dir else None,
+        "dialects": available_dialects,
     }
 
 
-@app.get("/api/dataset/signs/{sign_id}")
-def get_sign_by_id(sign_id: str):
-    for s in sign_catalog:
-        if s["id"] == sign_id:
-            return s
-    raise HTTPException(status_code=404, detail="Sign not found")
-
-
-@app.get("/api/dataset/stats")
-def dataset_stats():
-    total_signs = len(sign_catalog)
-    total_approved = sum(s["approved_samples"] for s in sign_catalog)
-    total_pending = sum(s["pending_samples"] for s in sign_catalog)
-    total_rejected = sum(s["rejected_samples"] for s in sign_catalog)
-    languages = list(set(s["language"] for s in sign_catalog))
-    categories = list(set(s["category"] for s in sign_catalog))
-    return {
-        "total_signs": total_signs,
-        "total_approved_samples": total_approved,
-        "total_pending_samples": total_pending,
-        "total_rejected_samples": total_rejected,
-        "languages": languages,
-        "categories": categories,
-        "dataset_version": "v0.1",
-        "model_version": REGISTRY.active["name"] if REGISTRY.active else "none",
-    }
-
-
-# ─────────────────────────────────────────────
-# PREDICTION: frame → landmark → MLP + NMM
-# ─────────────────────────────────────────────
-class PredictResponse(BaseModel):
-    detected: bool
-    label: str
-    confidence: float
-    top5: list
-    hands_detected: int
-    nmm: dict
-    # Affect + raw NMM geometry. These MUST be declared here: FastAPI validates
-    # the response against this model and silently DROPS undeclared keys, so
-    # detect_nmm() computing an emotion the model does not list means the client
-    # never receives it.
-    emotion: dict | None = None
-    metrics: dict | None = None
-
-
-@app.post("/api/predict/frame", response_model=PredictResponse)
-async def predict_frame(file: UploadFile = File(...)):
-    # A temporal graph declares [N, T, 126]: it cannot be fed one frame. Without
-    # this guard the run() below raises a shape error, the client sees a 500, and
-    # the model looks like it "detects nothing". Fail loudly and name the
-    # endpoint that CAN serve it instead.
-    if REGISTRY.temporal_session is not None:
-        frames = (REGISTRY.active or {}).get("frames", SEQ_T)
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                f"The active model '{REGISTRY.active['name']}' is temporal and "
-                f"expects a clip of {frames} frames, not a single frame. Use "
-                f"POST /api/predict/clip, or activate a static model "
-                f"(e.g. a 126-input MLP) in the admin panel."
-            ),
-        )
+@app.get("/api/admin/model/training-data/{gloss}/clips/{clip_index}")
+def admin_training_clip(gloss: str, clip_index: int):
+    """Load one feature sequence from the active model's archived dataset."""
+    if gloss not in _available_model_classes():
+        raise HTTPException(404, "Training gloss not found for the active model.")
+    run_dir = _active_run_dir()
+    path = run_dir / "training_data" / "features" / f"{gloss}.npy" if run_dir else None
+    if not path or not path.is_file():
+        raise HTTPException(404, "This model does not have archived training data.")
     try:
-        raw = await file.read()
-        nparr = np.frombuffer(raw, np.uint8)
-        frame_bgr = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-
-        if frame_bgr is None:
-            raise HTTPException(status_code=400, detail="Could not decode image")
-
-        vec = process_bgr_frame(frame_bgr, _active_width())
-        nmm_flags = detect_nmm(frame_bgr)
-
-        if vec is None:
-            return PredictResponse(
-                detected=False,
-                label="NO_HAND",
-                confidence=0.0,
-                top5=[],
-                hands_detected=0,
-                nmm=nmm_flags,
-                emotion=nmm_flags.get("emotion"),
-                metrics=nmm_flags.get("metrics"),
-            )
-
-        # The width is the graph's, not a constant: a 126-dim MLP wants the
-        # two-hand vector, the 258-dim daily LSTM wants hands + pose. Hard-coding
-        # 126 here is what made the LSTM runs fail with a shape error.
-        width = _active_width()
-        logits = session.run(None, {INPUT_NAME: vec.reshape(1, width)})[0][0]
-        probs = np.exp(logits - logits.max())
-        probs = probs / probs.sum()
-
-        top_idx = np.argsort(probs)[::-1][:5]
-        top5 = [
-            {"label": CLASSES[i], "confidence": float(probs[i])}
-            for i in top_idx
-        ]
-
-        best = int(top_idx[0])
-        return PredictResponse(
-            detected=True,
-            label=CLASSES[best],
-            confidence=float(probs[best]),
-            top5=top5,
-            hands_detected=1,
-            nmm=nmm_flags,
-            emotion=nmm_flags.get("emotion"),
-            metrics=nmm_flags.get("metrics"),
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# ─────────────────────────────────────────────
-# PREDICTION: T-frame clip → temporal model
-# ─────────────────────────────────────────────
-@app.post("/api/predict/clip")
-async def predict_clip(files: list[UploadFile] = File(...)):
-    if unified_session is None:
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                "The active model is static and expects a single frame. Use "
-                "POST /api/predict/frame, or activate a temporal (LSTM) model "
-                "in the admin panel."
-            ),
-        )
-    # Read the clip length from the graph's own contract rather than assuming
-    # SEQ_T: a run may be exported with a different T, and silently resampling
-    # to the wrong length produces confident nonsense instead of an error.
-    want_t = (REGISTRY.active or {}).get("frames") or SEQ_T
-    width = _active_width()
-    vecs, last = [], None
-    for f in files:
-        raw = await f.read()
-        fr = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
-        if fr is None:
-            continue
-        v = process_bgr_frame(fr, width)
-        if v is not None:
-            last = v
-        vecs.append(v if v is not None else last)
-    vecs = [v for v in vecs if v is not None]
-    if len(vecs) < 8:
-        return {"ready": False, "detail": "No hands detected in clip"}
-    arr = np.array(vecs, np.float32)
-    if len(arr) != want_t:
-        arr = arr[np.linspace(0, len(arr) - 1, want_t).astype(int)]
-    logits = unified_session.run(None, {UNIFIED_INPUT: arr[None]})[0][0]
-    probs = np.exp(logits - logits.max())
-    probs /= probs.sum()
-    order = np.argsort(probs)[::-1][:3]
-    return {"ready": True, "label": ACTIVE_CLASSES[int(order[0])],
-            "confidence": float(probs[order[0]]),
-            "frames_used": int(want_t), "frames_supplied": int(len(vecs)),
-            "top3": [{"label": ACTIVE_CLASSES[i], "confidence": float(probs[i])} for i in order]}
-
-
-# ─────────────────────────────────────────────
-# PREDICTION: streaming window → temporal model (live auto-detection)
-# ─────────────────────────────────────────────
-@app.post("/api/predict/stream")
-async def predict_stream(files: list[UploadFile] = File(...)):
-    """Recognise a sign from a rolling window of recent frames.
-
-    This is what makes live signing work with a temporal model. The old design
-    made the user press a button and hold still for exactly three seconds, which
-    is both unnatural to perform and easy to get wrong: if the sign finished
-    early, or the hand left the frame, the fixed window captured the wrong half
-    of the movement.
-
-    Instead the client keeps a ring buffer of the last ``frames`` frames and
-    posts it whenever it sees motion. The server recognises the window, and
-    reports ``margin`` -- the gap between the best and second-best class -- so
-    the client can demand a *decisive* win before committing a gloss to the
-    sequence. A hesitant window therefore produces no output rather than a
-    confident-looking wrong one.
-    """
-    if unified_session is None:
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                "The active model is static and expects a single frame. Use "
-                "POST /api/predict/frame, or activate a temporal (LSTM) model "
-                "in the admin panel."
-            ),
-        )
-    want_t = (REGISTRY.active or {}).get("frames") or SEQ_T
-    width = _active_width()
-    vecs, last = [], None
-    last_frame_bgr = None
-    for f in files:
-        raw = await f.read()
-        fr = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
-        if fr is None:
-            continue
-        last_frame_bgr = fr
-        v = process_bgr_frame(fr, width)
-        if v is not None:
-            last = v
-        vecs.append(v if v is not None else last)
-    vecs = [v for v in vecs if v is not None]
-    if len(vecs) < 8:
-        return {"ready": False, "detail": "No hands detected in window"}
-
-    nmm_data = detect_nmm(last_frame_bgr) if last_frame_bgr is not None else {
-        "question": False, "wh_question": False, "negation": False, "affirmation": False, "emphasis": False,
-        "emotion": {"dominant": "neutral", "confidence": 1.0, "scores": {"neutral": 1.0}},
-        "metrics": {"brow_ratio": 0.0, "mouth_ratio": 0.0, "shake_var": 0.0, "nod_var": 0.0}
-    }
-    arr = np.array(vecs, np.float32)
-    if len(arr) != want_t:
-        arr = arr[np.linspace(0, len(arr) - 1, want_t).astype(int)]
-
-    # Same unconditional motion gate as /api/stream/frame (see the comment
-    # there): the legacy batch path the page falls back to needs the identical
-    # policy, and a NONE class in the label list is not evidence the model can
-    # actually recognise idleness.
-    if len(arr) > 1:
-        motion = float(np.mean(np.abs(np.diff(arr, axis=0))))
-        spread = float(np.mean(np.abs(arr - arr.mean(axis=0))))
-        if motion < IDLE_MOTION_GATE or spread < IDLE_SPREAD_GATE:
-            return {"ready": False, "detail": "idle"}
-
-    logits = unified_session.run(None, {UNIFIED_INPUT: arr[None]})[0][0]
-    probs = np.exp(logits - logits.max())
-    probs /= probs.sum()
-    order = np.argsort(probs)[::-1][:3]
+        clips = np.load(path, mmap_mode="r", allow_pickle=False)
+    except (OSError, ValueError) as exc:
+        logging.exception("Could not read archived training data %s", path)
+        raise HTTPException(500, f"Could not read archived training data for {gloss}.") from exc
+    if clips.ndim != 3 or clips.shape[1:] != (N_FRAMES, N_FEATURES):
+        raise HTTPException(500, f"Archived training data for {gloss} has an invalid shape.")
+    if clip_index < 0 or clip_index >= clips.shape[0]:
+        raise HTTPException(404, "Training clip not found.")
+    frames = np.asarray(clips[clip_index], dtype=np.float32)
+    if not np.isfinite(frames).all():
+        raise HTTPException(500, "Archived training clip contains invalid feature values.")
+    if REGISTRY.temporal_session is None or not REGISTRY.temporal_classes:
+        raise HTTPException(409, "The active model cannot classify training clips.")
+    try:
+        logits = REGISTRY.temporal_session.run(
+            None,
+            {REGISTRY.temporal_input: frames[np.newaxis].astype(np.float32)},
+        )[0][0]
+    except Exception as exc:
+        logging.exception("Could not classify archived training clip %s[%d]", gloss, clip_index)
+        raise HTTPException(500, "Could not classify this training clip with the active model.") from exc
+    if (
+        logits.ndim != 1
+        or len(logits) != len(REGISTRY.temporal_classes)
+        or not np.isfinite(logits).all()
+    ):
+        raise HTTPException(500, "The active model returned an invalid training-clip prediction.")
+    probabilities = np.exp(logits - logits.max())
+    probabilities /= probabilities.sum()
+    order = np.argsort(probabilities)[::-1][:3]
+    predicted = REGISTRY.temporal_classes[int(order[0])]
+    sources = []
+    source_report = run_dir / "training_data" / "features" / "extract_report.json"
+    if source_report.is_file():
+        try:
+            sources = json.loads(source_report.read_text(encoding="utf-8")).get("videos", [])
+        except (OSError, json.JSONDecodeError) as exc:
+            logging.exception("Could not read archived extraction report %s", source_report)
+            raise HTTPException(500, "Could not read the active model's training-data metadata.") from exc
+    source_video = next(
+        (
+            source.get("path")
+            for source in sources
+            if source.get("gloss") == gloss
+            and source.get("status") == "kept"
+            and source.get("row") == clip_index
+        ),
+        None,
+    )
     return {
-        "ready": True,
-        "label": ACTIVE_CLASSES[int(order[0])],
-        "confidence": float(probs[order[0]]),
-        # Best minus runner-up. A one-hot softmax and a coin-flip can both report
-        # "99%", so confidence alone cannot tell a real sign from noise; margin can.
-        "margin": float(probs[order[0]] - probs[order[1]]) if len(order) > 1 else 1.0,
-        "frames_used": int(want_t),
-        "frames_supplied": int(len(vecs)),
-        "nmm": nmm_data,
-        "emotion": nmm_data.get("emotion"),
-        "metrics": nmm_data.get("metrics"),
+        "gloss": gloss,
+        "clip_index": clip_index,
+        "clip_count": int(clips.shape[0]),
+        "frame_count": int(frames.shape[0]),
+        "feature_width": int(frames.shape[1]),
+        "frames": frames.tolist(),
+        "source_video": source_video,
+        "prediction": predicted,
+        "correct": predicted == gloss,
+        "confidence": float(probabilities[order[0]]),
         "top3": [
-            {"label": ACTIVE_CLASSES[i], "confidence": float(probs[i])}
-            for i in order
+            {
+                "label": REGISTRY.temporal_classes[int(index)],
+                "confidence": float(probabilities[index]),
+            }
+            for index in order
         ],
     }
 
 
 # ─────────────────────────────────────────────
-# PREDICTION: single frame in → server-side ring buffer → temporal model
+# PREDICTION: frame stream → span state machine → temporal model
 # ─────────────────────────────────────────────
-# The windows the server cuts out of its own buffer. Two lengths, not one: a
-# short window reads a fast sign, a long one reads a slow one, and the same
-# signer produces both. Fusing them and keeping the most decisive answer is
-# what stops a single unlucky window length from deciding the output.
-STREAM_WINDOWS = (24, 32)
-# Seconds between model runs per session. At 30 fps capture this is ~7 frames,
-# i.e. an order of magnitude fewer inferences than frames -- the client can push
-# frames as fast as the camera delivers them and the server does the throttling.
-STREAM_INFER_EVERY = 0.25
 
 
-# Below this mean frame-to-frame landmark motion a window is treated as idle.
-# Coordinates are normalised by hand size, so an absolutely still signer's
-# window sits around 1e-4 while even a slow sign clears 1e-2; the threshold is
-# set an order of magnitude above jitter and two below any real sign so sensor
-# noise alone can never cross it.
-IDLE_MOTION_GATE = 0.004
-# Mean per-column deviation from the window's own mean. This is the second,
-# independent idle signal: tracking jitter OSCILLATES, so its frame-to-frame
-# motion can sit above the gate while the hand never actually goes anywhere --
-# the window's spread stays tiny. A held "HUG" pose reported forever by a
-# signer who has stopped moving is exactly this signature; motion alone could
-# not see it, spread can.
-IDLE_SPREAD_GATE = 0.008
+def _span_duration(timestamps):
+    if len(timestamps) < 2:
+        return 1.0 / 30.0
+    intervals = np.diff(np.asarray(timestamps, dtype=np.float64))
+    intervals = intervals[np.isfinite(intervals) & (intervals > 0)]
+    if not len(intervals):
+        return len(timestamps) / 30.0
+    return float(len(timestamps) * np.median(intervals))
+
+
+def _recognize_stream_clip(clip, emotion, hands_detected):
+    logits = REGISTRY.session.run(
+        None, {REGISTRY.input_name: clip[np.newaxis].astype(np.float32)}
+    )[0][0]
+    probabilities = np.exp(logits - logits.max())
+    probabilities /= probabilities.sum()
+    order = np.argsort(probabilities)[::-1][:3]
+    top_probability = float(probabilities[order[0]])
+    margin = (
+        float(probabilities[order[0]] - probabilities[order[1]])
+        if len(order) > 1
+        else 1.0
+    )
+    return {
+        "ready": True,
+        "label": REGISTRY.active_classes[int(order[0])],
+        "confidence": top_probability,
+        "margin": margin,
+        "frames_used": N_FRAMES,
+        "state": "IDLE",
+        "emotion": emotion,
+        "hands_detected": hands_detected,
+        "top3": [
+            {
+                "label": REGISTRY.active_classes[int(index)],
+                "confidence": float(probabilities[index]),
+            }
+            for index in order
+        ],
+    }
 
 
 @app.post("/api/stream/frame")
-async def stream_frame(session_id: str = "default", file: UploadFile = File(...)):
-    """One JPEG in, buffered landmark out.
-
-    Inference runs server-side on a sliding window every ``STREAM_INFER_EVERY``
-    seconds -- the client no longer uploads 32 frames per tick.
-
-    ``ready: false`` is a normal answer, not an error: it means the buffer is
-    still filling or the throttle is holding. The client uses ``buffered`` to
-    show how much history exists without inventing a count of its own.
-    """
-    if unified_session is None:
-        raise HTTPException(409, "Active model is static; activate a temporal model first.")
+async def stream_frame(
+    session_id: str = "default",
+    file: UploadFile = File(...),
+    mode: str = Form(default="auto"),
+    recording: bool = Form(default=False),
+    capture_time: float | None = Form(default=None),
+):
+    if REGISTRY.session is None:
+        raise HTTPException(409, "No model loaded.")
+    if mode not in {"auto", "manual"}:
+        raise HTTPException(422, "mode must be 'auto' or 'manual'")
+    if capture_time is not None and not math.isfinite(capture_time):
+        raise HTTPException(400, "capture_time must be finite")
 
     raw = await file.read()
     fr = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
     if fr is None:
-        raise HTTPException(400, "Could not decode image")
-
-    width = _active_width()
+        raise HTTPException(400, detail="Could not decode image")
     sess = get_session(session_id)
-    vec = process_bgr_frame(fr, width)
-    # Bounded carry-forward: <= 8 consecutive misses (~0.8 s at 10 Hz client)
-    # keep the window dense through a flicker; beyond that the signer's hands
-    # are genuinely gone, and freezing the last vector would replay the ending
-    # pose of the previous sign as if it were still being performed. Zeros are
-    # what the hand-presence channels read as "no hands".
-    if vec is None:
-        sess.miss += 1
-        vec = (sess.buf[-1] if sess.buf and sess.miss <= 8
-               else np.zeros(width, np.float32))
+    if sess.mode != mode:
+        sess.reset(mode)
+    timestamp = capture_time if capture_time is not None else time.monotonic()
+    height, width = fr.shape[:2]
+    emotion = detect_emotion_from_frame(fr)
+    frame_data = process_holistic_frame(fr)
+    if frame_data is None:
+        pose = hands = face = None
+        in_use = np.zeros(2, dtype=bool)
+        features = np.zeros(N_FEATURES, np.float32)
+        complete = False
+        hands_detected = 0
     else:
-        sess.miss = 0
-    sess.buf.append(np.asarray(vec, np.float32))
+        pose = frame_data["pose"]
+        hands = frame_data["hands"]
+        face = frame_data["face"]
+        in_use = frame_in_use(pose, width, height)
+        features = frame_features(pose, hands, face, in_use, width, height, 0.0)
+        complete = complete_mask_single(
+            pose, hands, frame_data["face_ok"], in_use, width, height
+        )
+        hands_detected = int(in_use.sum())
 
-    now = time.time()
-    if len(sess.buf) < STREAM_WINDOWS[0]:
-        return {"ready": False, "buffered": len(sess.buf), "detail": "filling"}
-    if now - sess.last_infer < STREAM_INFER_EVERY:
-        return {"ready": False, "buffered": len(sess.buf), "detail": "throttled"}
-    sess.last_infer = now
-
-    nmm = detect_nmm(fr)
-    tail = np.array(list(sess.buf), np.float32)
-    want_t = (REGISTRY.active or {}).get("frames") or SEQ_T
-
-    # Motion gate -- per WINDOW, not per buffer. The buffer holds up to 18 s of
-    # history; gating on its mean kept the gate open for ~15 s after a sign
-    # ended, so idle windows decoded as the previous sign and repeated until
-    # the camera stopped. Each candidate window is now gated on its own
-    # geometry: a window the signer visibly stopped moving in is skipped, and
-    # if EVERY window is idle the endpoint answers "idle" instead of guessing.
-    best = None
-    idle_stats = None
-    for w in STREAM_WINDOWS:                       # multi-window fusion: max margin wins
-        win = tail[-w:]
-        if len(win) < 2:
-            continue
-        motion = float(np.mean(np.abs(np.diff(win, axis=0))))
-        spread = float(np.mean(np.abs(win - win.mean(axis=0))))
-        if idle_stats is None or motion > idle_stats[0]:
-            idle_stats = (motion, spread)
-        if motion < IDLE_MOTION_GATE or spread < IDLE_SPREAD_GATE:
-            continue                               # this window is idle or frozen
-
-        # The interpolation in resample_arr mixes the source rows with float
-        # weights, which promotes the result to float64. ONNX Runtime rejects
-        # that outright ("Unexpected input data type ... expected float"), so the
-        # dtype is pinned here rather than left to the arithmetic.
-        arr = resample_feature_width(resample_arr(win, want_t)[None], width).astype(np.float32)
-        logits = unified_session.run(None, {UNIFIED_INPUT: arr})[0][0]
-        probs = np.exp(logits - logits.max())
-        probs /= probs.sum()
-        order = np.argsort(probs)[::-1][:2]
-        # Margin, not confidence: a hesitant window can still report 99% on one
-        # class, but it cannot report a large gap to the runner-up as well.
-        margin = float(probs[order[0]] - probs[order[1]]) if len(order) > 1 else 1.0
-        if best is None or margin > best["margin"]:
-            best = {
-                "label": ACTIVE_CLASSES[int(order[0])],
-                "confidence": float(probs[order[0]]),
-                "margin": margin,
-                "window": int(w),
-                "top3": [{"label": ACTIVE_CLASSES[i], "confidence": float(probs[i])}
-                         for i in np.argsort(probs)[::-1][:3]],
+    if mode == "manual":
+        if recording:
+            if not sess.manual_recording:
+                sess.reset("manual")
+                sess.manual_recording = True
+            sess.frames.append(frame_data)
+            sess.features.append((len(sess.features), features, complete))
+            sess.timestamps.append(timestamp)
+            return {
+                "ready": False,
+                "buffered": len(sess.frames),
+                "state": "SIGN",
+                "emotion": emotion,
+                "hands_detected": hands_detected,
             }
+        if not sess.manual_recording:
+            return {
+                "ready": False,
+                "buffered": 0,
+                "state": "IDLE",
+                "emotion": emotion,
+                "hands_detected": hands_detected,
+            }
+        sess.manual_recording = False
+        clip = select_frames_from_span(sess.features)
+        duration = _span_duration(sess.timestamps)
+        sess.frames = []
+        sess.features = []
+        sess.timestamps = []
+        if clip is None:
+            return {
+                "ready": False,
+                "buffered": 0,
+                "state": "IDLE",
+                "detail": "incomplete_span",
+                "emotion": emotion,
+                "hands_detected": hands_detected,
+            }
+        clip[:, -1] = duration
+        return _recognize_stream_clip(clip, emotion, hands_detected)
 
-    if best is None:
-        motion, spread = idle_stats if idle_stats else (0.0, 0.0)
-        return {"ready": False, "buffered": len(sess.buf),
-                "detail": "idle",
-                "motion": round(motion, 5), "spread": round(spread, 5),
-                "nmm": nmm, "emotion": nmm.get("emotion")}
+    if frame_data is None:
+        state = update_span_state(
+            sess, False, None, features, False, timestamp
+        )
+    else:
+        state = update_span_state(
+            sess, bool(in_use.any()), frame_data, features, complete, timestamp
+        )
 
-    return {**best, "ready": True, "buffered": len(sess.buf),
-            "frames_used": int(want_t),
-            "nmm": nmm, "emotion": nmm.get("emotion"), "metrics": nmm.get("metrics")}
+    if state == "SPAN_COMPLETE":
+        clip = select_frames_from_span(sess.features)
+        duration = _span_duration(sess.timestamps)
+        sess.frames = []
+        sess.features = []
+        sess.timestamps = []
+        sess.pre_roll.clear()
+        if clip is None:
+            return {
+                "ready": False,
+                "buffered": 0,
+                "state": "IDLE",
+                "detail": "incomplete_span",
+                "emotion": emotion,
+                "hands_detected": hands_detected,
+            }
+        clip[:, -1] = duration
+        return _recognize_stream_clip(clip, emotion, hands_detected)
+
+    return {
+        "ready": False,
+        "buffered": len(sess.frames),
+        "state": state,
+        "detail": "no_pose" if frame_data is None else None,
+        "emotion": emotion,
+        "hands_detected": hands_detected,
+    }
 
 
 @app.get("/api/coverage")
 def coverage():
-    """Vocabulary and replay coverage for the currently selected model."""
+    """Vocabulary and avatar-data coverage for the active model."""
     summary = _coverage_summary()
     return {
         **summary,
         "by_category": {
             cat: {
                 "total": sum(1 for s in sign_catalog if s["category"] == cat),
-                "with_landmark_sequences": sum(
-                    1 for s in sign_catalog if s["category"] == cat
+                "with_avatar_data": sum(
+                    1 for s in sign_catalog
+                    if s["category"] == cat and s["has_avatar"]
                 ),
             }
             for cat in sorted({s["category"] for s in sign_catalog})
@@ -2336,114 +2289,66 @@ def coverage():
                 "label": s["label"],
                 "bengali": s["bengali_meaning"],
                 "category": s["category"],
-                "has_landmarks": True,
+                "has_landmarks": s["has_avatar"],
+                "has_avatar": s["has_avatar"],
             }
             for s in sign_catalog
         ],
         "active_model": REGISTRY.active["name"] if REGISTRY.active else None,
-        "endpoint": (REGISTRY.active or {}).get("endpoint", "/api/predict/frame"),
+        "endpoint": (REGISTRY.active or {}).get("endpoint", "/api/stream/frame"),
     }
 
 
-# ─────────────────────────────────────────────
-# REAL LANDMARK REPLAY (no synthetic skeletons anywhere)
-# ─────────────────────────────────────────────
 @app.get("/api/simulation/frames")
-def simulation_frames(label: str = "", sample_id: str = ""):
-    """Replay a model-bundled class sequence or a specific community sample."""
-    arr = None
-    face_mesh = None
-    source = ""
-    if sample_id:
-        rec = next((r for r in _load_manifest() if r["sample_id"] == sample_id), None)
-        if rec:
-            sample_path = (ROOT / rec["landmark_path"]).resolve()
-            if sample_path.parent != SAMPLES_DIR.resolve() and SAMPLES_DIR.resolve() not in sample_path.parents:
-                raise HTTPException(status_code=400, detail="Invalid community sample path")
-            if sample_path.is_file():
-                arr = np.load(sample_path, allow_pickle=False)
-                source = f"community:{sample_id}"
-    elif label:
-        sequence_path = _model_sequence_path(label)
-        if sequence_path:
-            loaded = np.load(sequence_path, allow_pickle=False)
-            arr = loaded[0] if loaded.ndim == 3 else loaded
-            source = f"{REGISTRY.active['run']}:{sequence_path.stem}"
-            face_mesh_path = sequence_path.with_name(
-                f"{sequence_path.stem}.face.npy"
-            )
-            if face_mesh_path.is_file():
-                try:
-                    face_sequences = np.load(face_mesh_path, allow_pickle=False)
-                except (OSError, ValueError) as exc:
-                    raise HTTPException(
-                        status_code=422,
-                        detail=f"Bundled face-mesh sequence cannot be loaded: {exc}",
-                    ) from exc
-                if (
-                    face_sequences.ndim != 4
-                    or face_sequences.shape[-2:] != (468, 3)
-                    or (loaded.ndim == 3 and face_sequences.shape[:2] != loaded.shape[:2])
-                    or (
-                        loaded.ndim == 2
-                        and (
-                            face_sequences.shape[0] != 1
-                            or face_sequences.shape[1] != loaded.shape[0]
-                        )
-                    )
-                ):
-                    raise HTTPException(
-                        status_code=422,
-                        detail="Bundled face mesh must align with model sequences "
-                        "and have shape (samples, frames, 468, 3).",
-                    )
-                face_mesh = np.asarray(face_sequences[0], dtype=np.float32)
-    if arr is None:
+def simulation_frames(label: str = ""):
+    """Serve the active model's per-sign avatar arrays."""
+    run_dir = _active_run_dir()
+    if not run_dir:
+        raise HTTPException(status_code=404, detail="No active model")
+
+    normalized = label.upper().replace(" ", "_")
+    if normalized not in _available_model_classes():
+        raise HTTPException(status_code=404, detail=f"No avatar data for '{label}'")
+    avatar_dir = run_dir / "avatar" / normalized
+    if not avatar_dir.is_dir():
+        raise HTTPException(status_code=404, detail=f"No avatar data for '{label}'")
+
+    try:
+        hands = np.load(avatar_dir / "hands.npy", allow_pickle=False)
+        pose = np.load(avatar_dir / "pose.npy", allow_pickle=False)
+        timestamps = np.load(avatar_dir / "t.npy", allow_pickle=False)
+        face_path = avatar_dir / "face.npy"
+        face = np.load(face_path, allow_pickle=False) if face_path.is_file() else None
+    except (OSError, ValueError) as exc:
         raise HTTPException(
-            status_code=404,
-            detail="No landmark sequence is bundled for this active-model sign.",
+            status_code=500, detail=f"Could not load avatar data for '{normalized}': {exc}"
+        ) from exc
+
+    frame_count = hands.shape[0] if hands.ndim else 0
+    if (
+        hands.ndim != 3
+        or hands.shape[1:] != (42, 3)
+        or frame_count == 0
+        or pose.shape != (frame_count, 8, 4)
+        or timestamps.shape != (frame_count,)
+        or (face is not None and face.shape != (frame_count, 19, 3))
+    ):
+        raise HTTPException(
+            status_code=422, detail=f"Avatar data for '{normalized}' has invalid shapes"
         )
 
-    arr = np.asarray(arr, dtype=np.float32)
-    if arr.ndim == 1:                                   # a single frame was stored
-        arr = arr[None]
-    if arr.ndim != 2 or arr.shape[-1] not in (HANDS_DIM, HOLISTIC_DIM):
-        raise HTTPException(status_code=422, detail="Bundled landmark sequence has an invalid shape")
-    arr = arr[:64]
-
-    if arr.shape[-1] == HOLISTIC_DIM:                   # 258 = hands 126 + pose 33x4
-        hands = arr[:, :126].reshape(len(arr), 42, 3)
-        pose = arr[:, 126:].reshape(len(arr), 33, 4)
-        result = {"frames": hands.tolist(), "pose": pose.tolist(), "points": 42,
-                  "count": int(len(arr)), "source": source, "width": HOLISTIC_DIM}
-    else:
-        result = {"frames": arr.reshape(len(arr), 42, 3).tolist(), "points": 42,
-                  "count": int(len(arr)), "source": source, "width": HANDS_DIM}
-    if face_mesh is not None:
-        face_mesh = face_mesh[:len(arr)]
-        result["face_mesh"] = [
-            frame.tolist() if np.any(frame) else []
-            for frame in face_mesh
-        ]
+    result = {
+        "frames": hands.tolist(),
+        "pose": pose.tolist(),
+        "times": timestamps.tolist(),
+        "points": 42,
+        "count": frame_count,
+        "source": f"avatar:{normalized}",
+        "width": FEATURE_WIDTH,
+    }
+    if face is not None:
+        result["face_avatar"] = face.tolist()
     return result
-
-
-@app.get("/api/dataset/index")
-def dataset_index(label: str = "", kind: str = ""):
-    idx = TRAINING_DATA_DIR / "index.jsonl"
-    if not idx.exists():
-        return {"items": []}
-    items = []
-    for line in idx.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        r = json.loads(line)
-        if label and r.get("label", "").upper() != label.upper():
-            continue
-        if kind and r.get("kind") != kind:
-            continue
-        items.append(r)
-    return {"items": items}
 
 
 # ─────────────────────────────────────────────
@@ -2451,20 +2356,10 @@ def dataset_index(label: str = "", kind: str = ""):
 # ─────────────────────────────────────────────
 class NLGRequest(BaseModel):
     gloss: str
-    # Detected NMM / affect context from the recognition layer. Optional so old
-    # clients keep working; forwarded to the LLM when present.
-    nmm: dict | None = None
     emotion: dict | None = None
-    intensity: float | None = None
-    hand: str | None = None
 
     def meta(self) -> dict:
-        return {
-            "nmm": self.nmm,
-            "emotion": self.emotion,
-            "intensity": self.intensity,
-            "hand": self.hand,
-        }
+        return {"emotion": self.emotion}
 
 
 class NLGSequenceRequest(BaseModel):
@@ -2723,23 +2618,6 @@ def text_to_sign_llm(payload: TextToSignRequest):
     }
 
 
-@app.get("/api/contributions/needs-data")
-def needs_data():
-    needs = sorted(sign_catalog, key=lambda s: s["approved_samples"])[:10]
-    return {
-        "items": [
-            {
-                "id": s["id"],
-                "label": s["label"],
-                "bengali": s["bengali_meaning"],
-                "current": s["approved_samples"],
-                "target": 50,
-            }
-            for s in needs
-        ]
-    }
-
-
 # ─────────────────────────────────────────────
 # TTS (Independent Free & ElevenLabs Premium)
 # ─────────────────────────────────────────────
@@ -2867,211 +2745,24 @@ async def speech_to_text(
 
 
 
-# ─────────────────────────────────────────────
-# CONTRIBUTIONS: session + REAL ingestion
-# ─────────────────────────────────────────────
-@app.post("/api/contributions/session")
-def create_session(payload: dict):
-    return {
-        "session_id": f"sess_{uuid.uuid4().hex[:8]}",
-        "signer_id": payload.get("signer_id", "anonymous"),
-        "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "status": "active",
-    }
-
-
-@app.post("/api/contributions/session/{session_id}/samples")
-async def ingest_sample(
-    session_id: str,
-    label: str = Form(...),
-    signer_id: str = Form(...),
-    nmm_tags: str = Form("{}"),
-    file: UploadFile = File(...),
-):
-    """Real upload: decode video server-side, extract 126-dim landmarks every
-    3rd frame, save .npy + append manifest record. No simulation."""
-    canonical_label = label.upper().replace(" ", "_")
-    if canonical_label not in _available_model_classes():
-        raise HTTPException(
-            status_code=400,
-            detail="Sign is not part of the active model vocabulary.",
-        )
-
-    import os
-    import tempfile
-
-    suffix = Path(file.filename or "rec.webm").suffix or ".webm"
-    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-    try:
-        tmp.write(await file.read())
-        tmp.close()
-
-        width = _active_width()
-        cap = cv2.VideoCapture(tmp.name)
-        frames = []
-        idx = 0
-        while True:
-            ok, frame = cap.read()
-            if not ok:
-                break
-            if idx % 3 == 0:
-                vec = process_bgr_frame(frame, width)
-                if vec is not None:
-                    frames.append(vec)
-            idx += 1
-        cap.release()
-    finally:
-        try:
-            os.unlink(tmp.name)
-        except OSError:
-            pass
-
-    if len(frames) < 5:
-        raise HTTPException(
-            status_code=400,
-            detail="Not enough hand landmarks extracted. Keep both hands visible while recording.",
-        )
-
-    arr = np.array(frames, dtype=np.float32)
-    safe_label = re.sub(r"[^A-Za-z0-9_-]", "_", canonical_label)
-    safe_signer_id = re.sub(r"[^A-Za-z0-9_-]", "_", signer_id) or "anonymous"
-    sample_id = f"v001_{safe_label}_{safe_signer_id}_{time.strftime('%Y%m%dT%H%M%S')}"
-    label_dir = SAMPLES_DIR / safe_label / safe_signer_id
-    label_dir.mkdir(parents=True, exist_ok=True)
-    npy_path = label_dir / f"{sample_id}.npy"
-    np.save(npy_path, arr)
-
-    record = {
-        "sample_id": sample_id,
-        "session_id": session_id,
-        "label": canonical_label,
-        "signer_id": signer_id,
-        "split": "unassigned",
-        "source": "community",
-        "verification": "pending",
-        "verified_by": None,
-        "captured_at": time.strftime("%Y-%m-%dT%H:%M:%SZ"),
-        "frames": int(arr.shape[0]),
-        "width": int(arr.shape[-1]),
-        "landmark_path": str(npy_path.relative_to(ROOT)),
-        "nmm_tags": json.loads(nmm_tags or "{}"),
-        "upload_status": "success",
-    }
-    with open(MANIFEST_PATH, "a", encoding="utf-8") as f:
-        f.write(json.dumps(record, ensure_ascii=False) + "\n")
-    _refresh_catalog_sample_counts()
-
-    return {"sample_id": sample_id, "status": "pending_review", "frames": int(arr.shape[0])}
-
-
-@app.get("/api/admin/contributions")
-def get_contributions():
-    return _load_manifest()
-
-
-def resample_arr(arr, t):
-    """Linear resample of a landmark sequence to a fixed frame count."""
-    if len(arr) == t:
-        return arr
-    ix = np.linspace(0, len(arr) - 1, t)
-    i0, i1 = ix.astype(int), np.minimum(ix.astype(int) + 1, len(arr) - 1)
-    f = (ix - i0)[:, None]
-    return arr[i0] * (1 - f) + arr[i1] * f
-
-
-@app.get("/api/admin/contributions/{sample_id}/evidence")
-def get_evidence(sample_id: str):
-    rec = next((r for r in _load_manifest() if r["sample_id"] == sample_id), None)
-    if rec is None:
-        raise HTTPException(status_code=404, detail="Sample not found")
-
-    preds = []
-    top_conf = 0.0
-    frames = rec.get("frames", 0)
-    mean_vel = 0.0
-    npy = ROOT / rec["landmark_path"]
-    if npy.exists():
-        arr = np.load(npy)
-        frames = int(arr.shape[0])
-        if frames > 1:
-            mean_vel = float(np.linalg.norm(np.diff(arr[:, :63], axis=0), axis=1).mean())
-        if unified_session is not None:
-            seq = resample_arr(arr, SEQ_T)[None].astype(np.float32)
-            # Same dispatch as the endpoints: the clip is assembled in the width
-            # the active graph declares, not in whatever the upload happens to be.
-            seq = resample_feature_width(seq, _active_width())
-            logits = unified_session.run(None, {UNIFIED_INPUT: seq})[0][0]
-        else:
-            mid = arr[frames // 2]
-            logits = session.run(
-                None, {INPUT_NAME: mid.reshape(1, _active_width())})[0][0]
-        probs = np.exp(logits - logits.max())
-        probs /= probs.sum()
-        order = np.argsort(probs)[::-1][:3]
-        preds = [{"label": ACTIVE_CLASSES[i], "confidence": round(float(probs[i]), 3)} for i in order]
-        top_conf = float(probs[order[0]])
-
-    agree = round(top_conf * 100, 1) if preds and preds[0]["label"] == rec["label"] else round(top_conf * 60, 1)
-    geom = round(min(100.0, 70 + frames * 0.5), 1)
-    temp = round(min(100.0, 60 + frames * 0.8), 1) if mean_vel < 200 else 40.0
-    tags = [t.upper() for t, v in (rec.get("nmm_tags") or {}).items() if v]
-
-    return {
-        "geometry_score": geom,
-        "temporal_score": temp,
-        "similarity_score": agree,
-        "label_agreement": agree,
-        "synthetic_score": round(min(100.0, mean_vel * 2), 1),
-        "model_predictions": preds or [{"label": rec["label"], "confidence": 0.5}],
-        "numerical_features": {"frames": frames, "mean_velocity": round(mean_vel, 3)},
-        "symbolic_tags": tags or ["NO_NMM"],
-        "movement_description": (
-            f"Community recording of '{rec['label']}' by {rec['signer_id']}; "
-            f"{frames} landmark frames extracted at stride 3."
-        ),
-        "reasoning": {
-            "handshape_match": "Strong" if agree > 70 else "Moderate",
-            "movement_match": "Strong" if temp > 70 else "Moderate",
-            "temporal_match": f"{frames} frames captured",
-            "nmm_detected": ", ".join(tags).lower() or "none",
-            "top_candidate": f"{preds[0]['label']} · {preds[0]['confidence'] * 100:.1f}%" if preds else "—",
-        },
-    }
-
-
-@app.post("/api/admin/contributions/{sample_id}/verify")
-def verify_contribution(sample_id: str, payload: dict):
-    action = payload.get("action", "needs_review")
-    items = _load_manifest()
-    changed = False
-    for r in items:
-        if r["sample_id"] == sample_id:
-            r["verification"] = action
-            r["verified_by"] = payload.get("reviewer", "admin")
-            changed = True
-    if changed:
-        _write_manifest(items)
-        _refresh_catalog_sample_counts()
-    return {"success": changed}
-
-
 @app.get("/api/admin/stats")
 def admin_stats():
     ai = get_ai_config()
+    coverage = _coverage_summary()
     return {
-        "total_signs": len(sign_catalog),
-        "total_approved_samples": sum(s["approved_samples"] for s in sign_catalog),
-        "total_pending_samples": sum(s["pending_samples"] for s in sign_catalog),
-        "total_rejected_samples": sum(s["rejected_samples"] for s in sign_catalog),
+        "total_signs": len(_available_model_classes()),
+        "avatar_classes": coverage["with_avatar_data"],
         "model_active": REGISTRY.active["name"] if REGISTRY.active else None,
         "model_classes": len(REGISTRY.active_classes),
-        "contract": (REGISTRY.active or {}).get("contract") or {
-            "kind": "temporal" if (REGISTRY.active or {}).get("temporal") else "static",
-            "feature_width": (REGISTRY.active or {}).get("input_width", 126),
+        "contract": {
+            "kind": "temporal",
+            "feature_width": FEATURE_WIDTH,
+            "frames": SEQ_T,
         },
         "llm_available": is_llm_available(),
         "llm_model": ai["model"],
         "inference_mode": ai["provider"],
+        "ai_mode": ai["mode"],
         "dataset_version": "v0.1",
     }
 
@@ -3086,385 +2777,38 @@ if __name__ == "__main__":
 
 ---
 
-# FILE: `backend\nmm.py`
-
-```python
-"""
-backend/nmm.py
-Enhanced Non-Manual Markers (NMM) and Affect/Emotion Detection.
-- 5 geometry markers: eyebrow raise (question), eyebrow furrow (wh_question),
-  head shake (negation), head nod (affirmation), mouth open (emphasis).
-- Facial Affect / Emotion recognition using ViT (Vision Transformer) ONNX model:
-  happy, sad, angry, fear, surprise, disgust, neutral.
-- Real-time configurable sensitivity thresholds with defaults calibrated to eliminate false triggers.
-- Per-marker ENABLE gates: a marker can be switched off entirely, which is not
-  the same as pushing its threshold out of reach. See NMM_MARKER_GATES below.
-"""
-
-from collections import deque
-from pathlib import Path
-import cv2
-import mediapipe as mp
-import numpy as np
-import onnxruntime as ort
-
-from backend.extract import _suppress_c_stderr
-
-# Initialize MediaPipe FaceMesh ONCE
-with _suppress_c_stderr():
-    _face_mesh = mp.solutions.face_mesh.FaceMesh(
-        max_num_faces=1,
-        refine_landmarks=True,
-        min_detection_confidence=0.5,
-        min_tracking_confidence=0.5,
-    )
-
-# Initialize ViT Emotion Model ONCE
-ROOT = Path(__file__).resolve().parent.parent
-VIT_PATH = ROOT / "models" / "emotion" / "vit_emotion.onnx"
-_vit_session = None
-_vit_input_name = None
-
-if VIT_PATH.exists():
-    try:
-        _vit_session = ort.InferenceSession(str(VIT_PATH), providers=["CPUExecutionProvider"])
-        _vit_input_name = _vit_session.get_inputs()[0].name
-    except Exception as exc:
-        print(f"[NMM] Notice: Could not load ViT emotion model: {exc}")
-
-EMOTION_LABELS = ['angry', 'disgust', 'fear', 'happy', 'neutral', 'sad', 'surprise']
-NORM_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32)
-NORM_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32)
-
-# Landmark indices
-LEFT_EYEBROW = [70, 63, 105, 66, 107]
-RIGHT_EYEBROW = [300, 293, 334, 296, 336]
-LEFT_EYE_TOP = 159
-LEFT_EYE_BOTTOM = 145
-RIGHT_EYE_TOP = 386
-RIGHT_EYE_BOTTOM = 374
-UPPER_LIP = 13
-LOWER_LIP = 14
-NOSE_TIP = 1
-FACE_LEFT = 234
-FACE_RIGHT = 454
-FACE_TOP = 10
-FACE_BOTTOM = 152
-
-# Default calibrated thresholds (raised to prevent wild false positives)
-DEFAULT_CONFIG = {
-    "brow_raise_thresh": 0.082,      # Raised from 0.060 (stops false questions during natural speech/expression)
-    "brow_furrow_thresh": 0.032,     # Lowered from 0.040 (requires genuine furrow for WH-question)
-    "mouth_thresh": 0.055,           # Raised from 0.040 (stops casual talking triggering emphasis)
-    "head_shake_var_thresh": 0.0018, # Raised from 0.0008 (requires deliberate head shake for negation)
-    "head_nod_var_thresh": 0.0018,   # Raised from 0.0008 (requires deliberate nod for affirmation)
-    "emotion_min_confidence": 0.35,  # Minimum confidence to accept a non-neutral emotion
-    "emotion_sensitivity": 1.0,      # Multiplier on emotion logits
-}
-
-# Per-marker master switches.
-#
-# The threshold sliders are a *sensitivity* control -- they decide how much of an
-# expression counts as a marker. That is the wrong tool for turning a marker off.
-# Pushing brow_raise_thresh to its maximum does not disable the question marker;
-# it only raises the bar until it fires rarely, and it silently also changes the
-# value an operator would return to when they want the marker back.
-#
-# These gates are the on/off switch. Negation and the two question markers ship
-# OFF because a head shake and a brow raise are things every speaker does while
-# thinking or mid-sentence, so leaving them on fills the gloss string with
-# [negation] and [?] that the signer never intended. Affirmation and emphasis
-# are deliberately cheap to re-enable and are on by default.
-DEFAULT_MARKER_GATES = {
-    "negation": False,
-    "question": False,
-    "wh_question": False,
-    "affirmation": True,
-    "emphasis": True,
-}
-
-# Runtime active gates, keyed by marker flag name in detect_nmm()'s output.
-MARKER_GATES = dict(DEFAULT_MARKER_GATES)
-
-# The five flags a gate can act on. "emotion" and "metrics" are outputs of
-# detection, not markers, and must never be gated -- the UI reads metrics to draw
-# its live readout even when the corresponding marker is switched off.
-GATEABLE_MARKERS = tuple(DEFAULT_MARKER_GATES.keys())
-
-# Runtime active config
-CONFIG = dict(DEFAULT_CONFIG)
-
-WINDOW = 15
-_nose_x_history = deque(maxlen=WINDOW)
-_nose_y_history = deque(maxlen=WINDOW)
-_last_emotion = {"dominant": "neutral", "confidence": 1.0, "scores": {"neutral": 1.0}}
-_frame_counter = 0
-
-
-def update_nmm_thresholds(new_thresholds: dict):
-    """Allows UI threshold controller to update sensitivity on the fly."""
-    for k, v in new_thresholds.items():
-        if k in CONFIG and isinstance(v, (int, float)):
-            CONFIG[k] = float(v)
-    return CONFIG
-
-
-def update_marker_gates(new_gates: dict):
-    """Enable or disable individual markers.
-
-    Only the five gateable marker names are accepted, and only real booleans.
-    A string like ``"false"`` is rejected rather than coerced: truthy coercion
-    would read it as ON, which is the opposite of what was asked for and would
-    look like the switch was broken.
-    """
-    for k, v in new_gates.items():
-        if k in MARKER_GATES and isinstance(v, bool):
-            MARKER_GATES[k] = v
-    return dict(MARKER_GATES)
-
-
-def get_nmm_config() -> dict:
-    """Thresholds plus gates.
-
-    Returned together because the UI edits them in one panel and posts them to
-    one endpoint; splitting them across two endpoints would let the panel and the
-    detector disagree about which marker is on.
-    """
-    return {**CONFIG, "marker_gates": dict(MARKER_GATES),
-            "default_marker_gates": dict(DEFAULT_MARKER_GATES)}
-
-
-def _get_point(landmarks, idx, w, h):
-    lm = landmarks.landmark[idx]
-    return np.array([lm.x * w, lm.y * h])
-
-
-def _dist(p1, p2):
-    return np.linalg.norm(p1 - p2)
-
-
-def predict_emotion(face_bgr: np.ndarray) -> dict:
-    """Predict emotion from face crop using ViT. Returns dict with dominant, confidence, scores."""
-    if _vit_session is None or face_bgr is None or face_bgr.size == 0:
-        return {"dominant": "neutral", "confidence": 1.0, "scores": {"neutral": 1.0}}
-
-    try:
-        img = cv2.resize(face_bgr, (224, 224))
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        img = img.astype(np.float32) / 255.0
-        img = (img - NORM_MEAN) / NORM_STD
-        img = np.transpose(img, (2, 0, 1))
-        img = np.expand_dims(img, axis=0)
-
-        outputs = _vit_session.run(None, {_vit_input_name: img})
-        logits = outputs[0][0] * CONFIG.get("emotion_sensitivity", 1.0)
-        exp_logits = np.exp(logits - np.max(logits))
-        probs = exp_logits / exp_logits.sum()
-
-        scores = {EMOTION_LABELS[i]: round(float(probs[i]), 3) for i in range(len(EMOTION_LABELS))}
-        idx = int(np.argmax(probs))
-        dom = EMOTION_LABELS[idx]
-        conf = float(probs[idx])
-
-        # If highest confidence is below minimum, fall back to neutral
-        min_conf = CONFIG.get("emotion_min_confidence", 0.35)
-        if dom != "neutral" and conf < min_conf:
-            dom = "neutral"
-
-        return {"dominant": dom, "confidence": round(conf, 3), "scores": scores}
-    except Exception:
-        return {"dominant": "neutral", "confidence": 1.0, "scores": {"neutral": 1.0}}
-
-
-def detect_nmm(frame_bgr: np.ndarray, custom_thresholds: dict | None = None) -> dict:
-    """
-    Detect geometry-based NMMs and affect/emotions from a single BGR frame.
-    """
-    global _frame_counter, _last_emotion
-
-    cfg = dict(CONFIG)
-    if custom_thresholds:
-        cfg.update(custom_thresholds)
-
-    h, w, _ = frame_bgr.shape
-    rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-    results = _face_mesh.process(rgb)
-
-    flags = {
-        "question": False,
-        "wh_question": False,
-        "negation": False,
-        "affirmation": False,
-        "emphasis": False,
-        "emotion": _last_emotion,
-        "metrics": {
-            "brow_ratio": 0.0,
-            "mouth_ratio": 0.0,
-            "shake_var": 0.0,
-            "nod_var": 0.0,
-        }
-    }
-
-    if not results.multi_face_landmarks:
-        _last_emotion = {
-            "dominant": "neutral",
-            "confidence": 1.0,
-            "scores": {"neutral": 1.0},
-        }
-        flags["emotion"] = _last_emotion
-        return flags
-
-    lm = results.multi_face_landmarks[0]
-    p_left = _get_point(lm, FACE_LEFT, w, h)
-    p_right = _get_point(lm, FACE_RIGHT, w, h)
-    fw = _dist(p_left, p_right)
-    if fw <= 0:
-        fw = 1.0
-
-    # Eyebrow Raise / Furrow
-    lb = np.mean([_get_point(lm, i, w, h) for i in LEFT_EYEBROW], axis=0)
-    rb = np.mean([_get_point(lm, i, w, h) for i in RIGHT_EYEBROW], axis=0)
-    le = (_get_point(lm, LEFT_EYE_TOP, w, h) + _get_point(lm, LEFT_EYE_BOTTOM, w, h)) / 2.0
-    re = (_get_point(lm, RIGHT_EYE_TOP, w, h) + _get_point(lm, RIGHT_EYE_BOTTOM, w, h)) / 2.0
-    brow_ratio = float((_dist(lb, le) + _dist(rb, re)) / (2.0 * fw))
-
-    flags["metrics"]["brow_ratio"] = round(brow_ratio, 4)
-
-    if brow_ratio > cfg["brow_raise_thresh"]:
-        flags["question"] = True
-    elif brow_ratio < cfg["brow_furrow_thresh"]:
-        flags["wh_question"] = True
-
-    # Head Shake / Nod (temporal variance)
-    nose = _get_point(lm, NOSE_TIP, w, h)
-    _nose_x_history.append(nose[0] / fw)
-    _nose_y_history.append(nose[1] / fw)
-
-    shake_var = 0.0
-    nod_var = 0.0
-    if len(_nose_x_history) == WINDOW:
-        shake_var = float(np.var(list(_nose_x_history)))
-        flags["metrics"]["shake_var"] = round(shake_var, 6)
-        if shake_var > cfg["head_shake_var_thresh"]:
-            flags["negation"] = True
-
-    if len(_nose_y_history) == WINDOW:
-        nod_var = float(np.var(list(_nose_y_history)))
-        flags["metrics"]["nod_var"] = round(nod_var, 6)
-        if nod_var > cfg["head_nod_var_thresh"]:
-            flags["affirmation"] = True
-
-    # Mouth Open
-    mouth_ratio = float(_dist(_get_point(lm, UPPER_LIP, w, h), _get_point(lm, LOWER_LIP, w, h)) / fw)
-    flags["metrics"]["mouth_ratio"] = round(mouth_ratio, 4)
-    if mouth_ratio > cfg["mouth_thresh"]:
-        flags["emphasis"] = True
-
-    # Run Emotion ViT on cropped face every 4th frame
-    _frame_counter += 1
-    if _frame_counter % 4 == 0 or _last_emotion.get("dominant") == "neutral":
-        try:
-            p_top = _get_point(lm, FACE_TOP, w, h)
-            p_bottom = _get_point(lm, FACE_BOTTOM, w, h)
-            min_x = max(0, int(min(p_left[0], p_right[0]) - 0.1 * fw))
-            max_x = min(w, int(max(p_left[0], p_right[0]) + 0.1 * fw))
-            min_y = max(0, int(p_top[1] - 0.15 * fw))
-            max_y = min(h, int(p_bottom[1] + 0.1 * fw))
-
-            if max_x > min_x and max_y > min_y:
-                face_crop = frame_bgr[min_y:max_y, min_x:max_x]
-                _last_emotion = predict_emotion(face_crop)
-        except Exception:
-            pass
-
-    # Apply the master gates LAST, after every flag has been computed.
-    #
-    # This ordering is the point: the gates must not be able to change the
-    # detection itself. Doing it earlier (skipping the brow measurement when
-    # question is off, say) would also blank brow_ratio in metrics, and the
-    # panel's live readout would go dead for a marker the operator had merely
-    # switched off. Gating the output leaves the measurement intact and only
-    # stops the flag reaching the LLM.
-    for _marker, _enabled in MARKER_GATES.items():
-        if not _enabled:
-            flags[_marker] = False
-
-    flags["emotion"] = _last_emotion
-    return flags
-
-
-def reset_nmm_state():
-    """Clear temporal history."""
-    global _last_emotion
-    _nose_x_history.clear()
-    _nose_y_history.clear()
-    _last_emotion = {"dominant": "neutral", "confidence": 1.0, "scores": {"neutral": 1.0}}
-
-
-def emotion_available() -> bool:
-    """False when the local ViT model is not installed; the UI can then say
-    affect is offline instead of showing a permanently neutral panel."""
-    return _vit_session is not None
-```
-
----
-
 # FILE: `backend\pose.py`
 
 ```python
-"""
-backend/pose.py
-The Pose half of the 258-dim holistic feature vector, defined ONCE.
-
-``extract_holistic_frame`` (serving) and ``train_holistic.py`` (training) must
-produce the same 132 numbers for the same frame, or the graph is trained on a
-distribution it will never be served. Everything that is a property of the pose
-block rather than of the caller therefore lives here:
-
-    POSE_DIM         33 landmarks x (x, y, z, visibility) = 132 columns
-    POSE_BODY_PAIRS  the BlazePose skeleton edges that are actually pOSE
-                     geometry -- hands, feet and the face mesh are excluded
-                     because the hand block carries the fingers and the mouth is
-                     read separately by the NMM detector
-
-Importing the skeleton from one place means a client cannot draw one thing while
-the extractor means another.
-"""
+"""Pose data for the 98-dim sign-recognition feature architecture."""
 
 import numpy as np
 
-POSE_POINTS = 33
-POSE_DIM = POSE_POINTS * 4          # x, y, z, visibility
+POSE_INDICES = [11, 12, 13, 14, 15, 16, 23, 24]
+POSE_POINTS = len(POSE_INDICES)
+POSE_DIM = POSE_POINTS * 4
 
-# BlazePose indices used by the skeleton: shoulders, elbows, wrists, hips,
-# knees, ankles, ears and the mouth/nose cluster. The fingertip and foot
-# landmarks are omitted on purpose -- they belong to the hand block (126 cols)
-# and are invisible in the pose-only overlay.
+P_LSH, P_RSH, P_LEL, P_REL, P_LWR, P_RWR, P_LHIP, P_RHIP = range(8)
+
+VIS_MIN = 0.5
+
 POSE_BODY_PAIRS: list[tuple[int, int]] = [
-    (11, 12),                                    # shoulders
-    (11, 13), (13, 15),                          # left arm
-    (12, 14), (14, 16),                          # right arm
-    (11, 23), (12, 24), (23, 24),                # torso
-    (23, 25), (25, 27),                          # left leg
-    (24, 26), (26, 28),                          # right leg
-    (0, 9), (0, 10), (9, 10),                    # nose <-> mouth corners
-    (2, 5), (7, 8),                              # eyes and mouth midline
+    (0, 1),
+    (0, 2), (2, 4),
+    (1, 3), (3, 5),
+    (0, 6), (1, 7), (6, 7),
 ]
 
-# Nose + mouth corners: the landmarks the NMM readout is computed from, so the
-# replay marks exactly the points the detector actually looks at.
-POSE_FACE_MARKERS: list[int] = [0, 9, 10]
+POSE_FACE_MARKERS: list[int] = []
+POSE_FACE_PAIRS: list[tuple[int, int]] = []
 
 
 def pose_from_landmarks(pose_landmarks) -> np.ndarray:
-    """MediaPipe pose landmark list -> (33, 4) float32, un-normalised.
-
-    Returns the raw (x, y, z, visibility) rows. Reference subtraction and
-    scaling are the caller's job, because they depend on which hand is the
-    reference -- and that decision belongs with the hand block.
-    """
+    """Return the eight selected MediaPipe pose points as float32 x/y/z/visibility rows."""
     return np.array(
-        [[p.x, p.y, p.z, p.visibility] for p in pose_landmarks.landmark],
+        [[pose_landmarks.landmark[i].x, pose_landmarks.landmark[i].y,
+          pose_landmarks.landmark[i].z, pose_landmarks.landmark[i].visibility]
+         for i in POSE_INDICES],
         np.float32,
     )
 ```
@@ -3474,65 +2818,45 @@ def pose_from_landmarks(pose_landmarks) -> np.ndarray:
 # FILE: `backend\streaming.py`
 
 ```python
-"""
-backend/streaming.py
-Per-session rolling landmark buffer for live continuous recognition.
-
-Why the buffer lives here and not in the browser:
-
-The client used to keep a ring buffer of 32 JPEGs and POST all of them every
-tick. That is ~32 uploads and 32 MediaPipe passes for every single prediction,
-and it makes the browser the owner of the recognition window -- so two tabs, or
-a reload, silently reset the state the model depends on.
-
-Here the client uploads ONE JPEG, the server appends ONE landmark vector, and the
-model runs when the buffer is deep enough. Upload cost per tick drops by 32x, the
-window survives a page reload, and the multi-scale windowing in
-``/api/stream/frame`` can read any length of history it wants out of one deque.
-
-Sessions are keyed by a client-generated id and never garbage collected: they are
-tiny (a 180x258 float32 deque is ~186 KB) and eviction would have to guess at
-liveness. A long-lived server with many visitors will accumulate them; the cap in
-``MAX_SESSIONS`` bounds that, dropping the least recently used.
-"""
+"""Per-session state for continuous sign detection."""
 
 from collections import OrderedDict, deque
 
 import numpy as np
 
-# ~6 s at 30 fps of client capture. Long enough that a 24- and a 32-frame window
-# can both be cut from it with room to spare, short enough that a stale sign
-# falls out of the buffer on its own.
-DEFAULT_WINDOW = 180
+from backend.extract import END_FRAMES, KEEP_TAIL, PRE_ROLL, TRIGGER_FRAMES
+
 MAX_SESSIONS = 64
+REFERENCE_FPS = 30.0
 
 
 class StreamSession:
-    """One client's rolling landmark history.
+    """State and buffered frames for one client's sign stream."""
 
-    The whole point is that misses do not create gaps: a frame where a hand was
-    not detected appends the previous vector, so the sequence the model sees is
-    always dense and the same length as the wall-clock window. A truly empty
-    buffer still appends a zero vector, which the network reads (via its
-    hand-presence channels) as "no hands" rather than as a sign.
-    """
+    def __init__(self):
+        self.reset()
 
-    def __init__(self, maxlen: int = DEFAULT_WINDOW):
-        self.buf: deque = deque(maxlen=maxlen)
-        self.last_infer: float = 0.0
-        # Consecutive frames with no landmarks. Bounded carry-forward (see
-        # /api/stream/frame): a short occlusion keeps the window dense, a long
-        # absence decays to zeros so a dropped hand cannot replay the last
-        # sign pose forever.
-        self.miss: int = 0
+    def reset(self, mode: str = "auto"):
+        self.mode = mode
+        self.state = "IDLE"
+        self.up_count = 0
+        self.down_count = 0
+        self.last_up_idx = 0
+        self.up_started_at = None
+        self.down_started_at = None
+        self.frame_index = 0
+        self.pre_roll = deque(maxlen=PRE_ROLL + TRIGGER_FRAMES)
+        self.frames = []
+        self.features = []
+        self.timestamps = []
+        self.miss = 0
+        self.manual_recording = False
 
 
-# Ordered so the oldest session is the one evicted when the cap is hit.
 SESSIONS: "OrderedDict[str, StreamSession]" = OrderedDict()
 
 
 def get_session(sid: str) -> StreamSession:
-    """Fetch (and touch) the session for ``sid``, creating it on first use."""
     sess = SESSIONS.get(sid)
     if sess is None:
         sess = StreamSession()
@@ -3544,15 +2868,89 @@ def get_session(sid: str) -> StreamSession:
     return sess
 
 
-def last_vector(sess: StreamSession, width: int) -> np.ndarray:
-    """The vector to carry forward when this frame yielded no landmarks."""
-    if sess.buf:
-        return sess.buf[-1]
-    return np.zeros(width, np.float32)
-
-
 def reset_session(sid: str) -> None:
     SESSIONS.pop(sid, None)
+
+
+def update_span_state(
+    sess: StreamSession,
+    any_hand_up: bool,
+    frame_data: dict | None,
+    feature_vec: np.ndarray,
+    is_complete: bool,
+    timestamp: float,
+) -> str:
+    """Advance the span state machine and return its current state."""
+    sess.frame_index += 1
+
+    if sess.state == "IDLE":
+        sess.pre_roll.append((frame_data, feature_vec, is_complete, timestamp))
+        pre_roll_window = (PRE_ROLL + TRIGGER_FRAMES - 1) / REFERENCE_FPS
+        while (
+            len(sess.pre_roll) > 1
+            and timestamp - sess.pre_roll[0][3] > pre_roll_window + 1e-6
+        ):
+            sess.pre_roll.popleft()
+        if any_hand_up:
+            if sess.up_started_at is None:
+                sess.up_started_at = timestamp
+            sess.up_count += 1
+            if timestamp - sess.up_started_at + 1e-6 >= (
+                TRIGGER_FRAMES - 1
+            ) / REFERENCE_FPS:
+                sess.state = "SIGN"
+                sess.down_count = 0
+                sess.frames = list(sess.pre_roll)
+                sess.features = [
+                    (i, features, complete)
+                    for i, (_, features, complete, _) in enumerate(sess.frames)
+                ]
+                sess.timestamps = [time for _, _, _, time in sess.pre_roll]
+                sess.last_up_idx = len(sess.frames) - 1
+                sess.up_started_at = None
+                return "SIGN"
+        else:
+            sess.up_count = 0
+            sess.up_started_at = None
+        return "IDLE"
+
+    sess.frames.append(frame_data)
+    rel_idx = len(sess.frames) - 1
+    sess.features.append((rel_idx, feature_vec, is_complete))
+    sess.timestamps.append(timestamp)
+
+    if any_hand_up:
+        sess.last_up_idx = rel_idx
+        sess.down_count = 0
+        sess.down_started_at = None
+    else:
+        if sess.down_started_at is None:
+            sess.down_started_at = timestamp
+        sess.down_count += 1
+        if timestamp - sess.down_started_at + 1e-6 >= (
+            END_FRAMES - 1
+        ) / REFERENCE_FPS:
+            tail_time = (
+                sess.timestamps[sess.last_up_idx]
+                + KEEP_TAIL / REFERENCE_FPS
+                + 1e-6
+            )
+            end_idx = max(
+                sess.last_up_idx,
+                min(
+                    int(np.searchsorted(sess.timestamps, tail_time, side="right")) - 1,
+                    rel_idx,
+                ),
+            )
+            sess.frames = sess.frames[:end_idx + 1]
+            sess.features = sess.features[:end_idx + 1]
+            sess.timestamps = sess.timestamps[:end_idx + 1]
+            sess.state = "IDLE"
+            sess.up_count = 0
+            sess.down_count = 0
+            sess.pre_roll.clear()
+            return "SPAN_COMPLETE"
+    return "SIGN"
 ```
 
 ---
@@ -4318,8 +3716,8 @@ export default eslintConfig;
 ```typescript
 /// <reference types="next" />
 /// <reference types="next/image-types/global" />
-import "./.next/dev/types/routes.d.ts";
-import "./.next/dev/types/root-params.d.ts";
+import "./.next/types/routes.d.ts";
+import "./.next/types/root-params.d.ts";
 
 // NOTE: This file should not be edited
 // see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
@@ -4360,7 +3758,6 @@ export default {
 import React from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import {
-  Eye,
   Brain,
   MessageSquareText,
   Volume2,
@@ -4372,7 +3769,6 @@ import {
   Layers,
   Cpu,
   Camera,
-  ScanFace,
   Hand,
   Sparkles,
   AlertTriangle,
@@ -4380,9 +3776,9 @@ import {
   XCircle,
   Clock3,
   ArrowRight,
-  Lock,
   Globe,
   WifiOff,
+  Lock,
 } from "lucide-react";
 
 export default function AboutPage() {
@@ -4397,7 +3793,7 @@ export default function AboutPage() {
       name: "Koushaki Singha",
       roll: "34900124074",
       role: "Sign Language Data & Quality Lead",
-      focus: "WBSL/ISL/BdSL sign recording coordination, dataset annotation, NMM tagging, landmark data quality review",
+      focus: "WBSL/ISL/BdSL sign recording coordination, dataset annotation, landmark data quality review",
     },
     {
       name: "Monirul Halder",
@@ -4419,52 +3815,45 @@ export default function AboutPage() {
       icon: Camera,
       label: "CAMERA",
       color: "text-accent-primary",
-      desc: "30 FPS webcam capture, MediaPipe Holistic extracts 540 landmarks (42 hand + 468 face + 33 pose)",
+      desc: "30 FPS webcam capture, MediaPipe Holistic extracts hand, pose (8-point) and face landmarks",
     },
     {
       id: "recognition",
       icon: Hand,
       label: "RECOGNITION",
-      color: "text-status-pending",
-      desc: "Static MLP (99.9% acc) is LIVE. Continuous LSTM video training for dynamic signs is currently HALF-DONE and in active progress.",
-    },
-    {
-      id: "nmm",
-      icon: ScanFace,
-      label: "NMM GATE",
-      color: "text-accent-secondary",
-      desc: "5 geometry-based markers: eyebrow raise/furrow, head shake/nod, mouth open. Deterministic, < 5ms",
+      color: "text-status-approved",
+      desc: "98-dim shoulder-box feature vector → BiLSTM + Attention (64-frame temporal clips). Span-based auto-detection: hands raised = sign starts, hands lowered = inference runs.",
     },
     {
       id: "emotion",
       icon: Sparkles,
       label: "EMOTION",
       color: "text-accent-secondary",
-      desc: "ViT-ONNX 7-class classifier, robust to glasses, ~30–50ms. Supplementary affective context",
+      desc: "ViT-ONNX 7-class classifier, robust to glasses, ~30–50ms. Supplementary affective context for Bengali output tone.",
     },
     {
       id: "nlg",
       icon: Brain,
       label: "BENGALI NLG",
       color: "text-accent-primary",
-      desc: "gemma-4-E4B, 50-criteria constrained prompt, preserves question/negation/WHETHER/IF-THEN scope",
+      desc: "NVIDIA Nemotron 3.5-B (offline) / OpenRouter (online). 50-criteria constrained prompt. OpenAI-compatible API. AI_MODE selects the engine.",
     },
     {
       id: "tts",
       icon: Volume2,
       label: "TTS",
       color: "text-accent-primary",
-      desc: "edge-tts (online, ~604 ms/word) → BanglaTTS (offline, ~453 ms/word) automatic fallback",
+      desc: "edge-tts (online, ~604 ms/word) → BanglaTTS (offline, ~453 ms/word) automatic fallback. ElevenLabs premium option.",
     },
   ];
 
   const techStack = [
     { category: "Vision", items: "MediaPipe Holistic 0.10.14 · OpenCV · ViT-ONNX (trpakov/vit-face-expression)" },
-    { category: "ML", items: "PyTorch · ONNX Runtime · MLP (static) · LSTM (temporal, in progress) · 258-dim holistic (hands+pose) active contract" },
-    { category: "LLM", items: "gemma-4-E4B-it-Q4_K_M (deployment) · gemma-4-12b-it-Q4_0 (reference) · KoboldCpp" },
-    { category: "TTS", items: "edge-tts (bn-BD-NabanitaNeural) · BanglaTTS (silero) · mutagen" },
-    { category: "Frontend", items: "Next.js 14 · TypeScript · Tailwind · shadcn/ui · Framer Motion · Recharts" },
-    { category: "Backend", items: "FastAPI · WebSocket · Python 3.11 · Single venv deployment" },
+    { category: "ML", items: "PyTorch · ONNX Runtime · BiLSTM + Attention (98-dim shoulder box, 64-frame clips) · Training zone: extract → train → avatar_extract → test_model" },
+    { category: "LLM", items: "NVIDIA-Nemotron-3.5-Bolt-E4B-UD-Q3_K_XL.gguf (offline, KoboldCpp) · OpenRouter (online) · OpenAI-compatible API · AI_MODE selection" },
+    { category: "TTS", items: "edge-tts (bn-BD-NabanitaNeural) · BanglaTTS (silero) · ElevenLabs eleven_v3 (premium) · mutagen" },
+    { category: "Frontend", items: "Next.js · TypeScript · Tailwind · shadcn/ui · Framer Motion · Recharts · Three.js (3D avatar simulation)" },
+    { category: "Backend", items: "FastAPI · Python 3.11 · Single venv deployment · .env-driven AI_MODE configuration" },
   ];
 
   const gaps = [
@@ -4477,19 +3866,20 @@ export default function AboutPage() {
   ];
 
   const currentStatus = [
-    { label: "MediaPipe Stream", desc: "540 landmarks extracted at stable 30 FPS.", status: "DONE" },
-    { label: "Emotion & NMM", desc: "ViT-ONNX (glasses-robust) and 5 geometric NMM markers live.", status: "DONE" },
-    { label: "Static Recognition", desc: "126-dim MLP achieving 99.9% validation accuracy.", status: "DONE" },
-    { label: "Bengali NLG & TTS", desc: "6 models benchmarked; gemma-4-E4B selected and stress-tested.", status: "DONE" },
-    { label: "Continuous Action Recognition", desc: "Pipeline designed; LSTM video training is half-done.", status: "HALF-DONE" },
+    { label: "MediaPipe Stream", desc: "Hand + 8-point pose + 19-point face extracted at stable 30 FPS.", status: "DONE" },
+    { label: "Emotion Detection", desc: "ViT-ONNX 7-class classifier (glasses-robust) provides supplementary affect context.", status: "DONE" },
+    { label: "98-dim Feature Extraction", desc: "Shoulder-box coordinate system. 66 handshape + 12 palm + 4 wrist + 4 elbow + 6 wrist-face + 3 head + 2 flags + 1 duration.", status: "DONE" },
+    { label: "BiLSTM + Attention Model", desc: "Model 5 (sign_daily_lstm.onnx). Input: (batch, 64, 98). Span-based auto-detection with pre-roll and tail trimming.", status: "DONE" },
+    { label: "Bengali NLG & TTS", desc: "AI_MODE env variable. Offline: Nemotron 3.5-B via KoboldCpp. Online: OpenRouter. Dual-engine TTS.", status: "DONE" },
+    { label: "3D Avatar Simulation", desc: "Per-gloss avatar data (pose.npy, hands.npy, face.npy, t.npy) served from model bundle. Three.js 3D rendering.", status: "DONE" },
   ];
 
   const roadmap = [
-    { num: 1, label: "Continuous Action Recognition", desc: "Finalizing LSTM training on continuous video sequences for dynamic signs (currently half-done).", active: false },
+    { num: 1, label: "Expanded Sign Vocabulary", desc: "Growing the training dataset with more WBSL-specific signs beyond the current ISL-based vocabulary.", active: true },
     { num: 2, label: "WB Region Data Creation", desc: "A dedicated data collector tool is being prepared to build the first continuous dataset for WBSL/ISL/BdSL.", active: true },
-    { num: 3, label: "Field Survey", desc: "50+ field verification questions prepared and structured for real-world community data collection.", active: true },
-    { num: 4, label: "Unknown Sign Handling", desc: "Fully implementing the “Honesty Layer” to detect unknown signs and prevent AI hallucination.", active: false },
-    { num: 5, label: "Real-Time Workable UI", desc: "Conversation documenting, Sign-to-Voice and Voice-to-Sign on a single, high-speed interface.", active: false },
+    { num: 3, label: "Community Contributions", desc: "Planned future feature. Privacy-first landmark submission with human verification pipeline. Currently disabled.", active: false },
+    { num: 4, label: "Field Survey", desc: "50+ field verification questions prepared and structured for real-world community data collection.", active: true },
+    { num: 5, label: "Unknown Sign Handling", desc: "Fully implementing the 'Honesty Layer' to detect unknown signs and prevent AI hallucination.", active: false },
   ];
 
   return (
@@ -4561,14 +3951,10 @@ export default function AboutPage() {
           </div>
           <div className="space-y-3">
             {currentStatus.map((item) => (
-              <div key={item.label} className={`flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 p-4 rounded-md border ${item.status === "HALF-DONE" ? "bg-status-unknown/5 border-status-unknown" : "bg-surface border-border"}`}>
+              <div key={item.label} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 p-4 rounded-md border bg-surface border-border">
                 <div className="flex items-center gap-3 sm:w-1/3">
-                  {item.status === "DONE" ? (
-                    <CheckCircle2 size={18} className="text-status-approved shrink-0" />
-                  ) : (
-                    <Clock3 size={18} className="text-status-unknown shrink-0" />
-                  )}
-                  <span className={`text-sm font-semibold ${item.status === "HALF-DONE" ? "text-status-unknown" : "text-text-primary"}`}>
+                  <CheckCircle2 size={18} className="text-status-approved shrink-0" />
+                  <span className="text-sm font-semibold text-text-primary">
                     {item.label}
                   </span>
                 </div>
@@ -4651,7 +4037,7 @@ export default function AboutPage() {
                     <span className={`text-xs font-mono font-bold uppercase tracking-wider ${stage.color}`}>
                       {stage.label}
                     </span>
-                    <span className="text-[10px] font-mono text-text-muted">STAGE {i + 1}/6</span>
+                    <span className="text-[10px] font-mono text-text-muted">STAGE {i + 1}/{pipelineStages.length}</span>
                   </div>
                   <p className="text-xs text-text-secondary mt-1 leading-relaxed">{stage.desc}</p>
                 </div>
@@ -4668,10 +4054,10 @@ export default function AboutPage() {
         {/* Key Innovations */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4">
           {[
-            { title: "Landmark-Based Signer Independence", desc: "126-dim normalized vector removes skin color, background, lighting bias. 99.9% val accuracy for static signs." },
+            { title: "98-dim Shoulder Box Features", desc: "Signer-independent coordinate system. Origin at shoulder midpoint, unit = shoulder width. Removes skin color, background, lighting bias." },
+            { title: "Span-Based Auto-Detection", desc: "Hands raised → recording starts automatically. Hands lowered → 64-frame clip selected → inference. No button press needed." },
             { title: "Open-Set Honesty Layer", desc: "OOD gate detects unknown signs BEFORE LLM reasoning. Output carries সম্ভবত (probably), never forced classification." },
-            { title: "Fast/Slow Path Separation", desc: "Real-time recognition in fast path (<50ms). Heavy LLM reasoning runs asynchronously off critical path." },
-            { title: "Privacy-First Verification", desc: "Landmarks only, never raw video. Human reviewers decide. DPDP Act 2023 compliant." },
+            { title: "Privacy-First Design", desc: "Landmarks only, never raw video. Community contributions planned as future feature. DPDP Act 2023 compliant." },
           ].map((item) => (
             <div key={item.title} className="p-4 rounded-md bg-surface border border-border space-y-1">
               <div className="text-sm font-semibold text-text-primary">{item.title}</div>
@@ -4698,7 +4084,7 @@ export default function AboutPage() {
           ))}
         </div>
         <p className="text-xs text-text-muted font-mono">
-          All modules run in a single Python 3.11 venv on CPU. No cloud dependency for core operation.
+          All modules run in a single Python 3.11 venv on CPU. No cloud dependency for core operation. AI_MODE in .env selects offline or online LLM.
         </p>
       </section>
 
@@ -4710,8 +4096,7 @@ export default function AboutPage() {
         </div>
         <p className="text-sm text-text-secondary leading-relaxed max-w-3xl">
           Transfer-first approach. Ready-made datasets (BdSLW401, iSign, ISLTranslate) provide
-          ~15,000 pre-labelled sequences covering 460+ signs. Community collection via web platform
-          targets 10–15 recordings per sign from 3–5 signers across WBSL, ISL, and BdSL varieties.
+          ~15,000 pre-labelled sequences covering 460+ signs. Training pipeline: extract.py → train.py → avatar_extract.py → test_model.py.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {[
@@ -4728,8 +4113,8 @@ export default function AboutPage() {
         <div className="p-4 rounded-md bg-surface border border-border">
           <div className="text-xs font-mono text-text-muted mb-2">DATA INDEXING</div>
           <p className="text-xs text-text-secondary">
-            Signer-disjoint splits enforced. Manifest-based indexing by provenance, signer, and verification status.
-            Only human-accepted community data enters training. Embedding index rebuilt per dataset version.
+            Signer-disjoint splits enforced. Features id and model id are append-only (new id per run).
+            Daily report and confusion matrix stored per model. Avatar data co-located with model bundle.
           </p>
         </div>
       </section>
@@ -4741,13 +4126,13 @@ export default function AboutPage() {
           <h2 className="text-2xl font-bold text-text-primary">Unknown Sign Handling</h2>
         </div>
         <p className="text-sm text-text-secondary leading-relaxed max-w-3xl">
-          When the OOD gate detects a sign outside trained vocabulary, the system does not guess confidently.
-          It generates a three-tier movement representation and produces ranked tentative candidates.
+          When the confidence margin is below threshold or top probability &lt; 0.5, the system reports &quot;Not sure&quot;
+          instead of guessing. It generates ranked tentative candidates from the top-3 model outputs.
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {[
             { tier: "LEVEL 1", label: "Numerical", desc: "finger_extension, velocity, repetition, duration, distance_to_mouth" },
-            { tier: "LEVEL 2", label: "Symbolic", desc: "RIGHT_HAND INDEX_EXTENDED TOWARD_MOUTH REPEATED_3X NO_NMM" },
+            { tier: "LEVEL 2", label: "Symbolic", desc: "RIGHT_HAND INDEX_EXTENDED TOWARD_MOUTH REPEATED_3X" },
             { tier: "LEVEL 3", label: "Natural Language", desc: "\"The right hand moves toward the mouth, pauses, and returns. Repeated three times.\"" },
           ].map((level) => (
             <div key={level.tier} className="p-3 rounded-md bg-surface border border-border space-y-1">
@@ -4766,24 +4151,27 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* ─── COMMUNITY VERIFICATION ─── */}
+      {/* ─── COMMUNITY DATA (PLANNED FUTURE) ─── */}
       <section className="space-y-4">
         <div className="flex items-center gap-3">
           <ShieldCheck size={20} className="text-accent-primary" />
-          <h2 className="text-2xl font-bold text-text-primary">Community Data Verification</h2>
+          <h2 className="text-2xl font-bold text-text-primary">Community Data Collection</h2>
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-status-pending/20 border border-status-pending/40 text-status-pending font-bold">
+            PLANNED FUTURE FEATURE
+          </span>
         </div>
         <p className="text-sm text-text-secondary leading-relaxed max-w-3xl">
-          Privacy-first submission. Only landmarks are collected; original video is discarded on-device
-          before transmission. Automated validation produces evidence only. Human reviewers make all
+          Privacy-first submission. Only landmarks will be collected; original video discarded on-device
+          before transmission. Automated validation will produce evidence only. Human reviewers will make all
           final decisions. Compliant with India&rsquo;s Digital Personal Data Protection Act 2023.
         </p>
-        <div className="flex flex-wrap items-center gap-2 p-4 rounded-md bg-surface border border-border">
+        <div className="flex flex-wrap items-center gap-2 p-4 rounded-md bg-surface border border-border opacity-60">
           <Lock size={14} className="text-accent-primary" />
           <span className="text-xs font-mono text-text-secondary">
             AUTOMATION → ANALYSE → EXPLAIN → SIMULATE → SHOW EVIDENCE → HUMAN DECIDES
           </span>
         </div>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-3 gap-3 opacity-60">
           {[
             { icon: CheckCircle2, label: "ACCEPT", desc: "Enters trusted dataset", color: "text-status-approved" },
             { icon: XCircle, label: "REJECT", desc: "Not used for training", color: "text-status-error" },
@@ -4811,8 +4199,8 @@ export default function AboutPage() {
               <span className="text-xs font-mono font-bold text-text-primary">FORWARD: SIGN → BENGALI</span>
             </div>
             <p className="text-xs text-text-secondary leading-relaxed">
-              Camera → MediaPipe → 126-dim landmarks → MLP/LSTM → OOD Gate → NMM + Emotion packet
-              → Constrained LLM → Natural Bengali text → Dual-engine TTS audio
+              Camera → MediaPipe → 98-dim shoulder-box features → BiLSTM + Attention (64 frames)
+              → Emotion ViT → Constrained LLM (AI_MODE) → Natural Bengali text → Dual-engine TTS audio
             </p>
           </div>
           <div className="p-4 rounded-md bg-surface border border-border space-y-2">
@@ -4822,7 +4210,7 @@ export default function AboutPage() {
             </div>
             <p className="text-xs text-text-secondary leading-relaxed">
               Bengali text/voice → LLM gloss generation → Sign sequence mapping →
-              Admin-approved reference videos → Continuous sequential playback
+              Avatar landmark replay → Continuous sequential 3D simulation
             </p>
           </div>
         </div>
@@ -4865,15 +4253,15 @@ export default function AboutPage() {
         <div className="flex items-center gap-4 flex-wrap">
           <div className="flex items-center gap-2">
             <Globe size={14} className="text-status-approved" />
-            <span className="text-xs font-mono text-text-secondary">ONLINE: edge-tts + full features</span>
+            <span className="text-xs font-mono text-text-secondary">ONLINE: edge-tts + OpenRouter LLM</span>
           </div>
           <div className="flex items-center gap-2">
             <WifiOff size={14} className="text-status-pending" />
-            <span className="text-xs font-mono text-text-secondary">OFFLINE: BanglaTTS + local LLM (KoboldCpp)</span>
+            <span className="text-xs font-mono text-text-secondary">OFFLINE: BanglaTTS + Nemotron 3.5-B (KoboldCpp)</span>
           </div>
           <div className="flex items-center gap-2">
             <Cpu size={14} className="text-accent-primary" />
-            <span className="text-xs font-mono text-text-secondary">LLM: LOCAL (gemma-4-E4B)</span>
+            <span className="text-xs font-mono text-text-secondary">AI_MODE in .env selects the engine</span>
           </div>
         </div>
       </section>
@@ -4899,158 +4287,30 @@ export default function AboutPage() {
 
 ```tsx
 "use client";
-import React, { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { contributionService } from "@/services/contributions";
-import { EvidencePanel } from "@/components/verification/EvidencePanel";
-import { LandmarkSimulation } from "@/components/simulation/LandmarkSimulation";
-import { TableRowSkeleton } from "@/components/skeletons";
-import { Contribution } from "@/lib/types";
-import { toast } from "sonner";
-import axios from "axios";
 
-const API_BASE = "http://localhost:8200";
+import React from "react";
 
 export default function AdminContributionsPage() {
-  const { data: contributions, isLoading, isError, refetch } = useQuery({
-    queryKey: ["admin-contributions"],
-    queryFn: () => contributionService.getContributions(),
-  });
-
-  const [selectedContribution, setSelectedContribution] = useState<Contribution | null>(null);
-
-  const { data: evidence, isLoading: evidenceLoading } = useQuery({
-    queryKey: ["evidence", selectedContribution?.sample_id],
-    queryFn: () => contributionService.getEvidence(selectedContribution!.sample_id),
-    enabled: !!selectedContribution,
-  });
-
-  // Real extracted landmarks of the submitted sample (no synthetic fallback).
-  const { data: sim } = useQuery({
-    queryKey: ["sim-frames-sample", selectedContribution?.sample_id],
-    queryFn: async () =>
-      (await axios.get(`${API_BASE}/api/simulation/frames`, {
-        params: { sample_id: selectedContribution!.sample_id },
-      })).data,
-    enabled: !!selectedContribution,
-    retry: false,
-  });
-
-  const handleVerify = async (action: "accepted" | "rejected" | "needs_review", notes?: string) => {
-    if (!selectedContribution) return;
-    try {
-      await contributionService.verifyContribution(selectedContribution.sample_id, action, notes);
-      toast.success(`Submission marked as ${action.toUpperCase()}`);
-      setSelectedContribution(null);
-      refetch();
-    } catch {
-      toast.error("Failed to submit verification action");
-    }
-  };
-
   return (
     <div className="space-y-6 max-w-7xl">
       <div className="pb-3 border-b border-border">
-        <div className="text-xs font-mono uppercase text-text-muted">VERIFICATION PIPELINE</div>
+        <div className="text-xs font-mono uppercase text-text-muted">PLANNED FEATURE</div>
         <h1 className="text-2xl font-bold tracking-tight text-text-primary mt-1">
-          Community Contributions & Evidence Review
+          Community Contributions
         </h1>
       </div>
-
-      <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-        {/* Left: Contributions Queue Table (5 cols) */}
-        <div className="xl:col-span-5 bg-surface border border-border rounded-lg overflow-hidden flex flex-col">
-          <div className="p-4 border-b border-border bg-surface-elevated flex justify-between items-center text-xs font-mono">
-            <span className="font-semibold text-text-primary uppercase">INCOMING QUEUE</span>
-            <span className="text-text-secondary">{contributions?.length || 0} SAMPLES</span>
-          </div>
-
-          <div className="overflow-x-auto flex-1">
-            <table className="w-full text-left border-collapse text-xs font-mono">
-              <thead>
-                <tr className="border-b border-border text-text-muted">
-                  <th className="py-2.5 px-3">Sign</th>
-                  <th className="py-2.5 px-3">Signer</th>
-                  <th className="py-2.5 px-3">Status</th>
-                  <th className="py-2.5 px-3 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {isLoading ? (
-                  Array.from({ length: 4 }).map((_, i) => (
-                    <TableRowSkeleton key={i} columns={4} />
-                  ))
-                ) : isError ? (
-                  <tr>
-                    <td colSpan={4} className="py-8 text-center text-status-error">
-                      Could not load contributions. Check the backend connection and try again.
-                    </td>
-                  </tr>
-                ) : contributions?.length ? contributions.map((item) => (
-                  <tr
-                    key={item.sample_id}
-                    onClick={() => setSelectedContribution(item)}
-                    className={`cursor-pointer transition-colors ${
-                      selectedContribution?.sample_id === item.sample_id
-                        ? "bg-accent-primary/10 border-l-2 border-accent-primary"
-                        : "hover:bg-surface-elevated/60"
-                    }`}
-                  >
-                    <td className="py-3 px-3 font-bold text-text-primary">{item.label}</td>
-                    <td className="py-3 px-3 text-text-secondary">{item.signer_id}</td>
-                    <td className="py-3 px-3">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-semibold uppercase bg-status-pending/20 text-status-pending">
-                        {item.verification}
-                      </span>
-                    </td>
-                    <td className="py-3 px-3 text-right">
-                      <span className="text-accent-primary hover:underline text-[11px]">Inspect</span>
-                    </td>
-                  </tr>
-                )) : (
-                  <tr>
-                    <td colSpan={4} className="py-8 text-center text-text-muted">
-                      No community contributions have been submitted yet.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Right: Inspection, Simulation & Evidence Panel (7 cols) */}
-        <div className="xl:col-span-7 space-y-6">
-          {selectedContribution ? (
-            <>
-              {/* Landmark Canvas Player */}
-              <div className="space-y-2">
-                <div className="text-xs font-mono uppercase text-text-muted">
-                  Kinematic Skeleton Replay: {selectedContribution.label}
-                </div>
-                <LandmarkSimulation frames={sim?.frames} pose={sim?.pose} fps={15} title={sim?.source} />
-              </div>
-
-              {/* Evidence Panel with Reasoning Layer */}
-              {evidenceLoading ? (
-                <div className="p-8 bg-surface rounded border border-border text-center text-xs font-mono text-text-muted">
-                  Loading kinematic telemetry...
-                </div>
-              ) : evidence ? (
-                <EvidencePanel
-                  evidence={evidence}
-                  submittedLabel={selectedContribution.label}
-                  signerId={selectedContribution.signer_id}
-                  onAction={handleVerify}
-                />
-              ) : null}
-            </>
-          ) : (
-            <div className="h-96 bg-surface border border-border rounded-lg flex items-center justify-center text-center p-6 text-xs font-mono text-text-muted">
-              Select a contribution from the left queue to inspect MediaPipe coordinates and algorithmic evidence.
-            </div>
-          )}
-        </div>
+      <div className="p-8 bg-surface border border-border rounded-lg text-center space-y-3">
+        <div className="text-4xl">🚧</div>
+        <h2 className="text-lg font-semibold text-text-primary">Coming Soon</h2>
+        <p className="text-sm text-text-secondary max-w-md mx-auto">
+          Community contribution functionality is planned for a future release.
+        </p>
+        <button
+          disabled
+          className="px-4 py-2 rounded bg-surface-elevated border border-border text-text-muted text-xs font-mono cursor-not-allowed opacity-50"
+        >
+          Contributions (Unavailable)
+        </button>
       </div>
     </div>
   );
@@ -5071,11 +4331,11 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex-1 flex flex-col md:flex-row bg-background">
+    <div className="flex h-[100dvh] min-h-0 w-full flex-none flex-col overflow-hidden bg-background md:flex-row">
       <AdminSidebar />
-      <div className="flex-1 overflow-x-hidden p-6 md:p-8">
+      <main className="h-0 min-h-0 min-w-0 w-full flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain p-4 md:h-full md:w-auto md:p-6">
         {children}
-      </div>
+      </main>
     </div>
   );
 }
@@ -5117,13 +4377,35 @@ type RegistryResponse = {
   error: string | null;
 };
 
-/**
- * The two feature vectors the backend can actually produce (backend/extract.py):
- * 126 is the two-hand landmark block, 258 adds the 33x4 pose block that the
- * daily-conversation LSTM is trained on. Anything else cannot be fed, so the
- * backend refuses it -- this mirror only greys the button out first.
- */
-const SERVABLE_WIDTHS = [126, 258];
+type ModelReport = {
+  best_epoch?: number;
+  best_val_acc?: number;
+  best_val_loss?: number;
+  val_top3_acc?: number;
+  training_seconds?: number;
+  macro_avg?: { precision?: number; recall?: number; f1?: number };
+  per_class?: Record<string, {
+    precision?: number;
+    recall?: number;
+    f1?: number;
+    support?: number;
+  }>;
+  data?: { classes?: number; train_videos?: number; val_videos?: number };
+};
+
+type ConfusionReport = {
+  classes?: string[];
+  matrix?: number[][];
+  rows?: string;
+  columns?: string;
+};
+
+const SERVABLE_WIDTHS = [98];
+
+const mutationErrorMessage = (error: unknown, fallback: string) =>
+  axios.isAxiosError<{ detail?: string }>(error)
+    ? error.response?.data?.detail || fallback
+    : fallback;
 
 /** A model is servable when the backend has an extractor for its input width. */
 const canActivate = (m: ModelEntry) =>
@@ -5131,9 +4413,8 @@ const canActivate = (m: ModelEntry) =>
 
 /** Human name for the extractor an input width selects. */
 const featureLabel = (m: ModelEntry) => {
-  if (m.temporal) return "LSTM temporal";
-  if (m.input_width === 258) return "MLP static \u00b7 hands+pose 258";
-  return `MLP static \u00b7 input ${m.input_width ?? "?"}`;
+  if (m.temporal) return "BiLSTM temporal \u00b7 98-dim shoulder box";
+  return `input ${m.input_width ?? "?"}-dim`;
 };
 
 export default function AdminModelsPage() {
@@ -5146,6 +4427,20 @@ export default function AdminModelsPage() {
     refetchInterval: 15000,
   });
 
+  const { data: report } = useQuery({
+    queryKey: ["active-model-report", data?.active_path],
+    queryFn: async () =>
+      (await axios.get<ModelReport>(`${API_BASE}/api/admin/model/report`)).data,
+    enabled: Boolean(data?.active_path),
+  });
+
+  const { data: confusion } = useQuery({
+    queryKey: ["active-model-confusion", data?.active_path],
+    queryFn: async () =>
+      (await axios.get<ConfusionReport>(`${API_BASE}/api/admin/model/confusion`)).data,
+    enabled: Boolean(data?.active_path),
+  });
+
   const rescan = useMutation({
     mutationFn: async () =>
       (await axios.post(`${API_BASE}/api/admin/models/rescan`)).data,
@@ -5154,7 +4449,7 @@ export default function AdminModelsPage() {
       qc.invalidateQueries({ queryKey: ["admin-models"] });
       qc.invalidateQueries({ queryKey: ["admin-signs"] });
     },
-    onError: (e: any) => toast.error(e?.response?.data?.detail || "Rescan failed"),
+    onError: (error: unknown) => toast.error(mutationErrorMessage(error, "Rescan failed")),
   });
 
   const activate = useMutation({
@@ -5168,7 +4463,7 @@ export default function AdminModelsPage() {
       qc.invalidateQueries({ queryKey: ["admin-signs"] });
       qc.invalidateQueries({ queryKey: ["health"] });
     },
-    onError: (e: any) => toast.error(e?.response?.data?.detail || "Activation failed"),
+    onError: (error: unknown) => toast.error(mutationErrorMessage(error, "Activation failed")),
   });
 
   const models = data?.models ?? [];
@@ -5249,7 +4544,7 @@ export default function AdminModelsPage() {
                 {!servable && (
                   <span
                     className="px-2 py-0.5 rounded text-[10px] font-mono bg-status-pending/20 text-status-pending"
-                    title="The backend has no extractor for this input width (it emits 126-dim two-hand or 258-dim hands+pose vectors)"
+                    title="The backend requires a temporal model with 64 frames of 98-dim shoulder-box features."
                   >
                     INCOMPATIBLE
                   </span>
@@ -5281,6 +4576,125 @@ export default function AdminModelsPage() {
           {data.active.classes} classes, {data.active.temporal ? "temporal" : "static"})
         </div>
       )}
+
+      <section className="space-y-3 rounded-lg border border-border bg-surface p-5">
+        <div>
+          <div className="text-xs font-mono uppercase text-text-muted">ACTIVE MODEL REPORT</div>
+          <h2 className="mt-1 text-lg font-bold text-text-primary">
+            Validation &amp; Confusion Matrix
+          </h2>
+        </div>
+
+        {report?.best_val_acc === undefined ? (
+          <p className="text-xs font-mono text-text-muted">
+            No training report is available for the active model bundle.
+          </p>
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+              {[
+                ["Validation accuracy", report.best_val_acc],
+                ["Top-3 accuracy", report.val_top3_acc],
+                ["Macro F1", report.macro_avg?.f1],
+                ["Validation loss", report.best_val_loss],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded border border-border bg-surface-elevated p-3">
+                  <div className="text-[9px] font-mono uppercase text-text-muted">{label}</div>
+                  <div className="mt-1 text-lg font-bold text-text-primary">
+                    {typeof value === "number" ? `${(value * (label === "Validation loss" ? 1 : 100)).toFixed(1)}${label === "Validation loss" ? "" : "%"}` : "—"}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="text-[10px] font-mono text-text-muted">
+              Epoch {report.best_epoch ?? "—"} · {report.data?.train_videos ?? "—"} training clips ·{" "}
+              {report.data?.val_videos ?? "—"} validation clips · {report.training_seconds ?? "—"} s
+            </div>
+
+            {report.per_class && (
+              <details className="rounded border border-border">
+                <summary className="cursor-pointer px-3 py-2 text-[10px] font-mono text-text-secondary">
+                  Per-class precision, recall &amp; F1 ({Object.keys(report.per_class).length} classes)
+                </summary>
+                <div className="max-h-80 overflow-auto">
+                  <table className="w-full text-left text-[10px] font-mono">
+                    <thead className="sticky top-0 bg-surface-elevated text-text-muted">
+                      <tr>
+                        <th className="px-3 py-2">Gloss</th>
+                        <th className="px-3 py-2">Precision</th>
+                        <th className="px-3 py-2">Recall</th>
+                        <th className="px-3 py-2">F1</th>
+                        <th className="px-3 py-2">Support</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {Object.entries(report.per_class).map(([gloss, metrics]) => (
+                        <tr key={gloss}>
+                          <td className="px-3 py-1.5 font-bold text-text-primary">{gloss}</td>
+                          <td className="px-3 py-1.5 text-text-secondary">{metrics.precision?.toFixed(3) ?? "—"}</td>
+                          <td className="px-3 py-1.5 text-text-secondary">{metrics.recall?.toFixed(3) ?? "—"}</td>
+                          <td className="px-3 py-1.5 text-text-secondary">{metrics.f1?.toFixed(3) ?? "—"}</td>
+                          <td className="px-3 py-1.5 text-text-secondary">{metrics.support ?? "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            )}
+
+            {confusion?.classes?.length && confusion.matrix?.length ? (
+              <details className="rounded border border-border">
+                <summary className="cursor-pointer px-3 py-2 text-[10px] font-mono text-text-secondary">
+                  Confusion matrix · actual rows × predicted columns
+                </summary>
+                <div className="max-h-[440px] overflow-auto">
+                  <table className="min-w-max border-collapse text-[9px] font-mono">
+                    <thead className="sticky top-0 z-10 bg-surface-elevated text-text-muted">
+                      <tr>
+                        <th className="sticky left-0 z-20 border border-border bg-surface-elevated px-2 py-1">Actual</th>
+                        {confusion.classes.map((gloss) => (
+                          <th key={gloss} className="border border-border px-2 py-1" title={gloss}>
+                            {gloss}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {confusion.matrix.map((row, rowIndex) => (
+                        <tr key={confusion.classes?.[rowIndex] ?? rowIndex}>
+                          <th className="sticky left-0 border border-border bg-surface-elevated px-2 py-1 text-left text-text-primary">
+                            {confusion.classes?.[rowIndex] ?? rowIndex}
+                          </th>
+                          {row.map((count, columnIndex) => (
+                            <td
+                              key={columnIndex}
+                              className="border border-border px-2 py-1 text-center text-text-secondary"
+                              style={{
+                                backgroundColor: count
+                                  ? `rgba(94, 234, 212, ${Math.min(0.7, 0.12 + count / Math.max(1, ...row) * 0.55)})`
+                                  : undefined,
+                              }}
+                              title={`${confusion.classes?.[rowIndex]} → ${confusion.classes?.[columnIndex]}: ${count}`}
+                            >
+                              {count}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            ) : (
+              <p className="text-[10px] font-mono text-text-muted">
+                No confusion matrix is available for the active model bundle.
+              </p>
+            )}
+          </>
+        )}
+      </section>
     </div>
   );
 }
@@ -5333,15 +4747,15 @@ export default function AdminDashboardPage() {
           <div className="text-[11px] font-mono text-text-secondary">Classes in model: {stats?.model_classes ?? "—"}</div>
         </div>
         <div className="p-5 rounded-lg bg-surface border border-border space-y-2">
-          <div className="text-xs font-mono uppercase text-text-muted">Approved Samples</div>
-          <div className="text-2xl font-bold text-accent-primary">{stats?.total_approved_samples ?? "—"}</div>
-          <div className="text-[11px] font-mono text-text-secondary">Dataset: {stats?.dataset_version ?? "—"}</div>
+          <div className="text-xs font-mono uppercase text-text-muted">Signs With Avatar Data</div>
+          <div className="text-2xl font-bold text-accent-primary">{stats?.avatar_classes ?? "—"}</div>
+          <div className="text-[11px] font-mono text-text-secondary">Replay assets bundled with the active model</div>
         </div>
         <div className="p-5 rounded-lg bg-surface border border-border space-y-2">
           <div className="text-xs font-mono uppercase text-text-muted">Active Model</div>
           <div className="text-lg font-bold text-text-primary truncate">{stats?.model_active ?? "—"}</div>
           <div className="text-[11px] font-mono text-text-secondary">
-            {stats?.contract?.feature_width ?? 126}-dim {stats?.contract?.kind ?? "model"} · {stats?.model_classes ?? "—"} classes
+            {stats?.contract?.feature_width ?? 98}-dim · {stats?.contract?.frames ?? 64} frames · {stats?.model_classes ?? "—"} classes
           </div>
         </div>
         <div className="p-5 rounded-lg bg-surface border border-border space-y-2">
@@ -5353,9 +4767,9 @@ export default function AdminDashboardPage() {
 
       {/* Quick Launch Action Panels */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Link
-          href="/admin/contributions"
-          className="p-6 rounded-lg bg-surface border border-border hover:border-accent-primary transition-all flex flex-col justify-between space-y-4"
+        <div
+          aria-disabled="true"
+          className="p-6 rounded-lg bg-surface border border-border opacity-50 cursor-not-allowed flex flex-col justify-between space-y-4"
         >
           <div>
             <div className="w-10 h-10 rounded bg-accent-primary/10 text-accent-primary flex items-center justify-center mb-3">
@@ -5363,30 +4777,29 @@ export default function AdminDashboardPage() {
             </div>
             <h3 className="font-semibold text-text-primary">Contribution Verification</h3>
             <p className="text-xs text-text-secondary mt-1">
-              Inspect coordinate trajectories, validation scores, and reviewer reasoning layers.
+              Planned future feature. Not currently active.
             </p>
           </div>
-          <div className="flex items-center space-x-1 text-xs font-mono text-accent-primary font-bold">
-            <span>Review Queue</span>
-            <ArrowUpRight size={14} />
+          <div className="flex items-center space-x-1 text-xs font-mono text-text-muted">
+            <span>Coming Soon</span>
           </div>
-        </Link>
+        </div>
 
         <Link
-          href="/admin/dataset"
+          href="/admin/training-data"
           className="p-6 rounded-lg bg-surface border border-border hover:border-accent-secondary transition-all flex flex-col justify-between space-y-4"
         >
           <div>
             <div className="w-10 h-10 rounded bg-accent-secondary/10 text-accent-secondary flex items-center justify-center mb-3">
               <Database size={20} />
             </div>
-            <h3 className="font-semibold text-text-primary">Dataset Explorer</h3>
+            <h3 className="font-semibold text-text-primary">Training Data Verification</h3>
             <p className="text-xs text-text-secondary mt-1">
-              Browse the sign lexicon, filter by category and dialect, and inspect per-sign sample counts.
+              Review archived model clips, skeleton sequences, and recognition results.
             </p>
           </div>
           <div className="flex items-center space-x-1 text-xs font-mono text-accent-secondary font-bold">
-            <span>Open Explorer</span>
+            <span>Open Training Data</span>
             <ArrowUpRight size={14} />
           </div>
         </Link>
@@ -5424,9 +4837,11 @@ export default function AdminSettingsPage() {
   const rows: [string, string][] = [
     ["API PORT", "8200"],
     ["ACTIVE MODEL", `${health?.active_model ?? "—"} (${health?.model_run ?? "—"})`],
-    ["MODEL CONTRACT", `${health?.contract?.kind ?? "—"} · ${health?.contract?.feature_width ?? "—"}-dim · ${health?.contract?.frames ?? 1} frames`],
+    ["MODEL CONTRACT", `${health?.contract?.kind ?? "—"} · ${health?.contract?.feature_width ?? 98}-dim · ${health?.contract?.frames ?? 64} frames`],
+    ["ARCHITECTURE", "BiLSTM + Attention (98-dim shoulder box)"],
     ["SIGN VOCABULARY", String(health?.vocabulary_classes ?? 0)],
     ["LLM ENDPOINT", `${health?.llm_model ?? "—"} · ${health?.inference_mode ?? "—"}`],
+    ["AI MODE", health?.ai_mode ?? "offline"],
     ["TTS ENGINE", "edge-tts → BanglaTTS fallback"],
     ["MODEL SEQUENCE COVERAGE", `${health?.sequence_coverage?.with_landmark_sequences ?? 0}/${health?.sequence_coverage?.total_classes ?? 0}`],
   ];
@@ -5457,6 +4872,497 @@ export default function AdminSettingsPage() {
 
 ---
 
+# FILE: `frontend\src\app\admin\training-data\page.tsx`
+
+```tsx
+"use client";
+
+import React from "react";
+import { useQuery } from "@tanstack/react-query";
+import axios from "axios";
+import { ChevronLeft, ChevronRight, CircleCheck, CircleX, Search } from "lucide-react";
+
+const API_BASE = "http://localhost:8200";
+const GLOSS_LIST_LIMIT = 1000;
+
+interface TrainingGloss {
+  gloss: string;
+  category: "Alphabet" | "Word";
+  dialects: string[];
+  clip_count: number;
+}
+
+interface TrainingGlossPage {
+  items: TrainingGloss[];
+  total: number;
+  model_id: string | null;
+  dialects: string[];
+}
+
+interface TrainingClip {
+  gloss: string;
+  clip_index: number;
+  clip_count: number;
+  frame_count: number;
+  feature_width: number;
+  frames: number[][];
+  source_video: string | null;
+  prediction: string;
+  correct: boolean;
+  confidence: number;
+  top3: { label: string; confidence: number }[];
+}
+
+const HAND_COLORS = ["#5EEAD4", "#C4B5FD"];
+
+function TrainingClipView({ clip }: { clip: TrainingClip }) {
+  const [frameIndex, setFrameIndex] = React.useState(0);
+  const [playing, setPlaying] = React.useState(true);
+  const frame = clip.frames[frameIndex] ?? [];
+  const togglePlayback = () => setPlaying((value) => !value);
+
+  React.useEffect(() => {
+    if (!playing) return;
+    const timer = window.setInterval(() => {
+      setFrameIndex((current) => (current + 1) % clip.frame_count);
+    }, 100);
+    return () => window.clearInterval(timer);
+  }, [playing, clip.frame_count]);
+
+  const toScreen = (x: number, y: number) => ({
+    x: 50 + x * 34,
+    y: 44 - y * 28,
+  });
+  const elbows = [0, 1].map((side) =>
+    toScreen(frame[82 + side * 2] ?? 0, frame[83 + side * 2] ?? 0),
+  );
+  const wrists = [0, 1].map((side) =>
+    toScreen(frame[78 + side * 2] ?? 0, frame[79 + side * 2] ?? 0),
+  );
+  const handInUse = [0, 1].map((side) => (frame[95 + side] ?? 0) > 0.5);
+  const shoulders = [toScreen(0.5, 0), toScreen(-0.5, 0)];
+  const headMouth = toScreen(frame[92] ?? 0, frame[93] ?? 0);
+
+  const renderHand = (handIndex: number) => {
+    if (!handInUse[handIndex]) return null;
+    const start = handIndex * 33;
+    const wrist = { x: frame[78 + handIndex * 2] ?? 0, y: frame[79 + handIndex * 2] ?? 0 };
+    const scale = 0.24;
+    const points = Array.from({ length: 11 }, (_, pointIndex) => {
+      const offset = start + pointIndex * 3;
+      const x = frame[offset];
+      const y = frame[offset + 1];
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+      return toScreen(
+        wrist.x + scale * x,
+        wrist.y + scale * y,
+      );
+    });
+    const fingerSegments: [number, number][] = [
+      [1, 2], [3, 4], [5, 6], [7, 8], [9, 10],
+    ];
+    const palmBaseIndices = [1, 3, 5, 7, 9];
+    const palmBases = palmBaseIndices.map((index) => points[index]);
+    const palmPath = palmBases.every(Boolean) && points[0]
+      ? `M ${points[0].x} ${points[0].y} L ${palmBases[0]!.x} ${palmBases[0]!.y} Q ${palmBases[1]!.x} ${palmBases[1]!.y} ${palmBases[2]!.x} ${palmBases[2]!.y} Q ${palmBases[3]!.x} ${palmBases[3]!.y} ${palmBases[4]!.x} ${palmBases[4]!.y} Z`
+      : "";
+
+    return (
+      <g
+        key={handIndex}
+        stroke={HAND_COLORS[handIndex]}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      >
+        {palmPath && (
+          <path
+            d={palmPath}
+            fill={HAND_COLORS[handIndex]}
+            fillOpacity="0.12"
+            stroke={HAND_COLORS[handIndex]}
+            strokeWidth="0.65"
+            strokeOpacity="0.55"
+            vectorEffect="non-scaling-stroke"
+          />
+        )}
+        {fingerSegments.map(([from, to]) => {
+          const first = points[from];
+          const second = points[to];
+          return first && second ? (
+            <line
+              key={`finger-${from}-${to}`}
+              x1={first.x}
+              y1={first.y}
+              x2={second.x}
+              y2={second.y}
+              strokeWidth="1.05"
+              vectorEffect="non-scaling-stroke"
+            />
+          ) : null;
+        })}
+        {points.map((point, index) =>
+          point ? (
+            <circle
+              key={`point-${index}`}
+              cx={point.x}
+              cy={point.y}
+              r={index === 0 ? 1 : index % 2 === 1 ? 0.85 : 0.7}
+              fill={HAND_COLORS[handIndex]}
+              stroke="#0b0b0d"
+              strokeWidth="0.2"
+              vectorEffect="non-scaling-stroke"
+            />
+          ) : null,
+        )}
+      </g>
+    );
+  };
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div
+        role="button"
+        tabIndex={0}
+        aria-label={`${playing ? "Pause" : "Play"} ${clip.gloss} skeleton animation`}
+        onClick={togglePlayback}
+        onKeyDown={(event) => {
+          if (event.key === " " || event.key === "Enter") {
+            event.preventDefault();
+            togglePlayback();
+          }
+        }}
+        className="relative min-h-[220px] flex-1 cursor-pointer overflow-hidden rounded-lg border border-border bg-background/70 outline-none focus-visible:ring-2 focus-visible:ring-accent-primary"
+        title="Click or press Space to play/pause"
+      >
+        <svg
+          viewBox="0 0 100 100"
+          role="img"
+          aria-label={`${clip.gloss} skeleton, frame ${frameIndex + 1} of ${clip.frame_count}`}
+          className="absolute inset-0 h-full w-full"
+        >
+          <line x1="50" y1="8" x2="50" y2="88" stroke="currentColor" opacity="0.08" />
+          <line x1="19" y1="44" x2="81" y2="44" stroke="currentColor" opacity="0.08" />
+          <g stroke="#818CF8" strokeWidth="1.8" strokeLinecap="round" fill="none">
+            <path d={`M ${shoulders[0].x} ${shoulders[0].y} L ${shoulders[1].x} ${shoulders[1].y}`} />
+            <path d={`M ${shoulders[0].x} ${shoulders[0].y} L ${elbows[0].x} ${elbows[0].y}${handInUse[0] ? ` L ${wrists[0].x} ${wrists[0].y}` : ""}`} />
+            <path d={`M ${shoulders[1].x} ${shoulders[1].y} L ${elbows[1].x} ${elbows[1].y}${handInUse[1] ? ` L ${wrists[1].x} ${wrists[1].y}` : ""}`} />
+            <path d="M 40 70 L 60 70 M 50 32 L 50 70" opacity="0.6" />
+          </g>
+          <g fill="#818CF8">
+            {[...shoulders, ...elbows, ...wrists].map((point, index) => (
+              <circle key={index} cx={point.x} cy={point.y} r={index < 2 ? 2 : 1.5} />
+            ))}
+          </g>
+          <ellipse
+            cx={headMouth.x}
+            cy={headMouth.y - 5}
+            rx="4.3"
+            ry="6.3"
+            fill="#818CF8"
+            fillOpacity="0.14"
+            stroke="#818CF8"
+            strokeWidth="1.2"
+          />
+          <circle cx={headMouth.x} cy={headMouth.y} r="0.7" fill="#818CF8" />
+          {renderHand(0)}
+          {renderHand(1)}
+        </svg>
+        <span className="pointer-events-none absolute bottom-2 right-2 rounded bg-background/70 px-2 py-1 text-[9px] font-mono text-text-muted">
+          CLICK / SPACE {playing ? "TO PAUSE" : "TO PLAY"}
+        </span>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-2">
+        <input
+          type="range"
+          min={0}
+          max={Math.max(0, clip.frame_count - 1)}
+          value={frameIndex}
+          onChange={(event) => {
+            setPlaying(false);
+            setFrameIndex(Number(event.target.value));
+          }}
+          aria-label="Training clip frame"
+          className="m-0 min-w-0 flex-1 accent-[var(--accent-primary)]"
+        />
+        <span className="w-16 text-right text-[9px] font-mono text-text-muted">
+          {frameIndex + 1} / {clip.frame_count}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+export default function AdminTrainingDataPage() {
+  const [search, setSearch] = React.useState("");
+  const [category, setCategory] = React.useState("");
+  const [dialect, setDialect] = React.useState("");
+  const [selectedGloss, setSelectedGloss] = React.useState("");
+  const [clipIndex, setClipIndex] = React.useState(0);
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["model-training-data", search, category, dialect],
+    queryFn: async () =>
+      (
+        await axios.get<TrainingGlossPage>(
+          `${API_BASE}/api/admin/model/training-data`,
+          { params: { page: 1, limit: GLOSS_LIST_LIMIT, search, category, dialect } },
+        )
+      ).data,
+    refetchInterval: 15000,
+  });
+
+  const currentGloss = data?.items.some((item) => item.gloss === selectedGloss)
+    ? selectedGloss
+    : data?.items[0]?.gloss ?? "";
+  const currentClipIndex = currentGloss === selectedGloss ? clipIndex : 0;
+
+  const {
+    data: clip,
+    isLoading: clipLoading,
+    isError: clipError,
+  } = useQuery({
+    queryKey: ["model-training-clip", data?.model_id, currentGloss, currentClipIndex],
+    queryFn: async () =>
+      (
+        await axios.get<TrainingClip>(
+          `${API_BASE}/api/admin/model/training-data/${encodeURIComponent(currentGloss)}/clips/${currentClipIndex}`,
+        )
+      ).data,
+    enabled: Boolean(currentGloss),
+    retry: false,
+  });
+
+  const selectGloss = (gloss: string) => {
+    setSelectedGloss(gloss);
+    setClipIndex(0);
+  };
+
+  const handleNavigationKeys = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const target = event.target;
+    if (
+      target instanceof HTMLInputElement ||
+      target instanceof HTMLTextAreaElement ||
+      target instanceof HTMLSelectElement ||
+      (target instanceof HTMLElement && target.isContentEditable)
+    ) {
+      return;
+    }
+
+    if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+      const selectedItem = data?.items.find((item) => item.gloss === currentGloss);
+      const maxClip = Math.max(0, (selectedItem?.clip_count ?? clip?.clip_count ?? 1) - 1);
+      event.preventDefault();
+      setClipIndex((index) =>
+        event.key === "ArrowLeft" ? Math.max(0, index - 1) : Math.min(maxClip, index + 1),
+      );
+    } else if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+      const glosses = data?.items ?? [];
+      if (glosses.length === 0) return;
+      const currentIndex = glosses.findIndex((item) => item.gloss === currentGloss);
+      const nextIndex = event.key === "ArrowUp"
+        ? Math.max(0, currentIndex - 1)
+        : Math.min(glosses.length - 1, currentIndex + 1);
+      event.preventDefault();
+      selectGloss(glosses[nextIndex].gloss);
+    }
+  };
+
+  return (
+    <div
+      className="mx-auto flex h-full min-h-[480px] max-w-7xl flex-col gap-4"
+      onKeyDown={handleNavigationKeys}
+    >
+      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
+        <h1 className="text-xl font-bold text-text-primary">Training Data</h1>
+        <span className="rounded border border-border bg-surface px-2.5 py-1 text-[10px] font-mono text-text-muted">
+          MODEL {data?.model_id ?? "—"}
+        </span>
+      </header>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="relative flex-1">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+          <input
+            value={search}
+            onChange={(event) => {
+              setSearch(event.target.value);
+            }}
+            placeholder="Search glosses"
+            aria-label="Search glosses"
+            className="w-full rounded border border-border bg-surface py-2 pl-9 pr-3 text-xs text-text-primary focus:border-accent-primary focus:outline-none"
+          />
+        </label>
+        <select
+          value={category}
+          onChange={(event) => {
+            setCategory(event.target.value);
+          }}
+          aria-label="Filter by category"
+          className="rounded border border-border bg-surface px-3 py-2 text-[10px] font-mono text-text-secondary focus:border-accent-primary focus:outline-none"
+        >
+          <option value="">All categories</option>
+          <option value="Alphabet">Alphabet</option>
+          <option value="Word">Word</option>
+        </select>
+        <select
+          value={dialect}
+          onChange={(event) => {
+            setDialect(event.target.value);
+          }}
+          aria-label="Filter by dialect"
+          title="Filter using dialect/source labels saved in the model archive"
+          className="rounded border border-border bg-surface px-3 py-2 text-[10px] font-mono text-text-secondary focus:border-accent-primary focus:outline-none"
+        >
+          <option value="">All dialects</option>
+          {data?.dialects.map((availableDialect) => (
+            <option key={availableDialect} value={availableDialect}>{availableDialect}</option>
+          ))}
+        </select>
+        <span className="px-2 text-[10px] font-mono text-text-muted">{data?.total ?? 0} glosses</span>
+      </div>
+
+      {isError && (
+        <div className="rounded border border-status-error/30 bg-status-error/10 p-3 text-xs text-status-error">
+          Could not load the active model&apos;s archived training clips.
+        </div>
+      )}
+
+      <div className="grid min-h-0 flex-1 gap-3 md:grid-cols-[220px_minmax(0,1fr)] xl:grid-cols-[240px_minmax(0,1fr)]">
+        <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-surface">
+          <div className="flex items-center justify-between border-b border-border px-3 py-2 text-[10px] font-mono uppercase text-text-muted">
+            <span>Glosses</span>
+            <span className="flex items-center gap-2">
+              <span>{data?.total ?? 0}</span>
+              <span className="normal-case tracking-normal text-text-muted/70" title="Use Up and Down arrows to change gloss">↑ ↓</span>
+            </span>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+            {isLoading ? (
+              <div className="p-4 text-xs font-mono text-text-muted">Loading…</div>
+            ) : data?.items.length ? (
+              data.items.map((item) => (
+                <button
+                  key={item.gloss}
+                  type="button"
+                  onClick={() => selectGloss(item.gloss)}
+                  className={`flex w-full items-center justify-between gap-2 border-b border-border px-3 py-2.5 text-left text-xs font-mono last:border-0 ${
+                    currentGloss === item.gloss
+                      ? "bg-accent-primary/10 text-accent-primary"
+                      : "text-text-secondary hover:bg-surface-elevated"
+                  }`}
+                >
+                  <span className="truncate">{item.gloss}</span>
+                  <span className="shrink-0 text-[9px] text-text-muted">{item.clip_count}</span>
+                </button>
+              ))
+            ) : (
+              <div className="p-4 text-xs font-mono leading-relaxed text-text-muted">
+                {search
+                  ? "No matching glosses."
+                  : "No archived training data."}
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section className="flex min-h-0 min-w-0 flex-col rounded-lg border border-border bg-surface p-3 sm:p-4">
+          {clip ? (
+            <>
+              <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border pb-2.5">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-bold text-text-primary">{clip.gloss}</div>
+                  </div>
+                  <div className={`flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-[9px] font-mono font-bold ${
+                    clip.correct
+                      ? "border-status-approved/30 bg-status-approved/10 text-status-approved"
+                      : "border-status-error/30 bg-status-error/10 text-status-error"
+                  }`}>
+                    {clip.correct ? <CircleCheck size={11} /> : <CircleX size={11} />}
+                    {clip.correct ? "MATCH" : "MISMATCH"} · {Math.round(clip.confidence * 100)}%
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setClipIndex((value) => Math.max(0, value - 1))}
+                    disabled={clipIndex <= 0}
+                    className="rounded border border-border p-1.5 text-text-secondary disabled:opacity-30"
+                    aria-label="Previous training clip (left arrow)"
+                    title="Previous clip (←)"
+                  >
+                    <ChevronLeft size={15} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setClipIndex((value) => Math.min(clip.clip_count - 1, value + 1))}
+                    disabled={clipIndex >= clip.clip_count - 1}
+                    className="rounded border border-border p-1.5 text-text-secondary disabled:opacity-30"
+                    aria-label="Next training clip (right arrow)"
+                    title="Next clip (→)"
+                  >
+                    <ChevronRight size={15} />
+                  </button>
+                  <span className="whitespace-nowrap text-[9px] font-mono text-text-muted">
+                    Clip {clip.clip_index + 1} / {clip.clip_count}
+                  </span>
+                </div>
+              </div>
+              <TrainingClipView key={`${clip.gloss}-${clip.clip_index}`} clip={clip} />
+              <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-t border-border pt-2 text-[9px] font-mono text-text-muted">
+                <span>Expected <strong className="text-text-secondary">{clip.gloss}</strong></span>
+                <span>Predicted <strong className={clip.correct ? "text-status-approved" : "text-status-error"}>{clip.prediction}</strong></span>
+                {clip.source_video && (
+                  <span className="max-w-[220px] truncate" title={clip.source_video}>
+                    Source {clip.source_video}
+                  </span>
+                )}
+                <span className="ml-auto text-[8px]">Training clip · not validation accuracy</span>
+                <div className="flex w-full flex-wrap gap-x-4 gap-y-1.5">
+                  {clip.top3.map((item, index) => {
+                    const confidence = Math.max(0, Math.min(100, item.confidence * 100));
+                    return (
+                      <div key={item.label} className="flex min-w-[120px] flex-1 items-center gap-2">
+                        <span className="w-24 truncate text-text-secondary" title={item.label}>{item.label}</span>
+                        <div
+                          className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-border"
+                          role="meter"
+                          aria-label={`${item.label} confidence`}
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                          aria-valuenow={Math.round(confidence)}
+                        >
+                          <div
+                            className={`h-full rounded-full ${index === 0 ? "bg-accent-primary" : "bg-text-muted/60"}`}
+                            style={{ width: `${confidence}%` }}
+                          />
+                        </div>
+                        <span className="w-8 text-right">{Math.round(confidence)}%</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="flex min-h-[220px] flex-1 items-center justify-center text-center text-xs font-mono text-text-muted">
+              {clipLoading
+                ? "Loading clip…"
+                : clipError
+                  ? "Could not load clip."
+                  : "Select a gloss to view clips."}
+            </div>
+          )}
+        </section>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
 # FILE: `frontend\src\app\admin\videos\page.tsx`
 
 ```tsx
@@ -5477,7 +5383,7 @@ interface ModelSign {
 interface LandmarkReplay {
   frames: number[][][];
   pose?: [number, number, number, number][][];
-  face_mesh?: number[][][];
+  face_avatar?: number[][][];
   source: string;
 }
 
@@ -5502,8 +5408,8 @@ export default function ModelSimulationPage() {
 
   return (
     <div className="space-y-4 max-w-6xl">
-      <div className="text-xs font-mono uppercase text-text-muted">ACTIVE MODEL SIMULATION</div>
-      <h1 className="text-2xl font-bold text-text-primary">Landmark Sequence Inspector</h1>
+      <div className="text-xs font-mono uppercase text-text-muted">AVATAR DATA SIMULATION</div>
+      <h1 className="text-2xl font-bold text-text-primary">Avatar Landmark Inspector</h1>
       <p className="text-xs text-text-secondary">
         These sequences are read directly from {data?.active_model ?? "the active model"} and match its recognition vocabulary.
       </p>
@@ -5542,7 +5448,7 @@ export default function ModelSimulationPage() {
                 key={`${current?.label}-${replay.source}`}
                 frames={replay.frames}
                 pose={replay.pose}
-                faceMesh={replay.face_mesh}
+                faceAvatar={replay.face_avatar}
                 fps={15}
                 title={replay.source}
               />
@@ -5568,482 +5474,6 @@ export default function ModelSimulationPage() {
 
 ---
 
-# FILE: `frontend\src\app\contribute\page.tsx`
-
-```tsx
-"use client";
-import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { PageContainer } from "@/components/layout/PageContainer";
-import { contributionService } from "@/services/contributions";
-import { useRecordingStore } from "@/store/recording-store";
-import { Search, ArrowRight, Video } from "lucide-react";
-import { toast } from "sonner";
-import axios from "axios";
-
-const API_BASE = "http://localhost:8200";
-
-interface NeedsDataSign {
-  id: string;
-  label: string;
-  bengali: string;
-  current: number;
-  target: number;
-}
-
-export default function ContributePage() {
-  const router = useRouter();
-  const { setSession, selectSign } = useRecordingStore();
-  const [search, setSearch] = useState("");
-  const [isStarting, setIsStarting] = useState(false);
-  const [needsData, setNeedsData] = useState<NeedsDataSign[]>([]);
-
-  useEffect(() => {
-    axios.get(`${API_BASE}/api/contributions/needs-data`)
-      .then((res) => setNeedsData(res.data.items))
-      .catch(() => setNeedsData([]));
-  }, []);
-
-  const filtered = search
-    ? needsData.filter((s) =>
-        s.label.toLowerCase().includes(search.toLowerCase()) ||
-        s.bengali.includes(search)
-      )
-    : needsData;
-
-  const handleStartSession = async (signId: string, label: string) => {
-    setIsStarting(true);
-    try {
-      const sess = await contributionService.createSession("signer_temp");
-      setSession(sess.session_id);
-      selectSign(signId, label);
-      router.push(`/contribute/session/${sess.session_id}`);
-    } catch {
-      toast.error("Failed to initiate contribution session");
-    } finally {
-      setIsStarting(false);
-    }
-  };
-
-  return (
-    <PageContainer className="space-y-8 max-w-4xl">
-      <div className="space-y-3">
-        <div className="inline-flex items-center space-x-2 text-xs font-mono text-status-pending">
-          <span className="w-2 h-2 rounded-full bg-status-pending" />
-          <span>COMMUNITY KINEMATIC DATA INGESTION</span>
-        </div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-text-primary">
-          Contribute to WBSL
-        </h1>
-        <p className="text-sm text-text-secondary leading-relaxed">
-          Help improve AI recognition accuracy for West Bengal Sign Language.
-          Record authentic gestures from your district to diversify the open research dataset.
-        </p>
-      </div>
-
-      <div className="relative">
-        <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted" />
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search for a specific sign to contribute..."
-          className="w-full pl-11 pr-4 py-3 bg-surface border border-border rounded-lg text-text-primary text-sm focus:outline-none focus:border-accent-primary"
-        />
-      </div>
-
-      <div className="space-y-4">
-        <div className="flex items-center justify-between pb-2 border-b border-border">
-          <span className="text-xs font-mono uppercase tracking-wider text-text-secondary">
-            PRIORITY: NEEDS MORE DATA (LOWEST SAMPLE COUNTS)
-          </span>
-          <span className="text-xs font-mono text-status-pending">
-            TARGET: 50 SAMPLES / SIGN
-          </span>
-        </div>
-
-        {filtered.length === 0 ? (
-          <div className="py-8 text-center text-xs font-mono text-text-muted">
-            No signs found matching your search.
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {filtered.map((item) => (
-              <div
-                key={item.id}
-                className="p-4 rounded-lg bg-surface border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-accent-primary/50 transition-colors"
-              >
-                <div className="space-y-1">
-                  <div className="flex items-center space-x-3">
-                    <span className="font-mono text-sm font-bold text-text-primary">{item.label}</span>
-                    <span className="font-bengali text-sm text-text-secondary">{item.bengali}</span>
-                  </div>
-                  <div className="text-xs font-mono text-text-muted">
-                    Samples recorded: <strong className="text-accent-primary">{item.current}</strong> / {item.target} target
-                  </div>
-                </div>
-                <button
-                  disabled={isStarting}
-                  onClick={() => handleStartSession(item.id, item.label)}
-                  className="flex items-center justify-center space-x-2 px-4 py-2 rounded bg-accent-primary text-black font-semibold text-xs font-mono uppercase tracking-wider hover:bg-accent-primary/90 transition-colors shrink-0 disabled:opacity-50"
-                >
-                  <Video size={14} />
-                  <span>Record This Sign</span>
-                  <ArrowRight size={14} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </PageContainer>
-  );
-}
-```
-
----
-
-# FILE: `frontend\src\app\contribute\session\[id]\page.tsx`
-
-```tsx
-"use client";
-import React, { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { PageContainer } from "@/components/layout/PageContainer";
-import { PrivacyGate } from "@/components/recording/PrivacyGate";
-import { UploadRecovery } from "@/components/recording/UploadRecovery";
-import { LandmarkSimulation } from "@/components/simulation/LandmarkSimulation";
-import { useCamera } from "@/hooks/useCamera";
-import { useRecording } from "@/hooks/useRecording";
-import { useRecordingStore } from "@/store/recording-store";
-import { contributionService } from "@/services/contributions";
-import { Video, Square, RotateCcw, Check } from "lucide-react";
-import { toast } from "sonner";
-import axios from "axios";
-
-const API_BASE = "http://localhost:8200";
-
-interface LandmarkReplay {
-  label: string;
-  frames: number[][][];
-  pose?: [number, number, number, number][][];
-  face_mesh?: number[][][];
-  source: string;
-}
-
-export default function ContributeSessionPage() {
-  const params = useParams();
-  const router = useRouter();
-  const sessionId = params.id as string;
-
-  const {
-    state,
-    consentGiven,
-    currentSignLabel,
-    signerId,
-    nmmTags,
-    setState,
-    setConsent,
-    toggleNMMTag,
-    resetNMMTags,
-    incrementSamples,
-  } = useRecordingStore();
-
-  const { stream, videoRef, isReady, startCamera } = useCamera();
-  const { isRecording, startRecording, stopRecording, recordedBlob, recordedUrl, clearRecording } = useRecording(stream);
-
-  const [countdown, setCountdown] = useState<number | null>(null);
-  const [uploadError, setUploadError] = useState(false);
-  const [refMedia, setRefMedia] = useState<LandmarkReplay | null>(null);
-
-  useEffect(() => {
-    if (consentGiven && !isReady) {
-      startCamera();
-    }
-  }, [consentGiven, isReady, startCamera]);
-
-  // Show the same active-model sequence used by Text -> Sign and the dataset viewer.
-  useEffect(() => {
-    if (!currentSignLabel) {
-      return;
-    }
-    let cancelled = false;
-    axios.get<LandmarkReplay>(`${API_BASE}/api/simulation/frames`, {
-      params: { label: currentSignLabel },
-    })
-      .then((r) => {
-        if (!cancelled) setRefMedia({ ...r.data, label: currentSignLabel });
-      })
-      .catch(() => {
-        if (!cancelled) setRefMedia(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [currentSignLabel]);
-
-  // Handle countdown before recording starts
-  useEffect(() => {
-    if (countdown === null) return;
-
-    if (countdown === 0) {
-      // Side effects belong in an effect, NOT inside a setState updater.
-      // Calling them during the updater runs them mid-render, which is what
-      // produced "Cannot update a component while rendering a different component".
-      setCountdown(null);
-      startRecording();
-      setState("RECORDING");
-      return;
-    }
-
-    const timer = setTimeout(() => setCountdown((prev) => (prev === null ? null : prev - 1)), 1000);
-    return () => clearTimeout(timer);
-  }, [countdown, startRecording, setState]);
-
-  const triggerRecording = () => {
-    setCountdown(3);
-  };
-
-  const handleStopRecording = () => {
-    stopRecording();
-    setState("NMM_TAGGING");
-  };
-
-  // REAL upload: recorded video → backend extracts landmarks → npy + manifest
-  const handleSubmitSample = async () => {
-    if (!recordedBlob) {
-      toast.error("No recording captured. Record a gesture first.");
-      return;
-    }
-    setState("SUBMITTING_VIDEO");
-    const fd = new FormData();
-    fd.append("label", currentSignLabel || "UNKNOWN");
-    fd.append("signer_id", signerId || "anonymous");
-    fd.append("nmm_tags", JSON.stringify(nmmTags));
-    fd.append("file", recordedBlob, `rec_${Date.now()}.webm`);
-    try {
-      const res = await contributionService.submitSample(sessionId, fd);
-      incrementSamples();
-      setState("SUBMITTED");
-      toast.success(`Sample ${res.sample_id} uploaded (${res.frames} landmark frames)`);
-    } catch {
-      setUploadError(true);
-      setState("NMM_TAGGING");
-      toast.error("Upload failed — recording kept locally, retry when ready");
-    }
-  };
-
-  if (!consentGiven) {
-    return (
-      <PageContainer className="py-8">
-        <PrivacyGate
-          onConsent={(sId, saveVideo) => {
-            setConsent(sId, saveVideo);
-            setState("REFERENCE_VIEW");
-          }}
-        />
-      </PageContainer>
-    );
-  }
-
-  return (
-    <PageContainer className="space-y-6 max-w-3xl">
-      <div className="flex items-center justify-between pb-3 border-b border-border">
-        <div>
-          <div className="text-xs font-mono uppercase text-text-muted">SESSION ID: {sessionId}</div>
-          <h1 className="text-xl font-bold tracking-tight text-text-primary mt-0.5">
-            Recording: <span className="text-accent-primary">{currentSignLabel || "HELLO"}</span>
-          </h1>
-        </div>
-        <div className="text-xs font-mono text-text-secondary">
-          SIGNER: <strong className="text-text-primary">{signerId}</strong>
-        </div>
-      </div>
-
-      {uploadError && (
-        <UploadRecovery onRetry={() => { setUploadError(false); handleSubmitSample(); }} />
-      )}
-
-      {/* Camera Preview */}
-      <div className="relative aspect-video w-full bg-surface border border-border rounded-lg overflow-hidden flex items-center justify-center">
-        {state === "PREVIEW" && recordedUrl ? (
-          <video src={recordedUrl} controls className="w-full h-full object-contain" />
-        ) : (
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className="w-full h-full object-cover scale-x-[-1]"
-          />
-        )}
-
-        {/* Countdown Overlay */}
-        {countdown !== null && (
-          <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
-            <span className="text-7xl font-extrabold font-mono text-accent-primary animate-ping">
-              {countdown}
-            </span>
-          </div>
-        )}
-
-        {/* Recording active badge */}
-        {isRecording && (
-          <div className="absolute top-4 left-4 bg-status-error text-white px-3 py-1 rounded-full text-xs font-mono font-bold flex items-center space-x-1.5 animate-pulse">
-            <span className="w-2 h-2 rounded-full bg-white" />
-            <span>RECORDING GESTURE</span>
-          </div>
-        )}
-      </div>
-
-      {/* Watch and copy the active model's landmark sequence before recording */}
-      {state === "REFERENCE_VIEW" && (
-        <div className="p-4 bg-surface rounded-lg border border-border space-y-3">
-          <div className="text-xs font-mono uppercase text-text-muted">
-            ACTIVE MODEL SIGN — watch it, then copy the sign
-          </div>
-          {refMedia?.label === currentSignLabel && refMedia.frames.length ? (
-            <LandmarkSimulation
-              key={`${currentSignLabel}-${refMedia.source}`}
-              frames={refMedia.frames}
-              pose={refMedia.pose}
-              faceMesh={refMedia.face_mesh}
-              fps={15}
-              title={refMedia.source}
-            />
-          ) : (
-            <div className="aspect-video w-full bg-background border border-border rounded flex items-center justify-center text-xs font-mono text-text-muted">
-              No landmark sequence is bundled for this sign in the active model.
-            </div>
-          )}
-          <button
-            onClick={() => setState("READY_TO_RECORD")}
-            className="w-full py-2.5 rounded bg-accent-primary text-black font-mono text-xs uppercase font-bold hover:bg-accent-primary/90 transition-colors"
-          >
-            I have seen it — start recording
-          </button>
-        </div>
-      )}
-
-      {/* Workflow Controls based on State Machine */}
-      {state === "READY_TO_RECORD" && (
-        <div className="p-4 bg-surface rounded-lg border border-border flex justify-between items-center">
-          <span className="text-xs font-mono text-text-secondary">Position yourself in frame and click Record</span>
-          <button
-            onClick={triggerRecording}
-            className="flex items-center space-x-2 px-5 py-2.5 rounded bg-accent-primary text-black font-mono text-xs uppercase font-bold hover:bg-accent-primary/90 transition-colors"
-          >
-            <Video size={15} />
-            <span>Start 3s Countdown</span>
-          </button>
-        </div>
-      )}
-
-      {state === "RECORDING" && (
-        <div className="p-4 bg-surface rounded-lg border border-border flex justify-between items-center">
-          <span className="text-xs font-mono text-status-error font-semibold">Gesture in progress...</span>
-          <button
-            onClick={handleStopRecording}
-            className="flex items-center space-x-2 px-5 py-2.5 rounded bg-status-error text-white font-mono text-xs uppercase font-bold hover:bg-status-error/90 transition-colors"
-          >
-            <Square size={15} />
-            <span>Finish Gesture</span>
-          </button>
-        </div>
-      )}
-
-      {/* NMM Tagging Step per Section 8 & 9.5 */}
-      {state === "NMM_TAGGING" && (
-        <div className="p-6 bg-surface rounded-lg border border-border space-y-4">
-          <div className="flex justify-between items-center">
-            <div>
-              <h3 className="text-sm font-semibold text-text-primary">Tag Non-Manual Markers (NMM)</h3>
-              <p className="text-xs text-text-secondary">Did you perform facial grammatical markers during this sample?</p>
-            </div>
-            <button
-              onClick={() => setState("READY_TO_RECORD")}
-              className="flex items-center space-x-1 text-xs font-mono text-text-secondary hover:text-text-primary"
-            >
-              <RotateCcw size={13} />
-              <span>Retake</span>
-            </button>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {[
-              { id: "question", label: "Question (Raised Brows)" },
-              { id: "wh_question", label: "WH-Question (Furrowed Brows)" },
-              { id: "negation", label: "Negation (Head Shake)" },
-              { id: "affirmation", label: "Affirmation (Head Nod)" },
-              { id: "emphasis", label: "Emphasis (Intense Gaze)" },
-              { id: "head_tilt", label: "Head Tilt" },
-            ].map((tag) => (
-              <label
-                key={tag.id}
-                onClick={() => toggleNMMTag(tag.id as any)}
-                className={`p-3 rounded border text-xs font-mono cursor-pointer transition-colors ${
-                  (nmmTags as any)[tag.id]
-                    ? "bg-accent-primary/20 border-accent-primary text-text-primary font-semibold"
-                    : "bg-surface-elevated border-border text-text-secondary hover:text-text-primary"
-                }`}
-              >
-                <span>{tag.label}</span>
-              </label>
-            ))}
-          </div>
-
-          <button
-            onClick={handleSubmitSample}
-            className="w-full py-2.5 rounded bg-accent-primary text-black font-mono text-xs uppercase font-bold hover:bg-accent-primary/90 transition-colors mt-2"
-          >
-            Confirm & Upload Sample
-          </button>
-        </div>
-      )}
-
-      {state === "SUBMITTING_VIDEO" && (
-        <div className="p-6 bg-surface rounded-lg border border-border text-center text-xs font-mono text-text-secondary">
-          Uploading recording & extracting landmarks on server...
-        </div>
-      )}
-
-      {state === "SUBMITTED" && (
-        <div className="p-8 bg-surface rounded-lg border border-border text-center space-y-4">
-          <div className="w-12 h-12 mx-auto rounded-full bg-status-approved/20 border border-status-approved flex items-center justify-center text-status-approved">
-            <Check size={24} />
-          </div>
-          <h2 className="text-lg font-bold text-text-primary">Gesture Successfully Ingested</h2>
-          <p className="text-xs text-text-secondary max-w-md mx-auto">
-            Landmark sequence saved to the community dataset and queued for admin verification.
-          </p>
-          <div className="flex justify-center gap-3 pt-2">
-            <button
-              onClick={() => {
-                resetNMMTags();
-                clearRecording();
-                setUploadError(false);
-                setState("READY_TO_RECORD");
-              }}
-              className="px-4 py-2 rounded bg-accent-primary text-black text-xs font-mono font-semibold"
-            >
-              Record Another Sample
-            </button>
-            <button
-              onClick={() => router.push("/contribute")}
-              className="px-4 py-2 rounded bg-surface-elevated border border-border text-text-primary text-xs font-mono"
-            >
-              Choose Different Sign
-            </button>
-          </div>
-        </div>
-      )}
-    </PageContainer>
-  );
-}
-```
-
----
-
 # FILE: `frontend\src\app\demo\page.tsx`
 
 ```tsx
@@ -6051,8 +5481,7 @@ export default function ContributeSessionPage() {
 import React, { useState } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { LandmarkSimulation } from "@/components/simulation/LandmarkSimulation";
-import { PipelineStatus } from "@/components/pipeline/PipelineStatus";
-import { Play, Volume2, Sparkles, AlertCircle } from "lucide-react";
+import { Volume2, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
 export default function StandaloneDemoPage() {
@@ -6140,12 +5569,6 @@ export default function StandaloneDemoPage() {
           </button>
         ))}
       </div>
-
-      {/* Pipeline Status */}
-      <PipelineStatus
-        stages={{ camera: "idle", landmarks: "active", recognition: "active", nlg: "active", tts: "active" }}
-        fps={30}
-      />
 
       {/* Canvas Landmark Player */}
       <div className="bg-surface border border-border rounded-lg p-6 space-y-4">
@@ -7152,29 +6575,18 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
 import React, { useState, useEffect, useRef } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
-import {
-  NmmThresholdPanel,
-  DEFAULT_ALL,
-  DEFAULT_MARKER_GATES,
-  COMMIT_STORAGE_KEY,
-  type AllThresholds,
-  type MarkerGates,
-} from "@/components/sign/NmmThresholdPanel";
 import { EmotionPanel } from "@/components/sign/EmotionPanel";
 import { CameraFramingGuide } from "@/components/camera/CameraFramingGuide";
 import { FramingWarningArea } from "@/components/camera/FramingWarningArea";
 import {
-  Camera,
   CameraOff,
   Volume2,
   Trash2,
   Loader2,
   Delete,
   Plus,
-  Activity,
   Sparkles,
   ShieldAlert,
-  Lock,
 } from "lucide-react";
 import { toast } from "sonner";
 import axios from "axios";
@@ -7186,18 +6598,7 @@ interface Prediction {
   label: string;
   confidence: number;
   top5: { label: string; confidence: number }[];
-  hands_detected: number;
-  nmm: {
-    question: boolean;
-    wh_question: boolean;
-    negation: boolean;
-    affirmation: boolean;
-    emphasis: boolean;
-    emotion?: EmotionResult | null;
-    metrics?: NmmMetrics | null;
-  };
   emotion?: EmotionResult | null;
-  metrics?: NmmMetrics | null;
 }
 
 interface EmotionResultShape {
@@ -7208,30 +6609,20 @@ interface EmotionResultShape {
 
 type EmotionResult = EmotionResultShape;
 
-interface NmmMetrics {
-  brow_ratio: number;
-  mouth_ratio: number;
-  shake_var: number;
-  nod_var: number;
+function summarizeEmotionCounts(counts: Record<string, number>): EmotionResult | null {
+  const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
+  if (!total) return null;
+  const scores = Object.fromEntries(
+    Object.entries(counts).map(([name, count]) => [name, count / total]),
+  );
+  const [dominant, confidence] = Object.entries(counts)
+    .sort((left, right) => right[1] - left[1])[0];
+  return { dominant, confidence: confidence / total, scores };
 }
 
 interface DetectedSign {
   gloss: string;
-  question: boolean;
-  wh_question: boolean;
-  negation: boolean;
-  affirmation: boolean;
-  emphasis: boolean;
 }
-
-/**
- * [affirmation] and [emphasis] have no symbol in the LLM prompt's notation
- * guide, so they are never appended to the gloss string. They still travel in
- * the `nmm` metadata payload, where the model is told what they mean.
- *
- * Which markers can reach this point at all is decided server-side by the NMM
- * Controller's gates (backend/nmm.py MARKER_GATES), not here.
- */
 
 interface StreamResult {
   ready: boolean;
@@ -7241,9 +6632,9 @@ interface StreamResult {
   emotion?: EmotionResult | null;
   detail?: string;
   buffered?: number;
+  state?: string;
+  hands_detected?: number;
   top3?: { label: string; confidence: number }[];
-  /** The window's non-manual markers, captured on the frame being recognised. */
-  nmm?: Prediction["nmm"] & { emotion?: EmotionResult | null; metrics?: NmmMetrics | null };
 }
 
 interface CatalogSign {
@@ -7282,19 +6673,13 @@ export default function SignToTextPage() {
     sessionIdRef.current = newSessionId();
   }, []);
 
-  // Set once the streaming endpoint answers 404/405. From then on the tick uses
-  // the batch path, which posts a whole window to /api/predict/stream -- the
-  // only route a backend older than this page understands. Without this the page
-  // would spend every tick failing against an endpoint that is not there.
-  const [streamUnavailable, setStreamUnavailable] = useState(false);
-  const streamFallbackRef = useRef(false);
-
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [prediction, setPrediction] = useState<Prediction | null>(null);
   const [detectedHistory, setDetectedHistory] = useState<DetectedSign[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [backendOnline, setBackendOnline] = useState(false);
+  const [handsDetected, setHandsDetected] = useState(0);
 
   const [live, setLive] = useState<{
     label: string;
@@ -7303,75 +6688,27 @@ export default function SignToTextPage() {
   } | null>(null);
 
   const [autoDetect, setAutoDetect] = useState(true);
+  const autoDetectRef = useRef(autoDetect);
+  const [recognitionMode, setRecognitionMode] = useState<"auto" | "manual">("auto");
+  const recognitionModeRef = useRef(recognitionMode);
+  const [manualRecording, setManualRecording] = useState(false);
+  const manualRecordingRef = useRef(false);
+  const [streamState, setStreamState] = useState("IDLE");
+  const [recognitionNotice, setRecognitionNotice] = useState<string | null>(null);
   const [catalog, setCatalog] = useState<CatalogSign[]>([]);
   const [pickSign, setPickSign] = useState("");
   const [emotion, setEmotion] = useState<EmotionResult | null>(null);
   const [emotionAvailable, setEmotionAvailable] = useState(true);
+  const [emotionCounts, setEmotionCounts] = useState<Record<string, number>>({});
+  const emotionCountsRef = useRef<Record<string, number>>({});
+  const emotionCollectionActiveRef = useRef(false);
+  const emotionSummary = summarizeEmotionCounts(emotionCounts);
+  const [confidenceThreshold, setConfidenceThreshold] = useState(0.15);
+  const confidenceThresholdRef = useRef(confidenceThreshold);
 
-  // The thresholds the panel last saved, read once on mount. Declared as an
-  // initialiser rather than a useEffect that calls setThresholds: restoring
-  // saved state in an effect body is a second render for data that was already
-  // available synchronously, and the lint rule against setState-in-effect is
-  // pointing at a real cost here, not a stylistic one.
-  const savedThresholds = React.useMemo<Partial<AllThresholds> | null>(() => {
-    if (typeof window === "undefined") return null;
-
-    try {
-      const raw = localStorage.getItem(COMMIT_STORAGE_KEY);
-
-      return raw ? (JSON.parse(raw) as Partial<AllThresholds>) : null;
-    } catch {
-      return null;
-    }
-  }, []);
-
-  const thresholdsRef = useRef<AllThresholds>(DEFAULT_ALL);
-
-  const [thresholds, setThresholds] = useState<AllThresholds>({
-    ...DEFAULT_ALL,
-    ...(savedThresholds ?? {}),
-  });
-  // Marker on/off gates, mirrored from the NMM Controller panel. Held here
-  // because the panel can be closed and the page still needs the current state
-  // to know what the server was last told.
-  const [markerGates, setMarkerGates] =
-    useState<MarkerGates>(DEFAULT_MARKER_GATES);
-
-  const [repeatBlocked, setRepeatBlocked] = useState(false);
   // How deep the SERVER's buffer is. The client does not track this itself: it
   // uploads one frame per tick and the server reports what it holds.
   const [buffered, setBuffered] = useState(0);
-
-  useEffect(() => {
-    thresholdsRef.current = thresholds;
-  }, [thresholds]);
-
-  // The gates live on the server, so the page must not invent its own default.
-  // Reading them back on mount is what stops the panel showing OFF while the
-  // detector is still emitting [negation] from a previous session.
-  useEffect(() => {
-    let cancelled = false;
-
-    axios
-      .get(`${API_BASE}/api/nmm/config`)
-      .then((res) => {
-        if (cancelled) return;
-
-        const serverGates = res.data?.marker_gates;
-
-        if (serverGates && typeof serverGates === "object") {
-          setMarkerGates((prev) => ({ ...prev, ...serverGates }));
-        }
-      })
-      .catch(() => {});
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const [nmmFlags, setNmmFlags] =
-    useState<Prediction["nmm"] | null>(null);
 
   const [bengaliOutput, setBengaliOutput] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -7379,44 +6716,23 @@ export default function SignToTextPage() {
   const [voiceId, setVoiceId] = useState<string>("1");
   const [ttsEngine, setTtsEngine] = useState<"free" | "elevenlabs">("free");
   const [showTtsPremiumModal, setShowTtsPremiumModal] = useState(false);
-  const [unifiedActive, setUnifiedActive] = useState(false);
-
-  const frameBufferRef = useRef<Blob[]>([]);
-  const candidateRef = useRef<{
-    label: string;
-    count: number;
-  } | null>(null);
-
-  const lastAppendRef = useRef<{
-    label: string;
-    at: number;
-  }>({
-    label: "",
-    at: 0,
-  });
-  const idleSinceRef = useRef<number | null>(null);
-
-  const [activeClasses, setActiveClasses] = useState(35);
-
   const [contract, setContract] = useState<{
-    kind: "static" | "temporal";
     frames: number;
-    endpoint: string;
-    // Which extractor the active graph needs: "two_hand" (126-dim) or
-    // "hands_pose" (258-dim). Only used to tell the user why a 258-dim run
-    // wants their full body in frame; recognition itself is unchanged.
     feature_width?: number | null;
-    feature_kind?: "two_hand" | "hands_pose" | null;
   }>({
-    kind: "static",
-    frames: 1,
-    endpoint: "/api/predict/frame",
+    frames: 64,
+    feature_width: 98,
   });
 
-  const [coverage, setCoverage] = useState<{
-    with_landmark_sequences: number;
-    total_classes: number;
-  } | null>(null);
+  useEffect(() => {
+    autoDetectRef.current = autoDetect;
+  }, [autoDetect]);
+  useEffect(() => {
+    confidenceThresholdRef.current = confidenceThreshold;
+  }, [confidenceThreshold]);
+  useEffect(() => {
+    recognitionModeRef.current = recognitionMode;
+  }, [recognitionMode]);
 
   useEffect(() => {
     let cancelled = false;
@@ -7427,19 +6743,10 @@ export default function SignToTextPage() {
         if (cancelled) return;
 
         setBackendOnline(true);
-        setUnifiedActive(!!res.data.unified);
         setEmotionAvailable(!!res.data.emotion_available);
-
-        if (typeof res.data.vocabulary_classes === "number") {
-          setActiveClasses(res.data.vocabulary_classes);
-        }
 
         if (res.data.contract) {
           setContract(res.data.contract);
-        }
-
-        if (res.data.sequence_coverage) {
-          setCoverage(res.data.sequence_coverage);
         }
       })
       .catch(() => {
@@ -7466,17 +6773,40 @@ export default function SignToTextPage() {
     };
   }, []);
 
-  const isTemporal = contract.kind === "temporal";
+  const changeRecognitionMode = (mode: "auto" | "manual") => {
+    if (manualRecordingRef.current || isProcessingRef.current) return;
+    recognitionModeRef.current = mode;
+    setRecognitionMode(mode);
+    sessionIdRef.current = newSessionId();
+    setBuffered(0);
+    setStreamState("IDLE");
+    setLive(null);
+    setRecognitionNotice(null);
+  };
+
+  const toggleManualRecording = () => {
+    if (!cameraActive) return;
+    const next = !manualRecordingRef.current;
+    manualRecordingRef.current = next;
+    setManualRecording(next);
+    if (next) {
+      setPrediction(null);
+      setLive(null);
+      setBuffered(0);
+    }
+    setRecognitionNotice(null);
+  };
 
   const startCamera = async () => {
     setCameraError(null);
 
     try {
+      sessionIdRef.current = newSessionId();
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: "user",
-          width: 640,
-          height: 480,
+          width: { ideal: 640 },
+          height: { ideal: 480 },
         },
         audio: false,
       });
@@ -7489,24 +6819,10 @@ export default function SignToTextPage() {
 
       setCameraActive(true);
 
-      frameBufferRef.current = [];
-      candidateRef.current = null;
-      idleSinceRef.current = null;
-
       if (!intervalRef.current) {
-        // 100 ms = 10 uploads/s. The server throttles its own inference to every
-        // 250 ms and only keeps the newest frame in the buffer, so a faster tick
-        // costs bandwidth without buying resolution; anything slower than ~150 ms
-        // starts dropping frames out of the 30 fps capture the window assumes.
         intervalRef.current = setInterval(
-          // The tick choice is read on EVERY tick, not at setInterval creation:
-          // the 404 fallback flag can only flip after the first failed request,
-          // and a ternary evaluated here would freeze the wrong tick forever.
-          () => {
-            if (!isTemporal) return doCaptureAndPredict();
-            return streamFallbackRef.current ? doAutoDetectTick() : doStreamTick();
-          },
-          isTemporal ? 100 : 1000
+          () => void doStreamTick(performance.now() / 1000),
+          100
         );
       }
     } catch {
@@ -7519,6 +6835,10 @@ export default function SignToTextPage() {
   };
 
   const stopCamera = () => {
+    if (manualRecordingRef.current) {
+      setRecognitionNotice("Stop the manual recording before turning off the camera.");
+      return;
+    }
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
@@ -7534,6 +6854,9 @@ export default function SignToTextPage() {
     }
 
     setCameraActive(false);
+    sessionIdRef.current = newSessionId();
+    setBuffered(0);
+    setStreamState("IDLE");
   };
 
   useEffect(() => {
@@ -7552,127 +6875,22 @@ export default function SignToTextPage() {
 
   const buildGlossString = (history: DetectedSign[]) => {
     if (history.length === 0) return "";
-
-    // [?] belongs to the last sign of a question, BUT a question is only a
-    // question if something is actually being asked about: a WH-word, or a
-    // negated / affirmed clause. A bare head shake must not become "...?)".
-    const last = history[history.length - 1];
-    const questionAnchored = history.some(
-      (h) => h.wh_question || h.negation || h.affirmation || h.emphasis
-    );
-    const asksQuestion =
-      questionAnchored && (last.question || last.wh_question);
-
-    return history
-      .map((h, i) => {
-        let tok = `[${h.gloss.toLowerCase()}]`;
-
-        if (h.negation) {
-          tok += "[negation]";
-        }
-
-        if (asksQuestion && i === history.length - 1) {
-          tok += "[?]";
-        }
-
-        return tok;
-      })
-      .join(" + ");
+    return history.map((sign) => `[${sign.gloss.toLowerCase()}]`).join(" + ");
   };
 
-  const doCaptureAndPredict = async () => {
-    if (isProcessingRef.current) return;
-    if (isTemporal) return;
+  const resetEmotionCollection = () => {
+    emotionCountsRef.current = {};
+    setEmotionCounts({});
+  };
 
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-
-    if (!video || !canvas) return;
-
-    isProcessingRef.current = true;
-    setIsProcessing(true);
-
-    try {
-      canvas.width = video.videoWidth || 640;
-      canvas.height = video.videoHeight || 480;
-
-      const ctx = canvas.getContext("2d");
-
-      if (!ctx) return;
-
-      ctx.drawImage(video, 0, 0);
-
-      const blob = await new Promise<Blob | null>((resolve) =>
-        canvas.toBlob(resolve, "image/jpeg", 0.7)
-      );
-
-      if (!blob) return;
-
-      const formData = new FormData();
-
-      formData.append("file", blob, "frame.jpg");
-
-      const res = await axios.post<Prediction>(
-        `${API_BASE}/api/predict/frame`,
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
-
-      setPrediction(res.data);
-      setNmmFlags(res.data.nmm);
-      setEmotion(res.data.emotion ?? res.data.nmm?.emotion ?? null);
-
-      if (
-        res.data.detected &&
-        res.data.confidence > 0.5
-      ) {
-        const f = res.data.nmm;
-
-        setDetectedHistory((prev) => {
-          const last = prev[prev.length - 1];
-
-          if (last && last.gloss === res.data.label) {
-            const merged: DetectedSign = {
-              ...last,
-              question: last.question || f.question,
-              wh_question:
-                last.wh_question || f.wh_question,
-              negation: last.negation || f.negation,
-              affirmation:
-                last.affirmation || f.affirmation,
-              emphasis:
-                last.emphasis || f.emphasis,
-            };
-
-            return [
-              ...prev.slice(0, -1),
-              merged,
-            ];
-          }
-
-          return [
-            ...prev,
-            {
-              gloss: res.data.label,
-              question: f.question,
-              wh_question: f.wh_question,
-              negation: f.negation,
-              affirmation: f.affirmation,
-              emphasis: f.emphasis,
-            },
-          ];
-        });
-      }
-    } catch {
-      // Keep camera running.
-    } finally {
-      isProcessingRef.current = false;
-      setIsProcessing(false);
-    }
+  const recordEmotionSample = (sample: EmotionResult | null | undefined) => {
+    if (!sample?.dominant) return;
+    const next = {
+      ...emotionCountsRef.current,
+      [sample.dominant]: (emotionCountsRef.current[sample.dominant] ?? 0) + 1,
+    };
+    emotionCountsRef.current = next;
+    setEmotionCounts(next);
   };
 
   const handleStreamAndSpeak = async () => {
@@ -7687,6 +6905,9 @@ export default function SignToTextPage() {
     setBengaliOutput("");
 
     let full = "";
+    const translationEmotion = summarizeEmotionCounts(emotionCountsRef.current);
+    emotionCollectionActiveRef.current = false;
+    resetEmotionCollection();
 
     try {
       const gloss = buildGlossString(
@@ -7700,13 +6921,7 @@ export default function SignToTextPage() {
           headers: {
             "Content-Type": "application/json",
           },
-          // NMM + affect travel alongside the gloss so the LLM is not left
-          // guessing at the question / negation / emotion context.
-          body: JSON.stringify({
-            gloss,
-            nmm,
-            emotion,
-          }),
+          body: JSON.stringify({ gloss, emotion: translationEmotion }),
         }
       );
 
@@ -7849,38 +7064,12 @@ export default function SignToTextPage() {
     }
   };
 
-  const appendGloss = (
-    gloss: string,
-    nmm?: DetectedSign
-  ) => {
-    // The markers are whatever the detector reported for the window this sign
-    // came from. Nothing is merged in from the UI: the manual marker buttons
-    // were removed, and inventing a marker the detector never saw is exactly
-    // what made the old panel untrustworthy.
-    const applied: DetectedSign = {
-      gloss,
-      question: !!nmm?.question,
-      wh_question: !!nmm?.wh_question,
-      negation: !!nmm?.negation,
-      affirmation: !!nmm?.affirmation,
-      emphasis: !!nmm?.emphasis,
-    };
-
-    setDetectedHistory((prev) => [...prev, applied]);
-  };
-
-  /**
-   * Everything the recognition stage knows but the gloss string cannot show.
-   * This is what makes the questions block an OPTION rather than a blind rule:
-   * the LLM only marks a question when the detector actually reported one -- and
-   * only for markers whose gate is open in the NMM Controller.
-   */
-  const nmm = {
-    question: !!prediction?.nmm?.question,
-    wh_question: !!prediction?.nmm?.wh_question,
-    negation: !!prediction?.nmm?.negation,
-    affirmation: !!prediction?.nmm?.affirmation,
-    emphasis: !!prediction?.nmm?.emphasis,
+  const appendGloss = (gloss: string) => {
+    if (!emotionCollectionActiveRef.current) {
+      resetEmotionCollection();
+      emotionCollectionActiveRef.current = true;
+    }
+    setDetectedHistory((prev) => [...prev, { gloss }]);
   };
 
   const handleBackspace = () => {
@@ -7888,14 +7077,12 @@ export default function SignToTextPage() {
       return;
     }
 
+    emotionCollectionActiveRef.current = false;
+    resetEmotionCollection();
     setDetectedHistory((prev) =>
       prev.slice(0, -1)
     );
 
-    // The dropped sign's markers leave with it. Nothing is restored, because
-    // markers are no longer something the UI holds on the user's behalf -- they
-    // come from the detector on the frame that is being recognised, and a
-    // marker that has passed is a marker that has passed.
     setBengaliOutput("");
   };
 
@@ -7908,21 +7095,14 @@ export default function SignToTextPage() {
 
   const handleClear = () => {
     setDetectedHistory([]);
+    emotionCollectionActiveRef.current = false;
+    resetEmotionCollection();
     setPrediction(null);
-    setNmmFlags(null);
     setBengaliOutput("");
     setLive(null);
-    setRepeatBlocked(false);
-
-    candidateRef.current = null;
-    idleSinceRef.current = null;
-
-    lastAppendRef.current = {
-      label: "",
-      at: 0,
-    };
-
-    frameBufferRef.current = [];
+    setRecognitionNotice(null);
+    manualRecordingRef.current = false;
+    setManualRecording(false);
 
     // The recognition window lives on the server now, so clearing the sequence
     // has to clear it there too. A fresh session id is the cheapest correct
@@ -7932,271 +7112,85 @@ export default function SignToTextPage() {
     sessionIdRef.current = newSessionId();
 
     setBuffered(0);
+    setStreamState("IDLE");
   };
 
-  /**
-   * Legacy batch tick: fills a 32-frame client buffer and posts it to
-   * /api/predict/stream.
-   *
-   * Kept because it is the only path that works if the page is served against a
-   * backend without /api/stream/frame, and because it is a useful reference for
-   * what the server-side windowing replaced. All recognition policy now lives in
-   * commitFromStream, so the two ticks cannot disagree about when a sign counts.
-   */
-  const doAutoDetectTick = async () => {
-    if (
-      isProcessingRef.current ||
-      !isTemporal
-    ) {
-      return;
-    }
-
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-
-    if (
-      !video ||
-      !canvas ||
-      !video.videoWidth
-    ) {
-      return;
-    }
-
-    const nFrames =
-      contract.frames || 32;
-
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    const ctx = canvas.getContext("2d");
-
-    if (!ctx) return;
-
-    ctx.drawImage(video, 0, 0);
-
-    const blob =
-      await new Promise<Blob | null>(
-        (resolve) =>
-          canvas.toBlob(
-            resolve,
-            "image/jpeg",
-            0.7
-          )
-      );
-
-    if (!blob) return;
-
-    const buf =
-      frameBufferRef.current;
-
-    buf.push(blob);
-
-    while (buf.length > nFrames) {
-      buf.shift();
-    }
-
-    if (buf.length < nFrames) {
-      setPrediction(null);
-      return;
-    }
-
-    isProcessingRef.current = true;
-    setIsProcessing(true);
-
-    try {
-      const fd = new FormData();
-
-      buf.forEach((frame, i) => {
-        fd.append(
-          "files",
-          frame,
-          `f${i}.jpg`
-        );
-      });
-
-      const res =
-        await axios.post<StreamResult>(
-          `${API_BASE}/api/predict/stream`,
-          fd,
-          {
-            headers: {
-              "Content-Type":
-                "multipart/form-data",
-            },
-            timeout: 15000,
-          }
-        );
-
-      commitFromStream(res.data);
-    } catch (err) {
-      // Keep camera and buffer alive.
-      console.warn(
-        "recognition tick failed:",
-        err
-      );
-    } finally {
-      isProcessingRef.current = false;
-      setIsProcessing(false);
-    }
-  };
-
-  /**
-   * Everything that happens once the server has recognised a window.
-   *
-   * Shared by the single-frame streaming tick and the legacy batch tick, so the
-   * commit policy exists in exactly one place: confidence and margin must clear
-   * the panel's thresholds, the same label must repeat ``stable_windows`` times,
-   * and a repeat inside the cooldown is reported rather than swallowed.
-   *
-   * The window's NMM / affect belongs to the SIGN being recognised, not to the
-   * previous one, so it is read here -- from the payload that carried the
-   * prediction -- and not from whatever the last frame happened to report.
-   */
+  /** Apply one completed span returned by the server's state machine. */
   const commitFromStream = (data: StreamResult) => {
-    const label = data.label;
-    const incomingEmotion = data.emotion ?? data.nmm?.emotion ?? null;
-    if (incomingEmotion) setEmotion(incomingEmotion);
+    setStreamState(data.state ?? "IDLE");
+    setRecognitionNotice(
+      data.detail === "incomplete_span" ? "Hands not clear, try again." : null
+    );
+    setEmotion(data.emotion ?? null);
+    if (data.state === "SIGN" && !emotionCollectionActiveRef.current) {
+      resetEmotionCollection();
+      emotionCollectionActiveRef.current = true;
+    }
+    if (emotionCollectionActiveRef.current) {
+      recordEmotionSample(data.emotion);
+    }
 
-    const markIdle = () => {
-      candidateRef.current = null;
-      if (!lastAppendRef.current.label) return;
-
-      const now = Date.now();
-      idleSinceRef.current ??= now;
-      if (
-        now - idleSinceRef.current >=
-        thresholdsRef.current.repeat_cooldown_ms
-      ) {
-        lastAppendRef.current = { label: "", at: 0 };
-        idleSinceRef.current = null;
-        setRepeatBlocked(false);
-      }
-    };
-
-    if (!data.ready || !label) {
+    if (!data.ready || !data.label) {
       setLive(null);
-      const detail = data.detail?.toLowerCase() ?? "";
-      if (detail === "idle" || detail.includes("no hands")) {
-        markIdle();
-      } else if (detail !== "throttled" && detail !== "filling") {
-        candidateRef.current = null;
-      }
       return;
     }
 
+    const label = data.label;
     const confidence = data.confidence ?? 0;
     const margin = data.margin ?? 0;
     const top3 = data.top3 ?? [];
-
-    const nn = data.nmm ?? {
-      question: false,
-      wh_question: false,
-      negation: false,
-      affirmation: false,
-      emphasis: false,
-    };
-
-    const emo = (incomingEmotion ?? null) as EmotionResult | null;
+    const isSign = !["NOT_SURE", "NONE", "BACKGROUND"].includes(label);
 
     setPrediction({
-      detected: true,
+      detected: isSign,
       label,
       confidence,
       top5: top3.map((t) => ({ label: t.label, confidence: t.confidence })),
-      hands_detected: 1,
-      nmm: nn,
-      emotion: emo,
-      metrics: (data.nmm?.metrics ?? null) as NmmMetrics | null,
+      emotion: data.emotion ?? null,
     });
 
-    const T = thresholdsRef.current;
-    const decisive = confidence >= T.min_confidence && margin >= T.min_margin;
-    // The background class is an answer, not a sign: showing it in the live
-    // readout is useful, committing it to the gloss sequence is not. Without
-    // this guard an idle signer accumulates [NONE] chips every cooldown.
-    const isBackground = label === "NONE" || label === "BACKGROUND";
-    setLive(isBackground ? null : { label, confidence, margin });
-
-    if (isBackground) {
-      markIdle();
-      return;
-    }
-
-    idleSinceRef.current = null;
-
-    if (!decisive) {
-      candidateRef.current = null;
-      return;
-    }
-
-    const cand = candidateRef.current;
-    const count = cand && cand.label === label ? cand.count + 1 : 1;
-
-    candidateRef.current = { label, count };
-
-    if (count < Math.max(1, Math.round(T.stable_windows))) return;
-
-    const now = Date.now();
-    const last = lastAppendRef.current;
-
-    if (last.label === label) {
-      setRepeatBlocked(true);
-      candidateRef.current = null;
-      return;
-    }
-
-    candidateRef.current = null;
-    setRepeatBlocked(false);
-
-    // "Clear" is the one thing that resets the server's window: the model would
-    // otherwise keep reading the previous signer state after the user wiped the
-    // sequence and started over.
-    if (autoDetect) {
-      lastAppendRef.current = { label, at: now };
-      appendGloss(label, { gloss: label, ...nn });
+    setLive(isSign ? { label, confidence, margin } : null);
+    if (isSign && confidence >= confidenceThresholdRef.current && autoDetectRef.current) {
+      appendGloss(label);
     }
   };
 
   /**
    * One JPEG in, one buffered landmark out.
    *
-   * This replaces the old tick that pushed a JPEG into a client-side ring buffer
-   * and uploaded all 32 of them every time. The browser never holds the window
-   * now: it sends the newest frame and the server appends it to that session's
-   * history and runs the model on its own schedule. Upload cost per tick drops
-   * by the window length, and latency stops depending on how fast the client can
-   * serialise 32 blobs.
+   * The browser sends the newest frame; the server tracks the sign span and
+   * selects the model input when that span completes.
    */
-  const doStreamTick = async () => {
-    if (isProcessingRef.current || !isTemporal) return;
+  const doStreamTick = async (captureTime: number) => {
+    if (isProcessingRef.current) return;
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
 
     if (!video || !canvas || !video.videoWidth) return;
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-
-    const ctx = canvas.getContext("2d");
-
-    if (!ctx) return;
-
-    ctx.drawImage(video, 0, 0);
-
-    const blob = await new Promise<Blob | null>((r) =>
-      canvas.toBlob(r, "image/jpeg", 0.7)
-    );
-
-    if (!blob) return;
-
     isProcessingRef.current = true;
     setIsProcessing(true);
 
     try {
+      const scale = Math.min(1, 640 / video.videoWidth);
+      canvas.width = Math.round(video.videoWidth * scale);
+      canvas.height = Math.round(video.videoHeight * scale);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) throw new Error("Could not create the camera frame.");
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      const blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, "image/jpeg", 0.7)
+      );
+      if (!blob) throw new Error("Could not encode the camera frame.");
+
       const fd = new FormData();
 
       fd.append("file", blob, "f.jpg");
+      fd.append("mode", recognitionModeRef.current);
+      fd.append("recording", String(manualRecordingRef.current));
+      fd.append("capture_time", String(captureTime));
 
       const res = await axios.post<StreamResult>(
         `${API_BASE}/api/stream/frame?session_id=${sessionIdRef.current}`,
@@ -8211,43 +7205,21 @@ export default function SignToTextPage() {
       );
 
       setBuffered(res.data.buffered ?? 0);
-
-      if (!res.data.ready || !res.data.label) {
-        setLive(null);
-        if (res.data.emotion || res.data.nmm?.emotion) {
-          commitFromStream(res.data);
-        } else if (
-          res.data.detail?.toLowerCase() === "idle" ||
-          res.data.detail?.toLowerCase().includes("no hands")
-        ) {
-          commitFromStream(res.data);
-        }
-        return;
-      }
-
+      setHandsDetected(res.data.hands_detected ?? 0);
       commitFromStream(res.data);
     } catch (err) {
-      // A backend without /api/stream/frame 404s on every tick, which is not a
-      // transient network blip -- falling back is the only way the page can work
-      // against it. Any other failure keeps the single-frame path, because a
-      // dropped frame is exactly what server-side buffering is designed to
-      // absorb.
-      const status = (err as { response?: { status?: number } })?.response?.status;
-
-      if (status === 404 || status === 405) {
-        streamFallbackRef.current = true;
-        setStreamUnavailable(true);
-        return;
-      }
+      console.warn("Recognition stream request failed:", err);
+      const detail = axios.isAxiosError(err)
+        ? err.response?.data?.detail || err.message
+        : err instanceof Error
+          ? err.message
+          : "Recognition request failed.";
+      setRecognitionNotice(`Recognition unavailable: ${detail}`);
     } finally {
       isProcessingRef.current = false;
       setIsProcessing(false);
     }
   };
-
-  const anyQuestion = detectedHistory.some(
-    (h) => h.question || h.wh_question
-  );
 
   const glossPreview = detectedHistory.length
     ? buildGlossString(detectedHistory)
@@ -8273,13 +7245,7 @@ export default function SignToTextPage() {
               Camera Feed
             </span>
             <span className="text-[10px] font-mono uppercase tracking-wider text-text-muted">
-              {cameraActive
-                ? isTemporal
-                  ? streamUnavailable
-                    ? "BATCH MODE"
-                    : `${buffered}/${contract.frames * 6} BUFFER`
-                  : "POLLING 1S"
-                : "STANDBY"}
+              {cameraActive ? `${buffered} BUFFERED` : "STANDBY"}
             </span>
           </div>
 
@@ -8343,8 +7309,8 @@ export default function SignToTextPage() {
           {/* Framing Warning Guidance Area */}
           <FramingWarningArea
             cameraActive={cameraActive}
-            handsDetected={prediction?.hands_detected ?? (live ? 1 : 0)}
-            hasFace={Boolean(prediction?.nmm?.metrics || prediction?.detected)}
+            handsDetected={handsDetected}
+            hasFace={Boolean(emotion)}
             detected={Boolean(prediction?.detected)}
             confidence={prediction?.confidence ?? 0}
           />
@@ -8359,7 +7325,9 @@ export default function SignToTextPage() {
 
               <button
                 onClick={stopCamera}
-                className="px-2.5 py-1 rounded-lg bg-status-error/15 border border-status-error/40 text-status-error text-[10px] font-mono font-bold hover:bg-status-error/25 transition-colors"
+                disabled={manualRecording}
+                title={manualRecording ? "Stop the recording before stopping the camera" : undefined}
+                className="px-2.5 py-1 rounded-lg bg-status-error/15 border border-status-error/40 text-status-error text-[10px] font-mono font-bold hover:bg-status-error/25 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 STOP CAMERA
               </button>
@@ -8377,37 +7345,94 @@ export default function SignToTextPage() {
             <span className="text-[10px] font-mono uppercase tracking-[0.18em] text-text-muted select-none font-semibold">
               Live Recognition
             </span>
+            <span className="text-[9px] font-mono text-text-muted">
+              {streamState} · {buffered} FRAMES
+            </span>
+          </div>
 
-            <div className="flex items-center gap-2">
-              {isTemporal && (
-                <label className="flex items-center gap-1.5 cursor-pointer text-text-secondary text-[9px] font-mono">
-                  <span>Auto-append</span>
-                  <input
-                    type="checkbox"
-                    checked={autoDetect}
-                    onChange={(e) => setAutoDetect(e.target.checked)}
-                    className="w-3.5 h-3.5 accent-[var(--accent-primary)] rounded cursor-pointer"
-                  />
-                </label>
-              )}
-
-              <NmmThresholdPanel
-                values={thresholds}
-                onChange={setThresholds}
-                gates={markerGates}
-                onGatesChange={setMarkerGates}
-                variant="header"
-              />
+          <div className="flex items-center justify-between gap-2 rounded-xl bg-background/50 p-2">
+            <div className="flex items-center gap-1">
+              {(["auto", "manual"] as const).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => changeRecognitionMode(mode)}
+                  disabled={isProcessing || manualRecording}
+                  className={`px-2.5 py-1 rounded-lg text-[9px] font-mono font-bold uppercase transition-colors disabled:opacity-40 ${
+                    recognitionMode === mode
+                      ? "bg-accent-primary/20 text-accent-primary border border-accent-primary/40"
+                      : "text-text-muted hover:text-text-secondary"
+                  }`}
+                >
+                  {mode}
+                </button>
+              ))}
             </div>
+            {recognitionMode === "auto" && (
+              <label className="flex items-center gap-1.5 cursor-pointer text-text-secondary text-[9px] font-mono">
+                <span>Auto-append</span>
+                <input
+                  type="checkbox"
+                  checked={autoDetect}
+                  onChange={(e) => setAutoDetect(e.target.checked)}
+                  className="w-3.5 h-3.5 accent-[var(--accent-primary)] rounded cursor-pointer"
+                />
+              </label>
+            )}
+          </div>
+
+          {recognitionMode === "manual" && (
+            <div className="flex items-center justify-between gap-2 rounded-xl bg-background/50 p-2.5">
+              <span className="text-[9px] font-mono text-text-muted">
+                Record one complete sign, then stop to recognize it.
+              </span>
+              <button
+                type="button"
+                onClick={toggleManualRecording}
+                disabled={!cameraActive || isProcessing}
+                className={`shrink-0 px-3 py-1.5 rounded-lg text-[9px] font-mono font-bold disabled:opacity-40 ${
+                  manualRecording
+                    ? "bg-status-error/20 text-status-error border border-status-error/40"
+                    : "bg-accent-primary text-black"
+                }`}
+              >
+                {manualRecording ? "STOP & RECOGNIZE" : "START RECORDING"}
+              </button>
+            </div>
+          )}
+
+          <div className="rounded-xl bg-background/50 px-3 py-2">
+            <div className="mb-1 flex items-center justify-between gap-2 text-[9px] font-mono">
+              <label htmlFor="confidence-threshold" className="text-text-secondary">
+                Auto-append confidence
+              </label>
+              <span className="text-accent-primary">{Math.round(confidenceThreshold * 100)}%</span>
+            </div>
+            <input
+              id="confidence-threshold"
+              type="range"
+              min={0}
+              max={0.8}
+              step={0.05}
+              value={confidenceThreshold}
+              onChange={(event) => setConfidenceThreshold(Number(event.target.value))}
+              className="w-full accent-[var(--accent-primary)]"
+            />
+            <p className="text-[8px] font-mono text-text-muted">
+              Best-match labels remain visible at every confidence; this only controls auto-append.
+            </p>
           </div>
 
           {/* Recognition Result Card */}
           <div className="rounded-xl bg-background/50 p-3 flex flex-col gap-2.5 min-w-0">
+            {recognitionNotice && (
+              <div className="flex items-center gap-2 rounded-lg border border-status-error/30 bg-status-error/10 px-2.5 py-2 text-[10px] font-mono text-status-error">
+                <ShieldAlert size={13} className="shrink-0" />
+                <span>{recognitionNotice}</span>
+              </div>
+            )}
             {live && (
               <div className="flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-surface-elevated border border-border text-[9px] font-mono">
-                <span className="uppercase text-text-muted">
-                  {repeatBlocked ? "WAIT FOR RELEASE" : "HOLDING"}
-                </span>
                 <span className="text-accent-secondary font-bold truncate">
                   {live.label} · {Math.round(live.confidence * 100)}%
                 </span>
@@ -8465,51 +7490,25 @@ export default function SignToTextPage() {
             )}
           </div>
 
-          {/* Facial Expression & Non-Manual Markers (NMM) Badge Group */}
-          <div className="bg-background/50 rounded-xl p-3 flex flex-col gap-2">
-            <div className="text-[9px] font-mono uppercase tracking-wider text-text-muted">
-              Non-Manual Markers
-            </div>
-
-            <div className="flex flex-wrap gap-1.5">
-              {[
-                { key: "wh_question", label: "WH-Question", active: nmm.wh_question },
-                { key: "question", label: "Question", active: nmm.question },
-                { key: "negation", label: "Negation", active: nmm.negation },
-                { key: "affirmation", label: "Affirmation", active: nmm.affirmation },
-                { key: "emphasis", label: "Emphasis", active: nmm.emphasis },
-              ].map((m) => (
-                <span
-                  key={m.key}
-                  className={`px-2 py-1 rounded-md border text-[9px] font-mono font-bold transition-all ${
-                    m.active
-                      ? "bg-accent-secondary/20 border-accent-secondary text-accent-secondary shadow-sm"
-                      : "bg-surface-elevated border-border text-text-muted opacity-60"
-                  }`}
-                >
-                  {m.label}
-                </span>
-              ))}
-            </div>
-          </div>
-
           {/* Pipeline Specifications Info Box */}
           <div className="bg-background/50 rounded-xl p-2.5 flex flex-col gap-0.5 text-[9px] font-mono text-text-muted">
             <div className="flex justify-between">
               <span>Pipeline:</span>
               <span className="text-text-secondary font-medium">
-                {isTemporal ? `${contract.frames}-frame temporal sequence` : "Static frame recognition"}
+                {contract.frames}-frame temporal sequence
               </span>
             </div>
-            {contract.feature_kind === "hands_pose" && (
-              <div className="flex justify-between">
-                <span>Features:</span>
-                <span className="text-text-secondary font-medium">hands + body pose (258-dim)</span>
-              </div>
-            )}
             <div className="flex justify-between">
-              <span>Affect Input:</span>
-              <span className="text-accent-secondary font-medium">{emotion?.dominant ?? "—"}</span>
+              <span>Features:</span>
+              <span className="text-text-secondary font-medium">{contract.feature_width ?? 98}-dim shoulder-box</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Collected affect:</span>
+              <span className="text-accent-secondary font-medium">
+                {emotionSummary
+                  ? `${emotionSummary.dominant} · ${Math.round(emotionSummary.confidence * 100)}%`
+                  : "—"}
+              </span>
             </div>
           </div>
         </section>
@@ -8565,16 +7564,12 @@ export default function SignToTextPage() {
                       key={idx}
                       onClick={() => {
                         setDetectedHistory((prev) => prev.slice(0, idx));
+                        emotionCollectionActiveRef.current = false;
+                        resetEmotionCollection();
                         setBengaliOutput("");
                       }}
                       title="Click to remove signs from here"
-                      className={`px-2 py-0.5 rounded-md border font-mono text-[9px] font-bold hover:brightness-110 transition-all ${
-                        s.negation
-                          ? "border-status-error/60 bg-status-error/10 text-status-error"
-                          : idx === detectedHistory.length - 1 && anyQuestion
-                          ? "border-status-pending/60 bg-status-pending/10 text-status-pending"
-                          : "border-border bg-surface-elevated text-accent-primary"
-                      }`}
+                      className="px-2 py-0.5 rounded-md border border-border bg-surface-elevated font-mono text-[9px] font-bold text-accent-primary hover:brightness-110 transition-all"
                     >
                       {s.gloss}
                     </button>
@@ -8583,9 +7578,8 @@ export default function SignToTextPage() {
               )}
             </div>
 
-            {/* Quick Vocabulary Picker (for temporal testing) */}
-            {isTemporal && (
-              <div className="flex gap-2">
+            {/* Quick vocabulary picker */}
+            <div className="flex gap-2">
                 <select
                   value={pickSign}
                   onChange={(e) => setPickSign(e.target.value)}
@@ -8606,8 +7600,7 @@ export default function SignToTextPage() {
                   <Plus size={11} />
                   Add
                 </button>
-              </div>
-            )}
+            </div>
 
             <div className="text-[8px] font-mono text-text-muted truncate pt-0.5">
               NLG: <span className="text-text-secondary font-medium">{glossPreview}</span>
@@ -8842,7 +7835,6 @@ import { ContinuousSignSimulation } from "@/components/simulation/ContinuousSign
 import {
   AlertTriangle,
   ArrowRight,
-  Check,
   Cpu,
   Loader2,
   Mic,
@@ -9166,7 +8158,7 @@ export default function TextToSignPage() {
   const [playingSeq, setPlayingSeq] = useState(false);
   const [seqNonce, setSeqNonce] = useState(0);
   const [viewResetToken, setViewResetToken] = useState(0);
-  const [useLlm, setUseLlm] = useState(true);
+  const [useLlm, setUseLlm] = useState(false);
 
   // Fetch active vocabulary for dynamic samples
   useEffect(() => {
@@ -9784,8 +8776,8 @@ export default function TextToSignPage() {
     <PageContainer className="w-full max-w-[1600px] px-3 sm:px-6 lg:px-8 py-4 lg:py-6">
       <div className="grid grid-cols-1 lg:grid-cols-[30%_70%] gap-4 lg:gap-6 items-stretch">
         {/* LEFT PANEL: INPUT & CONTROLS */}
-        <section className="flex flex-col justify-between rounded-2xl border border-border/80 bg-surface/50 p-4 sm:p-5 backdrop-blur-sm gap-3.5 h-full">
-          {/* Top row: Label + STT Engine Selector + VAD Mode + Language Switcher + Clear */}
+        <section className={`flex flex-col justify-between rounded-2xl border border-border/80 bg-surface/50 p-4 sm:p-5 backdrop-blur-sm gap-3.5 h-full ${showVadSettings ? "relative z-20" : ""}`}>
+          {/* Top row: STT Engine Selector + VAD Mode */}
           <div className="flex flex-col gap-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
@@ -9829,68 +8821,6 @@ export default function TextToSignPage() {
                   </button>
                 </div>
 
-                {/* Silero VAD Indicator & Configuration (for local capture) */}
-                {sttEngine === "local" && (
-                  <div
-                    className="hidden sm:flex items-center gap-1 px-2 py-0.5 rounded-lg bg-surface/80 border border-border/80"
-                    role="group"
-                    aria-label="VAD Configuration"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setShowVadSettings((v) => !v)}
-                      aria-label="VAD Configuration"
-                      className={`p-1 rounded text-text-muted hover:text-text-primary transition-colors ${
-                        showVadSettings ? "bg-surface-elevated text-accent-secondary" : ""
-                      }`}
-                      title="Configure Silero VAD thresholds & padding"
-                    >
-                      <Sliders size={11} />
-                    </button>
-                  </div>
-                )}
-              </div>
-              <br/>
-              <div className="flex items-center gap-2">
-                {/* Language Selector */}
-                <div
-                  className="flex items-center gap-0.5 p-0.5 rounded-lg bg-surface/80 border border-border/80 shrink-0"
-                  role="group"
-                  aria-label="Input Language"
-                >
-                  {([
-                    { key: "auto", label: "AUTO" },
-                    { key: "bn", label: "বাংলা" },
-                    { key: "en", label: "ENGLISH" },
-                  ] as const).map((opt) => (
-                    <button
-                      key={opt.key}
-                      type="button"
-                      onClick={() => setSttLanguage(opt.key)}
-                      aria-pressed={sttLanguage === opt.key}
-                      className={`px-2.5 py-1 rounded text-[10px] font-mono font-bold uppercase tracking-wider transition-colors ${
-                        sttLanguage === opt.key
-                          ? "bg-accent-secondary text-white shadow-sm"
-                          : "text-text-muted hover:text-text-secondary"
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-
-                {inputText && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setInputText("");
-                      setResult(null);
-                    }}
-                    className="text-[10px] font-mono text-text-muted hover:text-text-primary transition-colors ml-1"
-                  >
-                    Clear
-                  </button>
-                )}
               </div>
             </div>
 
@@ -9911,96 +8841,6 @@ export default function TextToSignPage() {
               </div>
             )}
 
-            {/* Expandable VAD Settings Panel */}
-            {showVadSettings && sttEngine === "local" && (
-              <div className="p-3 rounded-xl bg-surface border border-border/80 flex flex-col gap-2.5 text-xs font-mono">
-                <div className="flex items-center justify-between pb-1 border-b border-border/50">
-                  <span className="font-bold text-[11px] text-text-primary flex items-center gap-1.5">
-                    <Sliders size={12} className="text-accent-secondary" />
-                    Silero VAD Parameters
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSilenceThreshold(0.5);
-                      setMinSilenceMs(500);
-                      setSpeechPadMs(400);
-                      setMaxSegmentS(15.0);
-                      toast.info("VAD parameters reset to defaults.");
-                    }}
-                    className="text-[9px] text-text-muted hover:text-text-primary underline"
-                  >
-                    Reset Defaults
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px]">
-                  <div className="flex flex-col gap-1">
-                    <div className="flex justify-between text-text-secondary">
-                      <span>Silence Threshold:</span>
-                      <span className="text-accent-secondary font-bold">{silenceThreshold}</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="0.1"
-                      max="0.9"
-                      step="0.05"
-                      value={silenceThreshold}
-                      onChange={(e) => setSilenceThreshold(parseFloat(e.target.value))}
-                      className="w-full h-1 bg-surface-elevated rounded accent-accent-secondary cursor-pointer"
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1">
-                    <div className="flex justify-between text-text-secondary">
-                      <span>Min Silence (ms):</span>
-                      <span className="text-accent-secondary font-bold">{minSilenceMs}ms</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="200"
-                      max="2000"
-                      step="50"
-                      value={minSilenceMs}
-                      onChange={(e) => setMinSilenceMs(parseInt(e.target.value, 10))}
-                      className="w-full h-1 bg-surface-elevated rounded accent-accent-secondary cursor-pointer"
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1">
-                    <div className="flex justify-between text-text-secondary">
-                      <span>Speech Padding (ms):</span>
-                      <span className="text-accent-secondary font-bold">{speechPadMs}ms</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="100"
-                      max="800"
-                      step="50"
-                      value={speechPadMs}
-                      onChange={(e) => setSpeechPadMs(parseInt(e.target.value, 10))}
-                      className="w-full h-1 bg-surface-elevated rounded accent-accent-secondary cursor-pointer"
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-1">
-                    <div className="flex justify-between text-text-secondary">
-                      <span>Max Segment (s):</span>
-                      <span className="text-accent-secondary font-bold">{maxSegmentS}s</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="5"
-                      max="30"
-                      step="1"
-                      value={maxSegmentS}
-                      onChange={(e) => setMaxSegmentS(parseFloat(e.target.value))}
-                      className="w-full h-1 bg-surface-elevated rounded accent-accent-secondary cursor-pointer"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
 
 {/* Premium Warning Modal */}
@@ -10054,12 +8894,24 @@ export default function TextToSignPage() {
 )}
 
           {/* Multiline Textarea with inline unmapped word highlighting and locked height */}
-          <div className="relative w-full flex-1 min-h-[340px] lg:min-h-[420px] rounded-xl bg-background/50 border border-border/80 focus-within:ring-1 focus-within:ring-accent-secondary/50 focus-within:border-accent-secondary/60 transition-all flex flex-col overflow-hidden">
+          <div className="relative w-full flex-1 min-h-[340px] lg:min-h-[420px] rounded-xl bg-background/50 border border-blue-500 focus-within:ring-1 focus-within:ring-accent-secondary/50 focus-within:border-accent-secondary/60 transition-all flex flex-col overflow-hidden">
+            {inputText && (
+              <button
+                type="button"
+                onClick={() => {
+                  setInputText("");
+                  setResult(null);
+                }}
+                className="absolute top-3 right-2 z-20 rounded-md border border-red-500 px-2 py-1 text-[10px] font-mono leading-none text-text-muted hover:text-text-primary transition-colors"
+              >
+                Clear
+              </button>
+            )}
             <div className="relative flex-1 w-full h-full min-h-[280px]">
               {/* Highlight backdrop overlay (mirrors textarea font, padding, word wrap) */}
               <div
                 aria-hidden="true"
-                className="pointer-events-none absolute inset-0 p-4 font-bengali text-base whitespace-pre-wrap break-words overflow-hidden select-none leading-relaxed text-transparent"
+                className="pointer-events-none absolute inset-0 p-4 pt-6 font-bengali text-base whitespace-pre-wrap break-words overflow-hidden select-none leading-relaxed text-transparent"
               >
                 {renderHighlightedText(inputText, effectiveUnmappedWords)}
               </div>
@@ -10075,7 +8927,7 @@ export default function TextToSignPage() {
                   }
                 }}
                 placeholder="বাংলা বাক্য লিখুন"
-                className="relative z-10 w-full h-full p-4 bg-transparent text-text-primary font-bengali text-base placeholder:text-text-muted/50 focus:outline-none resize-none leading-relaxed"
+                className="relative z-10 w-full h-full p-4 pt-6 bg-transparent text-text-primary font-bengali text-base placeholder:text-text-muted/50 focus:outline-none resize-none leading-relaxed"
               />
             </div>
           </div>
@@ -10090,7 +8942,7 @@ export default function TextToSignPage() {
 
           {/* Continuous Voice Splitter Control */}
           <div
-            className={`w-full rounded-xl border p-2.5 sm:p-3 flex flex-col gap-2 transition-all ${
+            className={`w-full rounded-xl border p-4 flex flex-col gap-2 transition-all ${
               isRecording
                 ? "bg-status-error/15 border-status-error/40 text-status-error shadow-sm"
                 : voiceStatus === "finalizing"
@@ -10102,97 +8954,211 @@ export default function TextToSignPage() {
                 : "bg-surface/50 border-border/70"
             }`}
           >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3 min-w-0">
-                <button
-                  type="button"
-                  disabled={voiceStatus === "finalizing"}
-                  onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
-                  title={
-                    voiceStatus === "finalizing"
-                      ? "Finalizing transcription..."
-                      : isRecording
-                      ? "Stop recording"
-                      : "Record voice (continuous stream)"
-                  }
-                  className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+              <button
+                type="button"
+                disabled={voiceStatus === "finalizing"}
+                onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
+                title={
+                  voiceStatus === "finalizing"
+                    ? "Finalizing transcription..."
+                    : isRecording
+                    ? "Stop recording"
+                    : "Record voice"
+                }
+                aria-label={
+                  isRecording ? "Stop voice recording" : "Start voice recording"
+                }
+                className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
+                  isRecording
+                    ? "bg-status-error text-white shadow-md animate-pulse"
+                    : voiceStatus === "finalizing"
+                    ? "bg-accent-secondary text-white shadow-sm"
+                    : "bg-accent-secondary/20 text-accent-secondary hover:bg-accent-secondary/30"
+                }`}
+              >
+                {voiceStatus === "finalizing" ? (
+                  <Loader2 size={17} className="animate-spin" />
+                ) : isRecording ? (
+                  <Square size={14} fill="currentColor" />
+                ) : (
+                  <Mic size={18} />
+                )}
+              </button>
+
+              <div className="flex w-[58px] min-w-0 shrink flex-col">
+                <span
+                  className={`whitespace-nowrap text-[9px] font-sans font-semibold tracking-wide leading-3 ${
                     isRecording
-                      ? "bg-status-error text-white shadow-md animate-pulse"
+                      ? "text-status-error"
                       : voiceStatus === "finalizing"
-                      ? "bg-accent-secondary text-white shadow-sm"
-                      : "bg-accent-secondary/20 text-accent-secondary hover:bg-accent-secondary/30"
+                      ? "text-accent-secondary"
+                      : voiceStatus === "complete"
+                      ? "text-status-success"
+                      : voiceStatus === "warning"
+                      ? "text-status-warning"
+                      : "text-text-primary"
                   }`}
                 >
-                  {voiceStatus === "finalizing" ? (
-                    <Loader2 size={16} className="animate-spin" />
-                  ) : isRecording ? (
-                    <Square size={13} fill="currentColor" />
-                  ) : (
-                    <Mic size={16} />
-                  )}
-                </button>
-
-                <div className="flex flex-col min-w-0">
-                  <span
-                    className={`text-xs font-mono font-bold tracking-wider leading-tight flex items-center gap-2 ${
-                      isRecording
-                        ? "text-status-error"
-                        : voiceStatus === "finalizing"
-                        ? "text-accent-secondary"
-                        : voiceStatus === "complete"
-                        ? "text-status-success"
-                        : voiceStatus === "warning"
-                        ? "text-status-warning"
-                        : "text-text-primary"
-                    }`}
-                  >
-                    {isRecording && "LISTENING"}
-                    {voiceStatus === "finalizing" && (
-                      <span className="flex items-center gap-1.5">
-                        <Loader2 size={12} className="animate-spin" />
-                        FINALIZING TRANSCRIPTION
-                      </span>
-                    )}
-                    {voiceStatus === "complete" && (
-                      <span className="flex items-center gap-1 text-status-success">
-                        <Check size={12} />
-                        TRANSCRIPTION COMPLETE
-                      </span>
-                    )}
-                    {voiceStatus === "warning" && (
-                      <span className="flex items-center gap-1 text-status-warning">
-                        <AlertTriangle size={12} />
-                        PARTIAL SPEECH NOT DETECTED
-                      </span>
-                    )}
-                    {voiceStatus === "idle" && "VOICE"}
-                    {isRecording && inFlightCount > 0 && (
-                      <span className="flex items-center gap-1 text-[9px] font-normal text-accent-secondary">
-                        <Loader2 size={10} className="animate-spin" />
-                        transcribing split...
-                      </span>
-                    )}
-                  </span>
-                  <span className="text-[8px] font-mono text-text-muted leading-tight mt-0.5">
-                    {isRecording
+                  {isRecording
+                    ? "LISTENING"
+                    : voiceStatus === "finalizing"
+                    ? "FINALIZING"
+                    : voiceStatus === "complete"
+                    ? "COMPLETE"
+                    : voiceStatus === "warning"
+                    ? "NO SPEECH"
+                    : "VOICE"}
+                </span>
+                {(isRecording || voiceStatus === "finalizing" || inFlightCount > 0) && (
+                  <span className="mt-0.5 max-w-[72px] break-words text-[8px] font-sans leading-tight text-text-secondary">
+                    {inFlightCount > 0
+                      ? `Transcribing ${inFlightCount} segment${inFlightCount === 1 ? "" : "s"}`
+                      : isRecording
                       ? sttEngine === "elevenlabs"
-                        ? `Next slice in ${sliceRemainingSec.toFixed(1)}s`
-                        : `Segmenting every ${recordingDuration}s`
-                      : voiceStatus === "finalizing"
-                      ? "Transcribing remaining audio..."
-                      : sttEngine === "elevenlabs"
-                      ? "ElevenLabs Scribe"
-                      : "Silero VAD"}
+                        ? `${sliceRemainingSec.toFixed(1)}s to next slice`
+                        : `Every ${recordingDuration}s`
+                      : "Transcribing audio"}
                   </span>
-                </div>
+                )}
               </div>
 
-              {/* VAD Status Indicator */}
-              <div className="flex items-center gap-1.5 shrink-0 bg-surface rounded-lg p-0.5 border border-border">
-                <span className="font-mono text-[10px] text-accent-secondary px-2 py-1 font-semibold flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-accent-secondary animate-pulse" />
-                  Silero VAD
-                </span>
+              </div>
+
+              <div className="flex shrink-0 items-center gap-2">
+              {/* Language Selector */}
+              <div
+                className="flex shrink-0 items-center gap-0.5 rounded-xl bg-surface/80 p-1"
+                role="group"
+                aria-label="Input Language"
+              >
+                {([
+                  { key: "auto", label: "AUTO" },
+                  { key: "bn", label: "বাংলা" },
+                  { key: "en", label: "ENGLISH" },
+                ] as const).map((opt) => (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    onClick={() => setSttLanguage(opt.key)}
+                    aria-pressed={sttLanguage === opt.key}
+                    className={`rounded-lg px-2 py-1.5 text-[10px] font-sans font-semibold tracking-wide transition-colors ${
+                      sttLanguage === opt.key
+                        ? "bg-accent-secondary text-white shadow-sm"
+                        : "text-text-secondary hover:bg-surface-elevated hover:text-text-primary"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="relative">
+                {sttEngine === "local" && (
+                  <button
+                    type="button"
+                    onClick={() => setShowVadSettings((v) => !v)}
+                    aria-label="VAD Configuration"
+                    aria-expanded={showVadSettings}
+                    className={`flex h-10 w-10 items-center justify-center rounded-xl bg-surface/80 text-text-secondary hover:text-text-primary transition-colors ${
+                      showVadSettings ? "bg-surface-elevated text-accent-secondary" : ""
+                    }`}
+                    title="Configure Silero VAD thresholds & padding"
+                  >
+                    <Sliders size={12} />
+                  </button>
+                )}
+                {showVadSettings && sttEngine === "local" && (
+                  <div className="absolute bottom-full left-1/2 z-30 mb-3 w-[min(26rem,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border border-border/80 bg-surface p-4 shadow-xl flex flex-col gap-3 text-xs font-mono">
+                    <div className="flex items-center justify-between pb-1 border-b border-border/50">
+                      <span className="font-bold text-[11px] text-text-primary flex items-center gap-1.5">
+                        <Sliders size={12} className="text-accent-secondary" />
+                        Silero VAD Parameters
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSilenceThreshold(0.5);
+                          setMinSilenceMs(500);
+                          setSpeechPadMs(400);
+                          setMaxSegmentS(15.0);
+                          toast.info("VAD parameters reset to defaults.");
+                        }}
+                        className="text-[9px] text-text-muted hover:text-text-primary underline"
+                      >
+                        Reset Defaults
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3 text-[10px]">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex justify-between text-text-secondary">
+                          <span className="whitespace-nowrap">Silence Threshold:</span>
+                          <span className="text-accent-secondary font-bold">{silenceThreshold}</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="0.1"
+                          max="0.9"
+                          step="0.05"
+                          value={silenceThreshold}
+                          onChange={(e) => setSilenceThreshold(parseFloat(e.target.value))}
+                          className="w-full h-1 bg-surface-elevated rounded accent-accent-secondary cursor-pointer"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1">
+                        <div className="flex justify-between text-text-secondary">
+                          <span className="whitespace-nowrap">Min Silence (ms):</span>
+                          <span className="text-accent-secondary font-bold">{minSilenceMs}ms</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="200"
+                          max="2000"
+                          step="50"
+                          value={minSilenceMs}
+                          onChange={(e) => setMinSilenceMs(parseInt(e.target.value, 10))}
+                          className="w-full h-1 bg-surface-elevated rounded accent-accent-secondary cursor-pointer"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1">
+                        <div className="flex justify-between text-text-secondary">
+                          <span className="whitespace-nowrap">Speech Padding (ms):</span>
+                          <span className="text-accent-secondary font-bold">{speechPadMs}ms</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="100"
+                          max="800"
+                          step="50"
+                          value={speechPadMs}
+                          onChange={(e) => setSpeechPadMs(parseInt(e.target.value, 10))}
+                          className="w-full h-1 bg-surface-elevated rounded accent-accent-secondary cursor-pointer"
+                        />
+                      </div>
+
+                      <div className="flex flex-col gap-1">
+                        <div className="flex justify-between text-text-secondary">
+                          <span className="whitespace-nowrap">Max Segment (s):</span>
+                          <span className="text-accent-secondary font-bold">{maxSegmentS}s</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="5"
+                          max="30"
+                          step="1"
+                          value={maxSegmentS}
+                          onChange={(e) => setMaxSegmentS(parseFloat(e.target.value))}
+                          className="w-full h-1 bg-surface-elevated rounded accent-accent-secondary cursor-pointer"
+                        />
+                      </div>
+                    </div>
+                    </div>
+                    )}
+                </div>
               </div>
             </div>
 
@@ -10619,10 +9585,10 @@ import {
 
 const links = [
   { label: "Dashboard", href: "/admin", icon: LayoutDashboard },
-  { label: "Contributions", href: "/admin/contributions", icon: CheckSquare },
-  { label: "Dataset Explorer", href: "/admin/dataset", icon: Database },
   { label: "Models Registry", href: "/admin/models", icon: Cpu },
-  { label: "Model Simulation", href: "/admin/videos", icon: Activity },
+  { label: "Training Data", href: "/admin/training-data", icon: Database },
+  { label: "Avatar Data Simulation", href: "/admin/videos", icon: Activity },
+  { label: "Contributions", href: "/admin/contributions", icon: CheckSquare },
   { label: "System Settings", href: "/admin/settings", icon: Settings },
 ];
 
@@ -10630,8 +9596,8 @@ export function AdminSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-64 border-r border-border bg-surface flex flex-col shrink-0 min-h-[calc(100vh-4rem)]">
-      <div className="p-4 border-b border-border flex items-center justify-between">
+    <aside className="flex h-[38vh] w-full shrink-0 flex-col overflow-hidden border-b border-border bg-surface md:h-full md:w-64 md:border-b-0 md:border-r">
+      <div className="flex shrink-0 items-center justify-between border-b border-border p-4">
         <div>
           <div className="text-xs font-mono uppercase tracking-wider text-text-muted">
             WORKSPACE
@@ -10649,14 +9615,17 @@ export function AdminSidebar() {
         </Link>
       </div>
 
-      <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+      <nav aria-label="Admin navigation" className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain p-3">
         {links.map((item) => {
           const Icon = item.icon;
-          const isActive = pathname === item.href;
+          const isActive =
+            pathname === item.href ||
+            (item.href !== "/admin" && pathname.startsWith(`${item.href}/`));
           return (
             <Link
               key={item.href}
               href={item.href}
+              aria-current={isActive ? "page" : undefined}
               className={`flex items-center space-x-3 px-3 py-2 rounded-md text-xs font-medium transition-colors ${
                 isActive
                   ? "bg-surface-elevated text-accent-primary font-semibold border-l-2 border-accent-primary"
@@ -10670,7 +9639,7 @@ export function AdminSidebar() {
         })}
       </nav>
 
-      <div className="p-4 border-t border-border text-[11px] font-mono text-text-muted">
+      <div className="shrink-0 border-t border-border p-4 text-[11px] font-mono text-text-muted">
         <div>ROLE: Lead Researcher</div>
         <div>ENV: Production Local</div>
       </div>
@@ -10693,7 +9662,6 @@ import { usePathname } from "next/navigation";
 import {
   ChevronLeft,
   ChevronRight,
-  Heart,
   Info,
   Languages,
   Shield,
@@ -10706,7 +9674,6 @@ import { SystemDiagnostics } from "./SystemDiagnostics";
 const navigationIcons: Record<string, LucideIcon> = {
   "/text-to-sign": Languages,
   "/sign-to-text": Video,
-  "/contribute": Heart,
   "/about": Info,
 };
 
@@ -10856,7 +9823,7 @@ export function Footer() {
           </div>
           <p className="text-sm text-text-secondary leading-relaxed max-w-md">
             West Bengal Sign Language Translation & Computational Research Framework.
-            Bridging Deaf communication through landmark-based computer vision, NMM parsing, and native Bengali NLG.
+            Bridging Deaf communication through landmark-based computer vision, emotion recognition, and Bengali NLG.
           </p>
           <div className="text-xs font-mono text-text-muted">
             Department of Computer Science & Engineering • Research Prototype
@@ -10870,7 +9837,6 @@ export function Footer() {
           <ul className="space-y-1.5 text-sm">
             <li><Link href="/sign-to-text" className="hover:text-text-primary transition-colors">Sign → Bengali</Link></li>
             <li><Link href="/text-to-sign" className="hover:text-text-primary transition-colors">Bengali → Sign</Link></li>
-            <li><Link href="/contribute" className="hover:text-text-primary transition-colors">Signer Contribution</Link></li>
             <li><Link href="/demo" className="hover:text-text-primary transition-colors">Demo Mode</Link></li>
           </ul>
         </div>
@@ -11024,348 +9990,6 @@ export function SystemDiagnostics({ compact = false }: { compact?: boolean }) {
         <span>•</span>
         <span>MODEL: <strong className="text-text-secondary">{health.model_version}</strong></span>
       </div>
-    </div>
-  );
-}
-```
-
----
-
-# FILE: `frontend\src\components\pipeline\PipelineStatus.tsx`
-
-```tsx
-"use client";
-import React from "react";
-import { CircleCheck, Clock3, CircleX, PauseCircle, HelpCircle } from "lucide-react";
-import { PipelineStage, PipelineStatus as StatusType } from "@/lib/types";
-import { PIPELINE_STAGES } from "@/lib/constants";
-
-interface PipelineStatusProps {
-  stages: Record<PipelineStage, StatusType>;
-  fps?: number;
-}
-
-export function PipelineStatus({ stages, fps = 0 }: PipelineStatusProps) {
-  const getStatusBadge = (status: StatusType) => {
-    switch (status) {
-      case "active":
-        return {
-          icon: <CircleCheck size={14} className="text-status-approved" />,
-          label: "ACTIVE",
-          color: "text-status-approved",
-        };
-      case "waiting":
-        return {
-          icon: <Clock3 size={14} className="text-status-pending" />,
-          label: "WAITING",
-          color: "text-status-pending",
-        };
-      case "error":
-        return {
-          icon: <CircleX size={14} className="text-status-error" />,
-          label: "ERROR",
-          color: "text-status-error",
-        };
-      case "idle":
-      default:
-        return {
-          icon: <PauseCircle size={14} className="text-text-muted" />,
-          label: "IDLE",
-          color: "text-text-muted",
-        };
-    }
-  };
-
-  return (
-    <div className="w-full bg-surface border border-border p-4 rounded-md">
-      <div className="flex items-center justify-between mb-4 pb-2 border-b border-border/50 text-xs font-mono">
-        <span className="text-text-secondary uppercase tracking-wider">
-          LIVE AI PIPELINE FLOW
-        </span>
-        <span className="text-accent-primary">
-          STREAM RATE: <strong className="text-text-primary">{fps} FPS</strong>
-        </span>
-      </div>
-
-      {/* Connected Technical Diagram per Section 8.4 */}
-      <div className="relative flex items-center justify-between">
-        {/* Horizontal Connecting Line */}
-        <div className="absolute top-1/2 left-8 right-8 h-[2px] bg-border -translate-y-1/2 z-0" />
-
-        {PIPELINE_STAGES.map((stage) => {
-          const status = stages[stage.id as PipelineStage] || "idle";
-          const badge = getStatusBadge(status);
-
-          return (
-            <div
-              key={stage.id}
-              className="relative z-10 flex flex-col items-center bg-surface px-3 py-1"
-            >
-              <div
-                className={`w-7 h-7 rounded-full flex items-center justify-center border transition-all ${
-                  status === "active"
-                    ? "border-accent-primary bg-accent-primary/10 shadow-[0_0_12px_rgba(34,197,94,0.3)]"
-                    : status === "waiting"
-                    ? "border-status-pending bg-status-pending/10"
-                    : "border-border bg-surface-elevated"
-                }`}
-              >
-                <div
-                  className={`w-2.5 h-2.5 rounded-full ${
-                    status === "active"
-                      ? "bg-accent-primary"
-                      : status === "waiting"
-                      ? "bg-status-pending"
-                      : "bg-text-muted"
-                  }`}
-                />
-              </div>
-
-              <div className="mt-2 text-xs font-mono font-semibold text-text-primary">
-                {stage.label}
-              </div>
-
-              <div className={`flex items-center space-x-1 mt-1 text-[11px] font-mono ${badge.color}`}>
-                {badge.icon}
-                <span>{badge.label}</span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-```
-
----
-
-# FILE: `frontend\src\components\recording\PrivacyGate.tsx`
-
-```tsx
-"use client";
-import React, { useState } from "react";
-import { ShieldCheck, Info } from "lucide-react";
-
-interface PrivacyGateProps {
-  onConsent: (signerId: string, recordVideo: boolean) => void;
-}
-
-export function PrivacyGate({ onConsent }: PrivacyGateProps) {
-  const [signerId, setSignerId] = useState("");
-  const [recordVideo, setRecordVideo] = useState(false);
-  const [checks, setChecks] = useState({
-    consentRecord: false,
-    consentUse: false,
-    understandDeletion: false,
-    declareOwnership: false,
-  });
-
-  const allChecked =
-    checks.consentRecord &&
-    checks.consentUse &&
-    checks.understandDeletion &&
-    checks.declareOwnership &&
-    signerId.trim().length >= 3;
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (allChecked) {
-      onConsent(signerId.trim(), recordVideo);
-    }
-  };
-
-  return (
-    <div className="max-w-2xl mx-auto bg-surface border border-border p-6 sm:p-8 rounded-lg">
-      <div className="flex items-center space-x-3 pb-4 border-b border-border">
-        <ShieldCheck className="text-accent-primary" size={24} />
-        <div>
-          <h2 className="text-lg font-semibold text-text-primary tracking-tight">
-            Signer Consent & Data Privacy Gate
-          </h2>
-          <div className="text-xs font-mono text-text-muted">
-            COMPLIANCE: Digital Personal Data Protection (DPDP) Act 2023
-          </div>
-        </div>
-      </div>
-
-      <div className="my-5 p-4 rounded bg-surface-elevated border border-border/80 text-xs text-text-secondary leading-relaxed space-y-2">
-        <div className="flex items-center space-x-2 text-text-primary font-medium">
-          <Info size={14} className="text-accent-secondary" />
-          <span>How WBSL Bridge processes your gesture data</span>
-        </div>
-        <p>
-          By default, WBSL Bridge records <strong>coordinate landmarks only</strong> (21 hand joints, 33 body pose points, and facial mesh contours). No raw facial recordings are stored on public research servers unless you explicitly opt in below.
-        </p>
-        <p>
-          You hold the perpetual right under DPDP guidelines to request deletion of any contributed sample associated with your unique Signer ID.
-        </p>
-      </div>
-
-      <form onSubmit={handleSubmit} className="space-y-5">
-        <div>
-          <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1.5">
-            Signer ID / Pseudonym *
-          </label>
-          <input
-            type="text"
-            required
-            value={signerId}
-            onChange={(e) => setSignerId(e.target.value.replace(/[^a-zA-Z0-9_-]/g, ""))}
-            placeholder="e.g. signer_kolkata_04"
-            className="w-full px-3 py-2 bg-background border border-border rounded text-text-primary font-mono text-sm focus:outline-none focus:border-accent-primary"
-          />
-          <div className="text-[11px] text-text-muted mt-1 font-mono">
-            Alphanumeric identifier to retain deletion authority.
-          </div>
-        </div>
-
-        {/* 4 Mandatory Checkboxes per Section 8.3 */}
-        <div className="space-y-3 pt-2">
-          <label className="flex items-start space-x-3 text-xs text-text-secondary cursor-pointer">
-            <input
-              type="checkbox"
-              checked={checks.consentRecord}
-              onChange={(e) => setChecks({ ...checks, consentRecord: e.target.checked })}
-              className="mt-0.5 accent-accent-primary"
-            />
-            <span>I consent to recording my gestures using computer vision landmark tracking.</span>
-          </label>
-
-          <label className="flex items-start space-x-3 text-xs text-text-secondary cursor-pointer">
-            <input
-              type="checkbox"
-              checked={checks.consentUse}
-              onChange={(e) => setChecks({ ...checks, consentUse: e.target.checked })}
-              className="mt-0.5 accent-accent-primary"
-            />
-            <span>I consent to using anonymized landmark coordinate vectors for training the WBSL AI model.</span>
-          </label>
-
-          <label className="flex items-start space-x-3 text-xs text-text-secondary cursor-pointer">
-            <input
-              type="checkbox"
-              checked={checks.understandDeletion}
-              onChange={(e) => setChecks({ ...checks, understandDeletion: e.target.checked })}
-              className="mt-0.5 accent-accent-primary"
-            />
-            <span>I understand I can request sample deletion at any time using my Signer ID.</span>
-          </label>
-
-          <label className="flex items-start space-x-3 text-xs text-text-secondary cursor-pointer">
-            <input
-              type="checkbox"
-              checked={checks.declareOwnership}
-              onChange={(e) => setChecks({ ...checks, declareOwnership: e.target.checked })}
-              className="mt-0.5 accent-accent-primary"
-            />
-            <span>I declare that I am demonstrating authentic West Bengal Sign Language (WBSL) gestures.</span>
-          </label>
-        </div>
-
-        {/* Radio Option: Landmarks vs Video per Section 8.3 */}
-        <div className="pt-3 border-t border-border space-y-2">
-          <div className="text-xs font-mono uppercase tracking-wider text-text-secondary mb-1">
-            Data Storage Preference
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <label
-              className={`p-3 rounded border flex items-start space-x-2.5 cursor-pointer text-xs ${
-                !recordVideo
-                  ? "bg-accent-primary/10 border-accent-primary text-text-primary"
-                  : "bg-surface border-border text-text-secondary"
-              }`}
-            >
-              <input
-                type="radio"
-                name="storageMode"
-                checked={!recordVideo}
-                onChange={() => setRecordVideo(false)}
-                className="mt-0.5 accent-accent-primary"
-              />
-              <div>
-                <strong className="block font-semibold">Landmarks Only</strong>
-                <span className="text-[11px] text-text-muted">Recommended for privacy. Only coordinate data is transmitted.</span>
-              </div>
-            </label>
-
-            <label
-              className={`p-3 rounded border flex items-start space-x-2.5 cursor-pointer text-xs ${
-                recordVideo
-                  ? "bg-accent-secondary/10 border-accent-secondary text-text-primary"
-                  : "bg-surface border-border text-text-secondary"
-              }`}
-            >
-              <input
-                type="radio"
-                name="storageMode"
-                checked={recordVideo}
-                onChange={() => setRecordVideo(true)}
-                className="mt-0.5 accent-accent-secondary"
-              />
-              <div>
-                <strong className="block font-semibold">Save Video Also</strong>
-                <span className="text-[11px] text-text-muted">Assists human researchers in verifying ambiguous handshapes.</span>
-              </div>
-            </label>
-          </div>
-        </div>
-
-        <button
-          type="submit"
-          disabled={!allChecked}
-          className={`w-full py-2.5 px-4 rounded text-xs font-mono uppercase tracking-wider font-semibold transition-all ${
-            allChecked
-              ? "bg-accent-primary text-black hover:bg-accent-primary/90"
-              : "bg-surface-elevated text-text-muted cursor-not-allowed border border-border"
-          }`}
-        >
-          Authorize Session & Begin Recording
-        </button>
-      </form>
-    </div>
-  );
-}
-```
-
----
-
-# FILE: `frontend\src\components\recording\UploadRecovery.tsx`
-
-```tsx
-"use client";
-import React from "react";
-import { AlertTriangle, RotateCw } from "lucide-react";
-
-interface UploadRecoveryProps {
-  onRetry: () => void;
-  pendingCount?: number;
-}
-
-export function UploadRecovery({ onRetry, pendingCount = 1 }: UploadRecoveryProps) {
-  return (
-    <div className="bg-surface border border-status-error/40 p-4 rounded-md flex flex-col sm:flex-row items-center justify-between gap-4">
-      <div className="flex items-center space-x-3">
-        <div className="p-2 rounded bg-status-error/10 text-status-error">
-          <AlertTriangle size={20} />
-        </div>
-        <div>
-          <div className="text-xs font-mono font-bold text-status-error uppercase tracking-wider">
-            UPLOAD INTERRUPTED
-          </div>
-          <div className="text-xs text-text-secondary mt-0.5">
-            Your recording ({pendingCount} pending sample) is safely cached in browser memory. Network connection failed.
-          </div>
-        </div>
-      </div>
-
-      <button
-        onClick={onRetry}
-        className="flex items-center space-x-1.5 px-4 py-2 rounded bg-surface-elevated hover:bg-surface border border-border text-xs font-mono uppercase text-text-primary transition-colors shrink-0"
-      >
-        <RotateCw size={14} className="text-accent-primary" />
-        <span>Retry Upload</span>
-      </button>
     </div>
   );
 }
@@ -11532,664 +10156,6 @@ function Sparkline() {
         strokeLinejoin="round"
       />
     </svg>
-  );
-}
-```
-
----
-
-# FILE: `frontend\src\components\sign\NmmThresholdPanel.tsx`
-
-```tsx
-"use client";
-import React, { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
-import { Sliders, RotateCcw, X } from "lucide-react";
-import axios from "axios";
-
-const API_BASE = "http://localhost:8200";
-
-/**
- * The NMM thresholds are all "how much of this expression counts as that marker".
- * They are exposed because the correct value is genuinely user- and
- * camera-dependent: a raised eyebrow in a dim room with a low-res webcam
- * produces a very different landmark ratio than the same eyebrow on a well-lit
- * 1080p feed. One hardcoded constant cannot serve both, and the failure mode of
- * getting it wrong is loud -- every casual expression registers as a question
- * marker, and the gloss string fills with [negation] and [?].
- *
- * Each slider maps to a key in backend/nmm.py DEFAULT_CONFIG and is pushed live
- * to the server, so the effect is visible on the very next detection tick.
- */
-
-export interface NmmThresholds {
-  brow_raise_thresh: number;
-  brow_furrow_thresh: number;
-  mouth_thresh: number;
-  head_shake_var_thresh: number;
-  head_nod_var_thresh: number;
-  emotion_min_confidence: number;
-}
-
-/**
- * Master on/off switches for the five non-manual markers.
- *
- * These are NOT thresholds. A slider decides how much of an expression counts as
- * a marker; a gate decides whether the marker exists at all. Turning the question
- * slider down still leaves it able to fire on a big enough brow raise, and it
- * loses the value the operator had tuned. A gate is the honest off switch.
- */
-export interface MarkerGates {
-  question: boolean;
-  wh_question: boolean;
-  negation: boolean;
-  affirmation: boolean;
-  emphasis: boolean;
-}
-
-/** The gate keys, in the order the panel lists them. */
-export const MARKER_GATE_KEYS: (keyof MarkerGates)[] = [
-  "question",
-  "wh_question",
-  "negation",
-  "affirmation",
-  "emphasis",
-];
-
-/**
- * Negation and the two question markers ship OFF.
- *
- * A head shake and a brow raise are things every speaker does while thinking or
- * mid-sentence, so leaving them armed fills the gloss string with [negation] and
- * [?] the signer never intended. Affirmation and emphasis are cheap to re-enable
- * and are on by default. These must match DEFAULT_MARKER_GATES in backend/nmm.py.
- */
-export const DEFAULT_MARKER_GATES: MarkerGates = {
-  question: false,
-  wh_question: false,
-  negation: false,
-  affirmation: true,
-  emphasis: true,
-};
-
-/**
- * Client-side acceptance thresholds. Unlike NMM these never reach the server:
- * the decision to accept a window and append a gloss is made in the page, from
- * the confidence and margin the stream endpoint already returns. They are
- * persisted to localStorage so an operator's tuning survives a reload.
- */
-export interface CommitThresholds {
-  min_confidence: number;
-  min_margin: number;
-  stable_windows: number;
-  repeat_cooldown_ms: number;
-}
-
-/** Every slider the panel exposes: the 6 server-side NMM values + 4 client-side. */
-export type AllThresholds = NmmThresholds & CommitThresholds;
-
-/** The full panel state: sensitivity sliders plus the marker on/off gates. */
-export interface PanelState {
-  thresholds: AllThresholds;
-  gates: MarkerGates;
-}
-
-/** localStorage key for the marker gates. */
-export const GATE_STORAGE_KEY = "wbsl.markerGates.v1";
-
-export const DEFAULT_THRESHOLDS: NmmThresholds = {
-  brow_raise_thresh: 0.082,
-  brow_furrow_thresh: 0.032,
-  mouth_thresh: 0.055,
-  head_shake_var_thresh: 0.0018,
-  head_nod_var_thresh: 0.0018,
-  emotion_min_confidence: 0.35,
-};
-
-export const DEFAULT_COMMIT_THRESHOLDS: CommitThresholds = {
-  min_confidence: 0.55,
-  min_margin: 0.25,
-  stable_windows: 2,
-  repeat_cooldown_ms: 1500,
-};
-
-export const DEFAULT_ALL: AllThresholds = {
-  ...DEFAULT_THRESHOLDS,
-  ...DEFAULT_COMMIT_THRESHOLDS,
-};
-
-/** localStorage key. Versioned so a future shape change cannot resurrect stale values. */
-export const COMMIT_STORAGE_KEY = "wbsl.commitThresholds.v1";
-
-interface SliderSpec {
-  key: string;
-  label: string;
-  hint: string;
-  min: number;
-  max: number;
-  step: number;
-  /** Rendered as a percentage multiplier rather than a raw ratio. */
-  asPercent?: boolean;
-  /** Rendered as a whole number with a unit suffix. */
-  unit?: string;
-  group: "commit" | "nmm" | "affect";
-}
-
-const SLIDERS: SliderSpec[] = [
-  {
-    key: "min_confidence",
-    label: "Sign confidence floor",
-    hint: "A recognised sign below this is ignored. Raise it if wrong signs appear.",
-    min: 0.2,
-    max: 0.95,
-    step: 0.05,
-    asPercent: true,
-    group: "commit",
-  },
-  {
-    key: "min_margin",
-    label: "Decisiveness margin",
-    hint: "How far the winning sign must beat the runner-up. This is the single most effective guard against confident-looking nonsense — raise it when similar signs get confused.",
-    min: 0.0,
-    max: 0.9,
-    step: 0.05,
-    asPercent: true,
-    group: "commit",
-  },
-  {
-    key: "stable_windows",
-    label: "Agreeing windows before commit",
-    hint: "How many consecutive windows must agree before a sign is added. 1 is fastest but jumps the gun; 3 is very strict.",
-    min: 1,
-    max: 6,
-    step: 1,
-    unit: "windows",
-    group: "commit",
-  },
-  {
-    key: "repeat_cooldown_ms",
-    label: "Release before repeating",
-    hint: "How long the camera must detect an idle/release state before the same sign can be added again.",
-    min: 300,
-    max: 5000,
-    step: 100,
-    unit: "ms",
-    group: "commit",
-  },
-  {
-    key: "brow_raise_thresh",
-    label: "Brow raise → question [?]",
-    hint: "How far the brows must lift above the eyes. Lower = easier to trigger.",
-    min: 0.02,
-    max: 0.18,
-    step: 0.002,
-    group: "nmm",
-  },
-  {
-    key: "brow_furrow_thresh",
-    label: "Brow furrow → wh-question",
-    hint: "How close the brows must sit to the eyes to count as a furrow.",
-    min: 0.01,
-    max: 0.08,
-    step: 0.001,
-    group: "nmm",
-  },
-  {
-    key: "mouth_thresh",
-    label: "Mouth open → emphasis",
-    hint: "Lip separation that counts as emphasis. Raise it to ignore casual speech.",
-    min: 0.01,
-    max: 0.14,
-    step: 0.002,
-    group: "nmm",
-  },
-  {
-    key: "head_shake_var_thresh",
-    label: "Head shake → negation",
-    hint: "Lateral nose movement needed. Raise it to require a deliberate shake.",
-    min: 0.0002,
-    max: 0.008,
-    step: 0.0001,
-    group: "nmm",
-  },
-  {
-    key: "head_nod_var_thresh",
-    label: "Head nod → affirmation",
-    hint: "Vertical nose movement needed. Raise it to require a deliberate nod.",
-    min: 0.0002,
-    max: 0.008,
-    step: 0.0001,
-    group: "nmm",
-  },
-  {
-    key: "emotion_min_confidence",
-    label: "Emotion confidence floor",
-    hint: "Below this, affect falls back to neutral instead of guessing.",
-    min: 0.1,
-    max: 0.9,
-    step: 0.05,
-    asPercent: true,
-    group: "affect",
-  },
-];
-
-const GROUP_META: Record<string, { title: string; blurb: string }> = {
-  commit: {
-    title: "Recognition acceptance",
-    blurb:
-      "Decides whether a recognised sign is actually added to the sequence. Tighten these when the sequence accumulates wrong signs.",
-  },
-  nmm: {
-    title: "Non-manual markers",
-    blurb:
-      "How much of each facial or head expression counts as a marker. Loosen a value if a deliberate expression never registers.",
-  },
-  affect: {
-    title: "Affect",
-    blurb: "How confident the emotion classifier must be before it reports a non-neutral emotion.",
-  },
-};
-
-interface Props {
-  values: AllThresholds;
-  onChange: (next: AllThresholds) => void;
-  /** Marker on/off gates. */
-  gates: MarkerGates;
-  onGatesChange: (next: MarkerGates) => void;
-  /** Open the modal on mount. Defaults to closed. */
-  defaultOpen?: boolean;
-  /** Renders the trigger button inline instead of in the control bar. */
-  variant?: "inline" | "header";
-}
-
-/** One-line description of each gate, shown next to its switch. */
-const GATE_META: Record<keyof MarkerGates, { label: string; desc: string }> = {
-  question: {
-    label: "Question (yes/no)",
-    desc: "Eyebrow raise. Adds [?] to the clause.",
-  },
-  wh_question: {
-    label: "WH-question",
-    desc: "Brow furrow. Frames what / why / how.",
-  },
-  negation: {
-    label: "Negation",
-    desc: "Head shake. Adds [negation] to the sign.",
-  },
-  affirmation: {
-    label: "Affirmation",
-    desc: "Head nod. Confirms the clause.",
-  },
-  emphasis: {
-    label: "Emphasis",
-    desc: "Mouth open. Stresses the clause.",
-  },
-};
-
-export function NmmThresholdPanel({
-  values,
-  onChange,
-  gates,
-  onGatesChange,
-  defaultOpen = false,
-  variant = "inline",
-}: Props) {
-  const [open, setOpen] = useState(defaultOpen);
-  // Portals cannot run during SSR/prerender -- there is no document to portal
-  // into -- so the overlay is only rendered after the first client mount.
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => setMounted(true), []);
-
-  // Escape closes, and the page behind must not scroll while an overlay is up.
-  useEffect(() => {
-    if (!open) return;
-
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-
-    document.addEventListener("keydown", onKey);
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [open]);
-
-  const update = (key: string, raw: number) => {
-    const next = { ...values, [key]: raw } as AllThresholds;
-    onChange(next);
-    // Server-side NMM values are pushed so detection reflects them on the next
-    // tick. The commit values are client-only, so they are written to
-    // localStorage instead. Sending the commit keys to the NMM endpoint would be
-    // silently ignored, which is worse than not sending them -- it would look
-    // like the tuning took effect when nothing changed.
-    const { min_confidence, min_margin, stable_windows, repeat_cooldown_ms } = next;
-    axios
-      .post(`${API_BASE}/api/nmm/config`, {
-        brow_raise_thresh: next.brow_raise_thresh,
-        brow_furrow_thresh: next.brow_furrow_thresh,
-        mouth_thresh: next.mouth_thresh,
-        head_shake_var_thresh: next.head_shake_var_thresh,
-        head_nod_var_thresh: next.head_nod_var_thresh,
-        emotion_min_confidence: next.emotion_min_confidence,
-      })
-      .catch(() => {});
-    try {
-      localStorage.setItem(
-        COMMIT_STORAGE_KEY,
-        JSON.stringify({ min_confidence, min_margin, stable_windows, repeat_cooldown_ms })
-      );
-    } catch {
-      /* private mode / storage disabled -- tuning still applies for this session */
-    }
-  };
-
-  const setGate = (key: keyof MarkerGates, enabled: boolean) => {
-    const next = { ...gates, [key]: enabled };
-    onGatesChange(next);
-    // The gates live on the server, so they are pushed the same way thresholds
-    // are. The local mirror is written too: without it a reload would show the
-    // defaults while the server kept the operator's choice.
-    axios
-      .post(`${API_BASE}/api/nmm/config`, { marker_gates: { [key]: enabled } })
-      .catch(() => {});
-    try {
-      localStorage.setItem(GATE_STORAGE_KEY, JSON.stringify(next));
-    } catch {
-      /* ignore */
-    }
-  };
-
-  const reset = () => {
-    onChange(DEFAULT_ALL);
-    onGatesChange(DEFAULT_MARKER_GATES);
-    axios
-      .post(`${API_BASE}/api/nmm/config`, {
-        ...DEFAULT_THRESHOLDS,
-        marker_gates: DEFAULT_MARKER_GATES,
-      })
-      .catch(() => {});
-    try {
-      localStorage.setItem(COMMIT_STORAGE_KEY, JSON.stringify(DEFAULT_COMMIT_THRESHOLDS));
-      localStorage.setItem(GATE_STORAGE_KEY, JSON.stringify(DEFAULT_MARKER_GATES));
-    } catch {
-      /* ignore */
-    }
-  };
-
-  const grouped = (group: SliderSpec["group"]) => SLIDERS.filter((s) => s.group === group);
-
-  /**
-   * How far the live values have drifted from the calibrated defaults.
-   * Surfacing this on the trigger matters because the modal is invisible when
-   * shut: without a count, an operator who tuned something last week has no way
-   * to know the detector is still running on those values.
-   *
-   * A switched-off marker counts as a change, because it is the one setting that
-   * silently deletes output the operator may later expect to see.
-   */
-  const changedCount =
-    SLIDERS.filter(
-      (s) =>
-        (values as unknown as Record<string, number>)[s.key] !==
-        (DEFAULT_ALL as unknown as Record<string, number>)[s.key]
-    ).length +
-    MARKER_GATE_KEYS.filter((k) => gates[k] !== DEFAULT_MARKER_GATES[k]).length;
-
-  const disabledCount = MARKER_GATE_KEYS.filter((k) => !gates[k]).length;
-
-  const trigger =
-    variant === "header" ? (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        title="NMM Controller"
-        className="relative p-1.5 rounded-lg bg-surface border border-border text-text-muted hover:text-accent-secondary hover:border-accent-secondary/50 transition-colors"
-      >
-        <Sliders size={13} />
-
-        {changedCount > 0 && (
-          <span className="absolute -top-1.5 -right-1.5 min-w-[14px] h-3.5 px-1 rounded-full bg-accent-secondary text-black text-[8px] font-bold flex items-center justify-center">
-            {changedCount}
-          </span>
-        )}
-      </button>
-    ) : (
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl border border-border/80 bg-surface/60 hover:bg-surface-elevated/50 transition-colors"
-      >
-        <span className="flex items-center gap-2 text-[10px] font-mono uppercase tracking-[0.15em] text-text-secondary">
-          <Sliders size={13} className="text-accent-secondary" />
-          NMM Controller
-        </span>
-
-        <span className="flex items-center gap-2 text-[10px] font-mono text-text-muted">
-          {/* Markers that are switched off are the most important thing to see
-              from outside the modal, so they are named rather than folded into
-              the tuned count. */}
-          {disabledCount > 0 ? (
-            <span className="text-status-pending">{disabledCount} off</span>
-          ) : changedCount > 0 ? (
-            <span className="text-accent-secondary">{changedCount} tuned</span>
-          ) : (
-            <span>defaults</span>
-          )}
-          <span>·</span>
-          <span>{SLIDERS.length} controls</span>
-        </span>
-      </button>
-    );
-
-  if (!open) return <>{trigger}</>;
-
-  const overlay = (
-    <div
-      className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 bg-black/70 backdrop-blur-sm"
-      onClick={() => setOpen(false)}
-      role="dialog"
-      aria-modal="true"
-      aria-label="NMM Controller"
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-2xl max-h-[88vh] flex flex-col rounded-xl border border-border bg-surface shadow-2xl overflow-hidden"
-      >
-          {/* HEADER */}
-          <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3 border-b border-border shrink-0">
-            <span className="flex items-center gap-2 text-xs font-mono uppercase tracking-[0.15em] text-text-secondary">
-              <Sliders size={13} className="text-accent-secondary" />
-              NMM Controller
-            </span>
-
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              aria-label="Close NMM controller"
-              className="p-1.5 rounded-lg text-text-muted hover:text-text-primary hover:bg-surface-elevated transition-colors"
-            >
-              <X size={15} />
-            </button>
-          </div>
-
-          {/* BODY — scrolls independently so the header stays put */}
-          <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-5 py-4 space-y-5">
-            <p className="text-[11px] text-text-muted leading-relaxed">
-              Every control below is live — changes take effect immediately. Not sure what
-              to change? Start with <strong className="text-text-secondary">Decisiveness margin</strong>{" "}
-              and <strong className="text-text-secondary">Agreeing windows</strong>: they do the
-              most to stop wrong signs without making detection sluggish.
-            </p>
-
-            {/* MARKER SWITCHES. First, because a switched-off marker explains
-                far more about a wrong output than any slider value does: no
-                amount of threshold tuning will produce a [negation] while the
-                negation gate is closed. */}
-            <div className="space-y-3">
-              <div className="pb-1 border-b border-border/50">
-                <div className="text-[10px] font-mono uppercase tracking-wider text-accent-secondary">
-                  Markers
-                </div>
-                <p className="text-[10px] text-text-muted leading-relaxed mt-0.5">
-                  Which non-manual markers are allowed to reach the LLM at all. A marker
-                  switched off is never reported, no matter how strongly it is performed —
-                  this is different from the sliders below, which only set how much of an
-                  expression is needed. Negation and questions are off by default because a
-                  head shake or a brow raise happens constantly in ordinary signing.
-                </p>
-              </div>
-
-              {MARKER_GATE_KEYS.map((key) => {
-                const on = gates[key];
-                const meta = GATE_META[key];
-                const isDefault = on === DEFAULT_MARKER_GATES[key];
-
-                return (
-                  <div
-                    key={key}
-                    className="flex items-center justify-between gap-3"
-                  >
-                    <div className="min-w-0">
-                      <div className="text-[11px] font-mono text-text-secondary">
-                        {meta.label}
-                        {!isDefault && (
-                          <span className="ml-1.5 text-[9px] text-accent-secondary">•</span>
-                        )}
-                      </div>
-                      <p className="text-[10px] text-text-muted leading-relaxed">
-                        {meta.desc}
-                      </p>
-                    </div>
-
-                    {/* A real switch, not a checkbox: the state has to read at a
-                        glance from across a room while signing. */}
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={on}
-                      aria-label={meta.label}
-                      onClick={() => setGate(key, !on)}
-                      className={`shrink-0 w-10 h-5 rounded-full border transition-colors relative ${
-                        on
-                          ? "bg-accent-primary/30 border-accent-primary/60"
-                          : "bg-surface-elevated border-border"
-                      }`}
-                    >
-                      <span
-                        className={`absolute top-0.5 w-3.5 h-3.5 rounded-full transition-all ${
-                          on
-                            ? "left-[22px] bg-accent-primary"
-                            : "left-0.5 bg-text-muted"
-                        }`}
-                      />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-
-            {(["commit", "nmm", "affect"] as const).map((group) => (
-              <div key={group} className="space-y-3">
-                <div className="pb-1 border-b border-border/50">
-                  <div className="text-[10px] font-mono uppercase tracking-wider text-accent-secondary">
-                    {GROUP_META[group].title}
-                  </div>
-                  <p className="text-[10px] text-text-muted leading-relaxed mt-0.5">
-                    {GROUP_META[group].blurb}
-                  </p>
-                </div>
-
-                {grouped(group).map((s) => {
-                  const v = (values as unknown as Record<string, number>)[s.key] ?? 0;
-                  const pct = ((v - s.min) / (s.max - s.min)) * 100;
-                  const isDefault =
-                    v === (DEFAULT_ALL as unknown as Record<string, number>)[s.key];
-                  const display = s.asPercent
-                    ? `${Math.round(v * 100)}%`
-                    : s.unit === "windows"
-                    ? `${Math.round(v)}`
-                    : s.unit === "ms"
-                    ? `${(v / 1000).toFixed(1)}s`
-                    : v.toFixed(4);
-                  return (
-                    <div key={s.key} className="space-y-1.5">
-                      <div className="flex items-center justify-between gap-3">
-                        <label className="text-[11px] font-mono text-text-secondary">
-                          {s.label}
-                          {!isDefault && (
-                            <span className="ml-1.5 text-[9px] text-accent-secondary">•</span>
-                          )}
-                        </label>
-                        <span className="text-[11px] font-mono font-bold text-accent-primary tabular-nums shrink-0">
-                          {display}
-                          {s.unit === "windows" && (
-                            <span className="text-text-muted font-normal"> win</span>
-                          )}
-                        </span>
-                      </div>
-                      <input
-                        type="range"
-                        min={s.min}
-                        max={s.max}
-                        step={s.step}
-                        value={v}
-                        onChange={(e) => update(s.key, parseFloat(e.target.value))}
-                        aria-label={s.label}
-                        className="w-full h-1 appearance-none rounded-full cursor-pointer accent-[var(--accent-primary)]"
-                        style={{
-                          background: `linear-gradient(to right, var(--accent-primary) ${pct}%, rgba(255,255,255,0.12) ${pct}%)`,
-                        }}
-                      />
-                      <p className="text-[10px] text-text-muted leading-relaxed">{s.hint}</p>
-                    </div>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-
-          {/* FOOTER */}
-          <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3 border-t border-border shrink-0">
-            <button
-              type="button"
-              onClick={reset}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-elevated border border-border text-[11px] font-mono text-text-secondary hover:text-text-primary hover:border-accent-secondary transition-colors"
-            >
-              <RotateCcw size={12} />
-              <span>Reset to calibrated defaults</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              className="px-4 py-1.5 rounded-lg bg-accent-primary text-black text-[11px] font-mono font-bold hover:bg-accent-primary/90 transition-colors"
-            >
-              Done
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-
-  return (
-    <>
-      {trigger}
-
-      {/* Portaled to <body>.
-          This component is mounted deep inside the Recognition column, whose
-          ancestors use overflow-hidden and own their own stacking contexts.
-          Rendering the overlay inline meant `fixed inset-0` was clipped by
-          those ancestors and z-[100] could not lift it above sibling columns,
-          so the dialog appeared mid-page and cut off. A portal moves the node
-          out of that subtree entirely, which is the only reliable way to escape
-          a clipped ancestor for a full-viewport overlay. */}
-      {mounted && createPortal(overlay, document.body)}
-    </>
   );
 }
 ```
@@ -12512,11 +10478,11 @@ export function RoundAlpanaStage({ seq }: { seq: SolvedSequence }) {
   const stage = useMemo(() => {
     const hipCenters: { x: number; y: number; z: number }[] = [];
     for (const { pose } of frames) {
-      if (pose[23 * 4 + 3] < THRESH || pose[24 * 4 + 3] < THRESH) continue;
+      if (pose[6 * 4 + 3] < THRESH || pose[7 * 4 + 3] < THRESH) continue;
       hipCenters.push({
-        x: (pose[23 * 4] + pose[24 * 4]) / 2,
-        y: (pose[23 * 4 + 1] + pose[24 * 4 + 1]) / 2,
-        z: (pose[23 * 4 + 2] + pose[24 * 4 + 2]) / 2,
+        x: (pose[6 * 4] + pose[7 * 4]) / 2,
+        y: (pose[6 * 4 + 1] + pose[7 * 4 + 1]) / 2,
+        z: (pose[6 * 4 + 2] + pose[7 * 4 + 2]) / 2,
       });
     }
     const radius = Math.max((bounds.maxX - bounds.minX) * 0.74, 1.55);
@@ -12737,7 +10703,7 @@ const API_BASE = "http://localhost:8200";
 interface LandmarkReplay {
   frames: number[][][];
   pose?: PosePoint[][];
-  face_mesh?: number[][][];
+  face_avatar?: number[][][];
   count: number;
   source: string;
 }
@@ -12751,7 +10717,7 @@ interface Segment {
 interface ReplaySequence {
   frames: number[][][];
   pose?: PosePoint[][];
-  faceMesh?: number[][][];
+  faceAvatar?: number[][][];
   segments: Segment[];
 }
 
@@ -12782,10 +10748,10 @@ async function fetchContinuousSequence(glosses: string[]): Promise<ReplaySequenc
   const replayByGloss = new Map(entries);
   const frames: number[][][] = [];
   const poses: PosePoint[][] = [];
-  const faceMesh: number[][][] = [];
+  const faceAvatar: number[][][] = [];
   const segments: Segment[] = [];
   let allHavePose = true;
-  let hasAnyFaceMesh = false;
+  let hasAnyFaceAvatar = false;
 
   for (const gloss of glosses) {
     const replay = replayByGloss.get(gloss);
@@ -12801,18 +10767,18 @@ async function fetchContinuousSequence(glosses: string[]): Promise<ReplaySequenc
       allHavePose = false;
     }
 
-    if (replay.face_mesh?.length === replay.frames.length) {
-      faceMesh.push(...replay.face_mesh);
-      hasAnyFaceMesh ||= replay.face_mesh.some((frame) => frame.length > 0);
+    if (replay.face_avatar?.length === replay.frames.length) {
+      faceAvatar.push(...replay.face_avatar);
+      hasAnyFaceAvatar ||= replay.face_avatar.some((frame) => frame.length > 0);
     } else {
-      faceMesh.push(...replay.frames.map(() => []));
+      faceAvatar.push(...replay.frames.map(() => []));
     }
   }
 
   return {
     frames,
     pose: allHavePose ? poses : undefined,
-    faceMesh: hasAnyFaceMesh ? faceMesh : undefined,
+    faceAvatar: hasAnyFaceAvatar ? faceAvatar : undefined,
     segments,
   };
 }
@@ -12861,13 +10827,12 @@ export function ContinuousSignSimulation({
       <div className="flex items-start justify-between gap-3 px-1 mb-1">
         <div className="flex items-center gap-2">
           <div className="inline-flex items-center px-2 py-0.5 rounded border border-border/80 bg-surface text-[10px] font-mono font-bold text-text-secondary uppercase tracking-wider w-fit">
-            {data ? `${data.segments.length} SIGNS` : `${normalizedGlosses.length} SIGNS`}
+            <span className="text-[10px] font-mono tabular-nums text-text-secondary">
+              {data ? `${activeSegment + 1}/${data.segments.length}` : "—"} SIGNS
+            </span>
           </div>
         </div>
         <div className="flex items-center gap-2 pt-0.5">
-          <span className="text-[10px] font-mono tabular-nums text-text-secondary">
-            {data ? `${activeSegment + 1}/${data.segments.length}` : "—"}
-          </span>
           <button
             type="button"
             onClick={onResetView}
@@ -12875,8 +10840,7 @@ export function ContinuousSignSimulation({
             aria-label="Reset simulation view"
             title="Reset simulation view"
           >
-            <RotateCcw size={11} />
-            Reset view
+            <RotateCcw size={15} />
           </button>
         </div>
       </div>
@@ -12895,8 +10859,10 @@ export function ContinuousSignSimulation({
             <LandmarkSimulation
               frames={data.frames}
               pose={data.pose}
-              faceMesh={data.faceMesh}
-              fps={15}
+              faceAvatar={data.faceAvatar}
+              fps={30}
+              defaultCameraDistanceScale={0.92}
+              defaultCameraVerticalOffset={0.06}
               minimal
               loop={false}
               autoPlay={playing}
@@ -12954,8 +10920,8 @@ export function ContinuousSignSimulation({
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
-import type { SampleRef } from "./LandmarkSimulation";
-import { DHUTI_DROP, THRESH } from "./simulationConstants";
+import type { SampleRef } from "./HeadFaceRig";
+import { DHUTI_DROP, DHUTI_HALF_WIDTH_RATIO, THRESH, TORSO_WORLD } from "./simulationConstants";
 
 const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
@@ -13179,16 +11145,16 @@ export function DhutiRig({ sampleRef }: { sampleRef: SampleRef }) {
     if (!group || !motifs) return;
     const P = sampleRef.current.pose;
     const vis = (i: number) => P[i * 4 + 3] >= THRESH;
-    if (!(vis(23) && vis(24))) {
+    if (!(vis(6) && vis(7))) {
       group.visible = false;
       return;
     }
     group.visible = true;
 
-    const hipY = (P[23 * 4 + 1] + P[24 * 4 + 1]) / 2;
-    frame.cx = (P[23 * 4] + P[24 * 4]) / 2;
-    frame.cz = (P[23 * 4 + 2] + P[24 * 4 + 2]) / 2;
-    frame.hw = Math.max(Math.abs(P[24 * 4] - P[23 * 4]) / 2, 0.14) * 1.12;
+    const hipY = (P[6 * 4 + 1] + P[7 * 4 + 1]) / 2;
+    frame.cx = (P[6 * 4] + P[7 * 4]) / 2;
+    frame.cz = (P[6 * 4 + 2] + P[7 * 4 + 2]) / 2;
+    frame.hw = TORSO_WORLD * DHUTI_HALF_WIDTH_RATIO;
     frame.waistY = hipY + 0.08;
 
     /* Fixed knee-length hem; leg motion never stretches it. */
@@ -13267,32 +11233,1491 @@ export function DhutiRig({ sampleRef }: { sampleRef: SampleRef }) {
 
 ---
 
+# FILE: `frontend\src\components\simulation\HandRig.tsx`
+
+```tsx
+"use client";
+
+import { useEffect, useMemo, useRef } from "react";
+import * as THREE from "three";
+import { useFrame } from "@react-three/fiber";
+import type { SampleRef } from "./HeadFaceRig";
+import { THRESH } from "./simulationConstants";
+
+// ============================================================
+// DESIGN PALETTE & MATERIALS THEME
+// ============================================================
+
+const CERAMIC_WHITE = "#e8edf5";
+const CERAMIC_SLEEVE = "#cbd5e1";
+const TITANIUM_DARK = "#2a3447";
+const TITANIUM_CORE = "#50637f";
+const ACCENT_GOLD = "#d4a359";
+const RING_CHROME = "#94a3b8";
+
+// ============================================================
+// ARM STRUCTURE & CONNECTIONS
+// 0: left shoulder, 1: right shoulder
+// 2: left elbow,    3: right elbow
+// 4: left wrist,    5: right wrist
+// ============================================================
+
+const ARM_SEGMENTS: {
+  conn: [number, number];
+  radiusTop: number;
+  radiusBottom: number;
+}[] = [
+  // Clavicle chest beam
+  { conn: [0, 1], radiusTop: 0.088, radiusBottom: 0.088 },
+  // Left Upper Arm (Shoulder -> Elbow)
+  { conn: [0, 2], radiusTop: 0.098, radiusBottom: 0.078 },
+  // Left Forearm (Elbow -> Wrist)
+  { conn: [2, 4], radiusTop: 0.074, radiusBottom: 0.052 },
+  // Right Upper Arm (Shoulder -> Elbow)
+  { conn: [1, 3], radiusTop: 0.098, radiusBottom: 0.078 },
+  // Right Forearm (Elbow -> Wrist)
+  { conn: [3, 5], radiusTop: 0.074, radiusBottom: 0.052 },
+];
+
+const ARM_JOINTS = [
+  { index: 0, radius: 0.125 }, // Left Shoulder
+  { index: 1, radius: 0.125 }, // Right Shoulder
+  { index: 2, radius: 0.084 }, // Left Elbow
+  { index: 3, radius: 0.084 }, // Right Elbow
+  { index: 4, radius: 0.056 }, // Left Wrist
+  { index: 5, radius: 0.056 }, // Right Wrist
+];
+
+// Sleeve collars for elbow and wrist
+const ARM_SOCKETS = [
+  { boneIdx: 1, t: 0.94, radius: 0.086, height: 0.038 }, // L elbow top
+  { boneIdx: 2, t: 0.06, radius: 0.082, height: 0.038 }, // L elbow bottom
+  { boneIdx: 2, t: 0.94, radius: 0.058, height: 0.030 }, // L wrist
+  { boneIdx: 3, t: 0.94, radius: 0.086, height: 0.038 }, // R elbow top
+  { boneIdx: 4, t: 0.06, radius: 0.082, height: 0.038 }, // R elbow bottom
+  { boneIdx: 4, t: 0.94, radius: 0.058, height: 0.030 }, // R wrist
+];
+
+// Elbow chrome accent rings
+const ELBOW_JOINTS = [2, 3];
+
+// ============================================================
+// HAND CONNECTIONS & TOPOLOGY
+// ============================================================
+
+const PALM_METACARPALS: [number, number][] = [
+  [0, 1],
+  [0, 5],
+  [0, 9],
+  [0, 13],
+  [0, 17],
+];
+
+const FINGER_SEGMENTS: [number, number][] = [
+  // Thumb
+  [1, 2], [2, 3], [3, 4],
+  // Index
+  [5, 6], [6, 7], [7, 8],
+  // Middle
+  [9, 10], [10, 11], [11, 12],
+  // Ring
+  [13, 14], [14, 15], [15, 16],
+  // Pinky
+  [17, 18], [18, 19], [19, 20],
+];
+
+const ALL_HAND_SEGMENTS = [...PALM_METACARPALS, ...FINGER_SEGMENTS];
+const FINGER_TIPS = [4, 8, 12, 16, 20];
+const PALM_PERIMETER = [0, 1, 5, 9, 13, 17];
+
+function buildPalmIndexBuffer(): number[] {
+  const indices: number[] = [];
+  indices.push(0, 1, 2, 0, 2, 3, 0, 3, 4, 0, 4, 5);
+  indices.push(6, 8, 7, 6, 9, 8, 6, 10, 9, 6, 11, 10);
+  for (let i = 0; i < 6; i++) {
+    const next = (i + 1) % 6;
+    const fA = i;
+    const fB = next;
+    const bA = i + 6;
+    const bB = next + 6;
+    indices.push(fA, bA, fB);
+    indices.push(fB, bA, bB);
+  }
+  return indices;
+}
+
+const PALM_INDICES = buildPalmIndexBuffer();
+
+const HAND_JOINT_RADII = [
+  0.038, // 0: Wrist
+  0.024, 0.021, 0.019, 0.017, // Thumb
+  0.025, 0.021, 0.018, 0.016, // Index
+  0.025, 0.021, 0.018, 0.016, // Middle
+  0.024, 0.020, 0.017, 0.015, // Ring
+  0.022, 0.018, 0.016, 0.014, // Pinky
+];
+
+// ============================================================
+// GEOMETRIES
+// ============================================================
+
+const armCylinderGeo = new THREE.CylinderGeometry(1, 1, 1, 24, 1, false);
+const jointSphereGeo = new THREE.SphereGeometry(1, 24, 20);
+const jointRingGeo = new THREE.TorusGeometry(1, 0.2, 16, 28);
+const socketCuffGeo = new THREE.CylinderGeometry(1.05, 0.98, 1, 24, 1);
+
+// Upper dome cap covering the top of the shoulder (thetaLength = Pi/2 = upper hemisphere dome)
+const shoulderTopArmorGeo = new THREE.SphereGeometry(
+  1,
+  32,
+  16,
+  0,
+  Math.PI * 2,
+  0,
+  Math.PI * 0.52,
+);
+
+const fingerBoneGeo = new THREE.CylinderGeometry(0.72, 0.96, 1, 16, 1);
+const knuckleSphereGeo = new THREE.SphereGeometry(1, 16, 14);
+const knuckleRingGeo = new THREE.TorusGeometry(1, 0.2, 12, 20);
+const fingertipDomeGeo = new THREE.SphereGeometry(1, 16, 14);
+
+// ============================================================
+// MATH HELPERS
+// ============================================================
+
+const Y_AXIS = new THREE.Vector3(0, 1, 0);
+
+function readPoint(target: THREE.Vector3, data: ArrayLike<number>, offset: number) {
+  target.set(data[offset], data[offset + 1], data[offset + 2]);
+}
+
+function updateSegment(
+  mesh: THREE.InstancedMesh,
+  index: number,
+  a: THREE.Vector3,
+  b: THREE.Vector3,
+  radiusTop: number,
+  radiusBottom: number,
+  dummy: THREE.Object3D,
+  dir: THREE.Vector3,
+) {
+  dir.subVectors(b, a);
+  const length = dir.length();
+
+  if (length < 0.0001) {
+    dummy.scale.setScalar(0);
+    dummy.updateMatrix();
+    mesh.setMatrixAt(index, dummy.matrix);
+    return;
+  }
+
+  dummy.position.copy(a).add(b).multiplyScalar(0.5);
+  dummy.quaternion.setFromUnitVectors(Y_AXIS, dir.normalize());
+
+  const avgRadius = (radiusTop + radiusBottom) * 0.5;
+  dummy.scale.set(avgRadius, length, avgRadius);
+  dummy.updateMatrix();
+
+  mesh.setMatrixAt(index, dummy.matrix);
+}
+
+function updateJoint(
+  mesh: THREE.InstancedMesh,
+  index: number,
+  position: THREE.Vector3,
+  radius: number,
+  dummy: THREE.Object3D,
+  quaternion?: THREE.Quaternion,
+) {
+  dummy.position.copy(position);
+  if (quaternion) {
+    dummy.quaternion.copy(quaternion);
+  } else {
+    dummy.quaternion.identity();
+  }
+  dummy.scale.setScalar(radius);
+  dummy.updateMatrix();
+
+  mesh.setMatrixAt(index, dummy.matrix);
+}
+
+// ============================================================
+// ENHANCED SHOULDER & ARM RIG
+// ============================================================
+
+export function ArmRig({ sampleRef }: { sampleRef: SampleRef }) {
+  const bonesRef = useRef<THREE.InstancedMesh>(null);
+  const jointsRef = useRef<THREE.InstancedMesh>(null);
+  const ringsRef = useRef<THREE.InstancedMesh>(null);
+  const socketsRef = useRef<THREE.InstancedMesh>(null);
+  const shoulderArmorRef = useRef<THREE.InstancedMesh>(null);
+
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+  const start = useMemo(() => new THREE.Vector3(), []);
+  const end = useMemo(() => new THREE.Vector3(), []);
+  const direction = useMemo(() => new THREE.Vector3(), []);
+  const tempQuat = useMemo(() => new THREE.Quaternion(), []);
+
+  const materials = useMemo(
+    () => ({
+      armShell: new THREE.MeshStandardMaterial({
+        color: CERAMIC_WHITE,
+        metalness: 0.24,
+        roughness: 0.22,
+      }),
+      joints: new THREE.MeshStandardMaterial({
+        color: TITANIUM_CORE,
+        metalness: 0.88,
+        roughness: 0.18,
+      }),
+      rings: new THREE.MeshStandardMaterial({
+        color: RING_CHROME,
+        metalness: 0.95,
+        roughness: 0.12,
+      }),
+      sockets: new THREE.MeshStandardMaterial({
+        color: TITANIUM_DARK,
+        metalness: 0.82,
+        roughness: 0.26,
+      }),
+      shoulderArmor: new THREE.MeshStandardMaterial({
+        color: CERAMIC_WHITE,
+        metalness: 0.28,
+        roughness: 0.18,
+        side: THREE.DoubleSide,
+      }),
+    }),
+    [],
+  );
+
+  useEffect(
+    () => () => {
+      materials.armShell.dispose();
+      materials.joints.dispose();
+      materials.rings.dispose();
+      materials.sockets.dispose();
+      materials.shoulderArmor.dispose();
+    },
+    [materials],
+  );
+
+  useFrame(() => {
+    const bones = bonesRef.current;
+    const joints = jointsRef.current;
+    const rings = ringsRef.current;
+    const sockets = socketsRef.current;
+    const shoulderArmor = shoulderArmorRef.current;
+    if (!bones || !joints || !rings || !sockets || !shoulderArmor) return;
+
+    const pose = sampleRef.current.pose;
+
+    // 1. Arm Limbs & Clavicle
+    for (let i = 0; i < ARM_SEGMENTS.length; i++) {
+      const { conn, radiusTop, radiusBottom } = ARM_SEGMENTS[i];
+      const [a, b] = conn;
+
+      const conf = Math.min(pose[a * 4 + 3], pose[b * 4 + 3]);
+      if (conf < THRESH) {
+        dummy.scale.setScalar(0);
+        dummy.updateMatrix();
+        bones.setMatrixAt(i, dummy.matrix);
+        continue;
+      }
+
+      readPoint(start, pose, a * 4);
+      readPoint(end, pose, b * 4);
+
+      updateSegment(
+        bones,
+        i,
+        start,
+        end,
+        radiusTop,
+        radiusBottom,
+        dummy,
+        direction,
+      );
+    }
+    bones.instanceMatrix.needsUpdate = true;
+
+    // 2. Anatomical Spherical Joints
+    for (let i = 0; i < ARM_JOINTS.length; i++) {
+      const { index, radius } = ARM_JOINTS[i];
+      const conf = pose[index * 4 + 3];
+
+      if (conf < THRESH) {
+        dummy.scale.setScalar(0);
+        dummy.updateMatrix();
+        joints.setMatrixAt(i, dummy.matrix);
+        continue;
+      }
+
+      readPoint(start, pose, index * 4);
+      updateJoint(joints, i, start, radius, dummy);
+    }
+    joints.instanceMatrix.needsUpdate = true;
+
+    // 3. Elbow Chrome Rings
+    for (let e = 0; e < ELBOW_JOINTS.length; e++) {
+      const jointIndex = ELBOW_JOINTS[e];
+      const conf = pose[jointIndex * 4 + 3];
+
+      if (conf < THRESH) {
+        dummy.scale.setScalar(0);
+        dummy.updateMatrix();
+        rings.setMatrixAt(e, dummy.matrix);
+        continue;
+      }
+
+      readPoint(start, pose, jointIndex * 4);
+      const wristIndex = jointIndex === 2 ? 4 : 5;
+      readPoint(end, pose, wristIndex * 4);
+
+      direction.subVectors(end, start).normalize();
+      tempQuat.setFromUnitVectors(Y_AXIS, direction);
+
+      updateJoint(rings, e, start, 0.084 * 1.05, dummy, tempQuat);
+    }
+    rings.instanceMatrix.needsUpdate = true;
+
+    // 4. Socket Sleeves (Elbow & Wrist)
+    for (let s = 0; s < ARM_SOCKETS.length; s++) {
+      const { boneIdx, t, radius, height } = ARM_SOCKETS[s];
+      const [a, b] = ARM_SEGMENTS[boneIdx].conn;
+
+      const conf = Math.min(pose[a * 4 + 3], pose[b * 4 + 3]);
+      if (conf < THRESH) {
+        dummy.scale.setScalar(0);
+        dummy.updateMatrix();
+        sockets.setMatrixAt(s, dummy.matrix);
+        continue;
+      }
+
+      readPoint(start, pose, a * 4);
+      readPoint(end, pose, b * 4);
+
+      direction.subVectors(end, start);
+      const pos = new THREE.Vector3().copy(start).addScaledVector(direction, t);
+      tempQuat.setFromUnitVectors(Y_AXIS, direction.normalize());
+
+      dummy.position.copy(pos);
+      dummy.quaternion.copy(tempQuat);
+      dummy.scale.set(radius, height, radius);
+      dummy.updateMatrix();
+
+      sockets.setMatrixAt(s, dummy.matrix);
+    }
+    sockets.instanceMatrix.needsUpdate = true;
+
+    // 5. Shoulder Armor Cap - Positioned from the top over the shoulder joint
+    for (let s = 0; s < 2; s++) {
+      const shoulderIdx = s; // 0: Left, 1: Right
+      const elbowIdx = s === 0 ? 2 : 3;
+
+      const conf = Math.min(
+        pose[shoulderIdx * 4 + 3],
+        pose[elbowIdx * 4 + 3],
+      );
+
+      if (conf < THRESH) {
+        dummy.scale.setScalar(0);
+        dummy.updateMatrix();
+        shoulderArmor.setMatrixAt(s, dummy.matrix);
+        continue;
+      }
+
+      readPoint(start, pose, shoulderIdx * 4);
+      readPoint(end, pose, elbowIdx * 4);
+
+      // Vector pointing towards the arm so the cap slightly leans outward
+      direction.subVectors(end, start).normalize();
+
+      // Cap sits right on top of the shoulder joint and tilts slightly outward
+      const capUp = new THREE.Vector3(0, 1, 0)
+        .addScaledVector(direction, 0.35)
+        .normalize();
+
+      tempQuat.setFromUnitVectors(Y_AXIS, capUp);
+
+      // Lift slightly upward so it rests cleanly on top of the shoulder sphere
+      const capPos = new THREE.Vector3()
+        .copy(start)
+        .addScaledVector(new THREE.Vector3(0, 1, 0), 0.022);
+
+      dummy.position.copy(capPos);
+      dummy.quaternion.copy(tempQuat);
+      dummy.scale.set(0.155, 0.165, 0.155);
+      dummy.updateMatrix();
+
+      shoulderArmor.setMatrixAt(s, dummy.matrix);
+    }
+    shoulderArmor.instanceMatrix.needsUpdate = true;
+  });
+
+  return (
+    <group>
+      {/* Limb Shells & Clavicle */}
+      <instancedMesh
+        ref={bonesRef}
+        args={[armCylinderGeo, materials.armShell, ARM_SEGMENTS.length]}
+        frustumCulled={false}
+        castShadow
+        receiveShadow
+      />
+
+      {/* Internal Ball Bearings */}
+      <instancedMesh
+        ref={jointsRef}
+        args={[jointSphereGeo, materials.joints, ARM_JOINTS.length]}
+        frustumCulled={false}
+        castShadow
+        receiveShadow
+      />
+
+      {/* Elbow Pivot Rings */}
+      <instancedMesh
+        ref={ringsRef}
+        args={[jointRingGeo, materials.rings, ELBOW_JOINTS.length]}
+        frustumCulled={false}
+        castShadow
+        receiveShadow
+      />
+
+      {/* Mechanical Socket Collars */}
+      <instancedMesh
+        ref={socketsRef}
+        args={[socketCuffGeo, materials.sockets, ARM_SOCKETS.length]}
+        frustumCulled={false}
+        castShadow
+        receiveShadow
+      />
+
+      {/* Top Shoulder Armor Dome Caps */}
+      <instancedMesh
+        ref={shoulderArmorRef}
+        args={[shoulderTopArmorGeo, materials.shoulderArmor, 2]}
+        frustumCulled={false}
+        castShadow
+        receiveShadow
+      />
+    </group>
+  );
+}
+
+// ============================================================
+// ENHANCED RESIZABLE HAND RIG
+// ============================================================
+
+export function HandRig({
+  slot,
+  color,
+  sampleRef,
+  scale = 1.0,
+}: {
+  slot: 0 | 1;
+  color: string;
+  sampleRef: SampleRef;
+  scale?: number;
+}) {
+  const groupRef = useRef<THREE.Group>(null);
+  const bonesRef = useRef<THREE.InstancedMesh>(null);
+  const jointsRef = useRef<THREE.InstancedMesh>(null);
+  const knucklesRef = useRef<THREE.InstancedMesh>(null);
+  const tipsRef = useRef<THREE.InstancedMesh>(null);
+  const palmRef = useRef<THREE.Mesh>(null);
+
+  const smoothPoints = useRef(new Float32Array(21 * 3));
+  const scaledPoints = useRef(new Float32Array(21 * 3));
+  const initialized = useRef(new Uint8Array(21));
+
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+  const start = useMemo(() => new THREE.Vector3(), []);
+  const end = useMemo(() => new THREE.Vector3(), []);
+  const direction = useMemo(() => new THREE.Vector3(), []);
+  const tempQuat = useMemo(() => new THREE.Quaternion(), []);
+
+  const vWrist = useMemo(() => new THREE.Vector3(), []);
+  const vIndex = useMemo(() => new THREE.Vector3(), []);
+  const vPinky = useMemo(() => new THREE.Vector3(), []);
+  const vPalmNormal = useMemo(() => new THREE.Vector3(), []);
+  const vA = useMemo(() => new THREE.Vector3(), []);
+  const vB = useMemo(() => new THREE.Vector3(), []);
+
+  const materials = useMemo(
+    () => ({
+      fingers: new THREE.MeshStandardMaterial({
+        color: CERAMIC_WHITE,
+        metalness: 0.28,
+        roughness: 0.22,
+      }),
+      joints: new THREE.MeshStandardMaterial({
+        color: TITANIUM_DARK,
+        metalness: 0.88,
+        roughness: 0.2,
+      }),
+      knuckleRings: new THREE.MeshStandardMaterial({
+        color: RING_CHROME,
+        metalness: 0.94,
+        roughness: 0.14,
+      }),
+      tips: new THREE.MeshStandardMaterial({
+        color: color || ACCENT_GOLD,
+        metalness: 0.45,
+        roughness: 0.32,
+        emissive: new THREE.Color(color || ACCENT_GOLD).multiplyScalar(0.2),
+      }),
+      palm: new THREE.MeshStandardMaterial({
+        color: CERAMIC_SLEEVE,
+        roughness: 0.32,
+        metalness: 0.35,
+        side: THREE.DoubleSide,
+      }),
+    }),
+    [color],
+  );
+
+  const palmGeo = useMemo(() => {
+    const geo = new THREE.BufferGeometry();
+    const positions = new Float32Array(12 * 3);
+    geo.setAttribute(
+      "position",
+      new THREE.BufferAttribute(positions, 3).setUsage(THREE.DynamicDrawUsage),
+    );
+    geo.setIndex(PALM_INDICES);
+    return geo;
+  }, []);
+
+  useEffect(
+    () => () => {
+      materials.fingers.dispose();
+      materials.joints.dispose();
+      materials.knuckleRings.dispose();
+      materials.tips.dispose();
+      materials.palm.dispose();
+      palmGeo.dispose();
+    },
+    [materials, palmGeo],
+  );
+
+  useEffect(() => {
+    initialized.current.fill(0);
+  }, []);
+
+  useFrame((_, delta) => {
+    const group = groupRef.current;
+    const bones = bonesRef.current;
+    const joints = jointsRef.current;
+    const knuckles = knucklesRef.current;
+    const tips = tipsRef.current;
+    const palm = palmRef.current;
+
+    if (!group || !bones || !joints || !knuckles || !tips || !palm) return;
+
+    const state = sampleRef.current;
+    const alpha = state.handAlpha[slot];
+
+    group.visible = alpha > 0.01;
+    if (!group.visible) {
+      initialized.current.fill(0);
+      return;
+    }
+
+    const points = state.hands[slot];
+    const valid = state.handValid[slot];
+
+    group.position.set(0, 0, 0);
+
+    const smoothing = 1 - Math.exp(-28 * Math.min(delta, 0.05));
+
+    for (let j = 0; j < 21; j++) {
+      const o = j * 3;
+      if (!valid[j]) {
+        initialized.current[j] = 0;
+        continue;
+      }
+
+      if (j === 0 || !initialized.current[j]) {
+        smoothPoints.current[o] = points[o];
+        smoothPoints.current[o + 1] = points[o + 1];
+        smoothPoints.current[o + 2] = points[o + 2];
+        initialized.current[j] = 1;
+        continue;
+      }
+
+      smoothPoints.current[o] = THREE.MathUtils.lerp(
+        smoothPoints.current[o],
+        points[o],
+        smoothing,
+      );
+      smoothPoints.current[o + 1] = THREE.MathUtils.lerp(
+        smoothPoints.current[o + 1],
+        points[o + 1],
+        smoothing,
+      );
+      smoothPoints.current[o + 2] = THREE.MathUtils.lerp(
+        smoothPoints.current[o + 2],
+        points[o + 2],
+        smoothing,
+      );
+    }
+
+    // Dynamic scale centered on the wrist
+    const wX = smoothPoints.current[0];
+    const wY = smoothPoints.current[1];
+    const wZ = smoothPoints.current[2];
+
+    const p = scaledPoints.current;
+    for (let j = 0; j < 21; j++) {
+      const o = j * 3;
+      p[o] = wX + (smoothPoints.current[o] - wX) * scale;
+      p[o + 1] = wY + (smoothPoints.current[o + 1] - wY) * scale;
+      p[o + 2] = wZ + (smoothPoints.current[o + 2] - wZ) * scale;
+    }
+
+    const fading = alpha < 0.985;
+    materials.fingers.transparent = fading;
+    materials.fingers.opacity = alpha;
+    materials.joints.transparent = fading;
+    materials.joints.opacity = alpha;
+    materials.knuckleRings.transparent = fading;
+    materials.knuckleRings.opacity = alpha;
+    materials.tips.transparent = fading;
+    materials.tips.opacity = alpha;
+    materials.palm.transparent = fading;
+    materials.palm.opacity = alpha;
+
+    // 1. Finger & Metacarpal Segments
+    for (let i = 0; i < ALL_HAND_SEGMENTS.length; i++) {
+      const [a, b] = ALL_HAND_SEGMENTS[i];
+
+      if (!valid[a] || !valid[b]) {
+        dummy.scale.setScalar(0);
+        dummy.updateMatrix();
+        bones.setMatrixAt(i, dummy.matrix);
+        continue;
+      }
+
+      readPoint(start, p, a * 3);
+      readPoint(end, p, b * 3);
+
+      const rA = HAND_JOINT_RADII[a] * 0.88 * scale;
+      const rB = HAND_JOINT_RADII[b] * 0.82 * scale;
+
+      updateSegment(bones, i, start, end, rA, rB, dummy, direction);
+    }
+    bones.instanceMatrix.needsUpdate = true;
+
+    // 2. Knuckle Spheres and Articulation Rings
+    for (let i = 0; i < 21; i++) {
+      if (!valid[i]) {
+        dummy.scale.setScalar(0);
+        dummy.updateMatrix();
+        joints.setMatrixAt(i, dummy.matrix);
+        knuckles.setMatrixAt(i, dummy.matrix);
+        continue;
+      }
+
+      readPoint(start, p, i * 3);
+      const rad = HAND_JOINT_RADII[i] * scale;
+      updateJoint(joints, i, start, rad, dummy);
+
+      if (i > 0 && !FINGER_TIPS.includes(i)) {
+        const nextIdx = i + 1;
+        readPoint(end, p, nextIdx * 3);
+        direction.subVectors(end, start).normalize();
+        tempQuat.setFromUnitVectors(Y_AXIS, direction);
+        updateJoint(knuckles, i, start, rad * 1.08, dummy, tempQuat);
+      } else {
+        dummy.scale.setScalar(0);
+        dummy.updateMatrix();
+        knuckles.setMatrixAt(i, dummy.matrix);
+      }
+    }
+    joints.instanceMatrix.needsUpdate = true;
+    knuckles.instanceMatrix.needsUpdate = true;
+
+    // 3. Tactile Fingertips
+    for (let t = 0; t < FINGER_TIPS.length; t++) {
+      const tipIdx = FINGER_TIPS[t];
+      if (!valid[tipIdx]) {
+        dummy.scale.setScalar(0);
+        dummy.updateMatrix();
+        tips.setMatrixAt(t, dummy.matrix);
+        continue;
+      }
+
+      readPoint(start, p, tipIdx * 3);
+      updateJoint(tips, t, start, HAND_JOINT_RADII[tipIdx] * 1.1 * scale, dummy);
+    }
+    tips.instanceMatrix.needsUpdate = true;
+
+    // 4. Contour Volumetric Palm Plate
+    palm.visible = !!valid[0];
+    if (palm.visible) {
+      readPoint(vWrist, p, 0);
+      readPoint(vIndex, p, 5 * 3);
+      readPoint(vPinky, p, 17 * 3);
+
+      vA.subVectors(vIndex, vWrist);
+      vB.subVectors(vPinky, vWrist);
+      vPalmNormal.crossVectors(vA, vB).normalize();
+
+      const palmThickness = 0.013 * scale;
+      const posAttr = palmGeo.getAttribute("position") as THREE.BufferAttribute;
+
+      for (let k = 0; k < PALM_PERIMETER.length; k++) {
+        const landmark = PALM_PERIMETER[k];
+        const offset = landmark * 3;
+
+        const lx = valid[landmark] ? p[offset] : p[0];
+        const ly = valid[landmark] ? p[offset + 1] : p[1];
+        const lz = valid[landmark] ? p[offset + 2] : p[2];
+
+        // Front vertex
+        posAttr.setXYZ(
+          k,
+          lx + vPalmNormal.x * palmThickness,
+          ly + vPalmNormal.y * palmThickness,
+          lz + vPalmNormal.z * palmThickness,
+        );
+
+        // Back vertex
+        posAttr.setXYZ(
+          k + 6,
+          lx - vPalmNormal.x * palmThickness,
+          ly - vPalmNormal.y * palmThickness,
+          lz - vPalmNormal.z * palmThickness,
+        );
+      }
+
+      posAttr.needsUpdate = true;
+      palmGeo.computeVertexNormals();
+    }
+  });
+
+  return (
+    <group ref={groupRef} renderOrder={2}>
+      {/* 3D Volumetric Palm Plate */}
+      <mesh
+        ref={palmRef}
+        geometry={palmGeo}
+        material={materials.palm}
+        frustumCulled={false}
+        castShadow
+        receiveShadow
+      />
+
+      {/* Tapered Finger & Metacarpal Bones */}
+      <instancedMesh
+        ref={bonesRef}
+        args={[fingerBoneGeo, materials.fingers, ALL_HAND_SEGMENTS.length]}
+        frustumCulled={false}
+        castShadow
+        receiveShadow
+      />
+
+      {/* Internal Ball Knuckles */}
+      <instancedMesh
+        ref={jointsRef}
+        args={[knuckleSphereGeo, materials.joints, 21]}
+        frustumCulled={false}
+        castShadow
+        receiveShadow
+      />
+
+      {/* Knuckle Articulation Rings */}
+      <instancedMesh
+        ref={knucklesRef}
+        args={[knuckleRingGeo, materials.knuckleRings, 21]}
+        frustumCulled={false}
+        castShadow
+        receiveShadow
+      />
+
+      {/* Tactile Colored Fingertips */}
+      <instancedMesh
+        ref={tipsRef}
+        args={[fingertipDomeGeo, materials.tips, FINGER_TIPS.length]}
+        frustumCulled={false}
+        castShadow
+        receiveShadow
+      />
+    </group>
+  );
+}
+```
+
+---
+
+# FILE: `frontend\src\components\simulation\HeadFaceRig.tsx`
+
+```tsx
+"use client";
+
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import * as THREE from "three";
+import { useFrame } from "@react-three/fiber";
+import { mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { THRESH } from "./simulationConstants";
+import {
+  getBoneGeometry,
+  hideAll,
+  placeBone,
+} from "./RigUtils";
+
+export const FACE_POINTS = 19;
+export const HEAD_LEN = 11;
+
+export interface SampleState {
+  pose: Float32Array;
+  poseInit: Uint8Array;
+  hands: [Float32Array, Float32Array];
+  handValid: [Uint8Array, Uint8Array];
+  handInit: Uint8Array;
+  handAlpha: Float32Array;
+  face: Float32Array;
+  faceValid: Uint8Array;
+  faceInit: Uint8Array;
+  head: Float32Array;
+  headValid: boolean;
+  headInit: boolean;
+  facePresent: boolean;
+  hasPose: boolean;
+}
+
+export type SampleRef = { current: SampleState };
+
+// Curve segment counts
+const BROW_STEPS = 10;
+const EYE_STEPS = 28;
+const PUPIL_STEPS = 16;
+const SPARKLE_STEPS = 8;
+const NOSE_SEGMENTS = 4;
+const LIP_STEPS = 20;
+const NECK_SEGMENTS = 4;
+
+const FACE_SEGMENTS = 240;
+
+// ---------------------------------------------------------------------------
+// Head Shell Tuning
+// ---------------------------------------------------------------------------
+const HEAD_FIT_X = 1.26;
+const HEAD_FIT_Y = 1.06;
+const HEAD_DEPTH = 0.62;
+const HEAD_BACK = 0.48;
+const HEAD_FOLLOW = 0.45;
+const HEAD_SCALE_FOLLOW = 0.12;
+
+// Downward pitch correction (~5.5 degrees) so head looks straight forward
+const PITCH_DOWN = 0.095;
+const cosPitch = Math.cos(PITCH_DOWN);
+const sinPitch = Math.sin(PITCH_DOWN);
+
+export const HEAD_FACING = {
+  center: new THREE.Vector3(),
+  front: new THREE.Vector3(0, 0, 1),
+  right: new THREE.Vector3(1, 0, 0),
+  valid: false,
+};
+
+function createCleanCuteHeadGeometry(): THREE.BufferGeometry {
+  const base = new THREE.SphereGeometry(1, 64, 48);
+  base.deleteAttribute("normal");
+  base.deleteAttribute("uv");
+  const pos = base.getAttribute("position") as THREE.BufferAttribute;
+
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    const z = pos.getZ(i);
+
+    // Superellipsoid squircle rounding
+    const n = 2.75;
+    const sum = Math.pow(Math.abs(x), n) + Math.pow(Math.abs(y), n) + Math.pow(Math.abs(z), n);
+    const r = Math.pow(sum, -1 / n);
+
+    let nx = x * r;
+    let ny = y * r;
+    let nz = z * r;
+
+    // Gentle bottom taper
+    if (ny < 0) {
+      const taper = 1.0 - 0.1 * Math.pow(-ny, 1.5);
+      nx *= taper;
+      nz *= taper;
+    }
+
+    pos.setXYZ(i, nx, ny, nz);
+  }
+
+  const merged = mergeVertices(base, 1e-4);
+  merged.computeVertexNormals();
+  base.dispose();
+  return merged;
+}
+
+function createExteriorEarGeometry(): THREE.BufferGeometry {
+  const geo = new THREE.CylinderGeometry(0.14, 0.18, 0.08, 32);
+  geo.rotateZ(Math.PI / 2);
+  geo.translate(0.04, 0, 0);
+  return geo;
+}
+
+// ---------------------------------------------------------------------------
+// Frosted Glass Shader: Reduced Inner Blue Core + Luminous Mint Rim
+// ---------------------------------------------------------------------------
+function createHeadMaterial(): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: true,
+    side: THREE.FrontSide,
+    blending: THREE.NormalBlending,
+    uniforms: {
+      uInnerGlow: { value: new THREE.Color("#050f1a") },
+      uCoreGlow: { value: new THREE.Color("#0b4e78") },
+      uRimColor: { value: new THREE.Color("#5effdc") },
+      uHazeColor: { value: new THREE.Color("#4effd3") },
+    },
+    vertexShader: /* glsl */ `
+      varying vec3 vNormal;
+      varying vec3 vView;
+      void main() {
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vNormal = normalize(normalMatrix * normal);
+        vView = normalize(-mv.xyz);
+        gl_Position = projectionMatrix * mv;
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform vec3 uInnerGlow;
+      uniform vec3 uRimColor;
+      uniform vec3 uCoreGlow;
+      uniform vec3 uHazeColor;
+      varying vec3 vNormal;
+      varying vec3 vView;
+
+      float hash(vec2 p) {
+        return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+      }
+
+      void main() {
+        vec3 N = normalize(vNormal);
+        vec3 V = normalize(vView);
+
+        float grain = (hash(gl_FragCoord.xy * 0.75) - 0.5) * 0.035;
+        float NdotV = clamp(abs(dot(N, V)) + grain, 0.0, 1.0);
+        float fresnel = 1.0 - NdotV;
+
+        float softMist = smoothstep(0.04, 0.88, fresnel);
+        float blurredRim = pow(softMist, 1.45);
+        float deepGlow = pow(fresnel, 0.9) * 0.35;
+
+        vec3 color = mix(uInnerGlow, uCoreGlow, deepGlow);
+        color = mix(color, uHazeColor, pow(fresnel, 2.5) * 0.25);
+        color = mix(color, uRimColor, blurredRim);
+
+        float alpha = clamp(0.60 + blurredRim * 0.40, 0.0, 1.0);
+        gl_FragColor = vec4(color, alpha);
+      }
+    `,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Head Rig Component
+// ---------------------------------------------------------------------------
+export function HeadRig({ sampleRef }: { sampleRef: SampleRef }) {
+  const headRef = useRef<THREE.Mesh>(null);
+  const neckRef = useRef<THREE.InstancedMesh>(null);
+  const neckColor = useMemo(() => new THREE.Color(), []);
+
+  const tmp = useMemo(
+    () => ({
+      top: new THREE.Vector3(),
+      bottom: new THREE.Vector3(),
+      sideA: new THREE.Vector3(),
+      sideB: new THREE.Vector3(),
+      right: new THREE.Vector3(),
+      up: new THREE.Vector3(),
+      front: new THREE.Vector3(),
+      center: new THREE.Vector3(),
+      target: new THREE.Vector3(),
+      basis: new THREE.Matrix4(),
+      quat: new THREE.Quaternion(),
+      scale: new THREE.Vector3(),
+      wasFace: false,
+      shoulderPt: new THREE.Vector3(),
+      headBasePt: new THREE.Vector3(),
+      tangent0: new THREE.Vector3(),
+      tangent1: new THREE.Vector3(),
+      pA: new THREE.Vector3(),
+      pB: new THREE.Vector3(),
+      arrA: new Float32Array(3),
+      arrB: new Float32Array(3),
+    }),
+    [],
+  );
+
+  const headGeo = useMemo(() => createCleanCuteHeadGeometry(), []);
+  const earGeo = useMemo(() => createExteriorEarGeometry(), []);
+  const headMat = useMemo(() => createHeadMaterial(), []);
+
+  const neckMat = useMemo(
+    () =>
+      new THREE.MeshStandardMaterial({
+        color: "#1c3863",
+        emissive: "#091c36",
+        emissiveIntensity: 0.2,
+        metalness: 0.8,
+        roughness: 0.25,
+      }),
+    [],
+  );
+
+  useEffect(() => () => {
+    headGeo.dispose(); earGeo.dispose(); headMat.dispose(); neckMat.dispose();
+  }, [headGeo, earGeo, headMat, neckMat]);
+
+  useLayoutEffect(() => hideAll(neckRef.current), []);
+
+  useFrame(() => {
+    const head = headRef.current;
+    const neck = neckRef.current;
+    if (!head || !neck) return;
+    const st = sampleRef.current;
+
+    head.visible = st.headValid;
+    if (!st.headValid) {
+      HEAD_FACING.valid = false;
+      hideAll(neck);
+      return;
+    }
+
+    const F = st.face;
+    const P = st.pose;
+    const fv = st.faceValid;
+    const faceFit = st.facePresent && !!fv[0] && !!fv[1] && !!fv[2] && !!fv[3];
+
+    if (faceFit) {
+      const { top, bottom, sideA, sideB, right, up, front, center, target, basis, quat, scale } = tmp;
+      top.set(F[0], F[1], F[2]);
+      bottom.set(F[3], F[4], F[5]);
+      sideA.set(F[6], F[7], F[8]);
+      sideB.set(F[9], F[10], F[11]);
+
+      up.subVectors(top, bottom);
+      right.subVectors(sideB, sideA);
+      if (up.y < 0) up.negate();
+      if (right.x < 0) right.negate();
+      const height = up.length();
+      const width = right.length();
+      up.normalize();
+      right.addScaledVector(up, -right.dot(up)).normalize();
+      front.crossVectors(right, up).normalize();
+
+      // Pitch adjustment: rotates front vector slightly down and up vector forward
+      const pitchedUp = up.clone().multiplyScalar(cosPitch).addScaledVector(front, sinPitch).normalize();
+      const pitchedFront = front.clone().multiplyScalar(cosPitch).addScaledVector(up, -sinPitch).normalize();
+      up.copy(pitchedUp);
+      front.copy(pitchedFront);
+
+      basis.makeBasis(right, up, front);
+      quat.setFromRotationMatrix(basis);
+
+      center.copy(top).add(bottom).add(sideA).add(sideB).multiplyScalar(0.25);
+
+      const radiusX = (width / 2) * HEAD_FIT_X;
+      const radiusY = (height / 2) * HEAD_FIT_Y;
+      const radiusZ = ((radiusX + radiusY) / 2) * HEAD_DEPTH;
+
+      scale.set(radiusX, radiusY, radiusZ);
+      target.copy(center).addScaledVector(front, -radiusZ * HEAD_BACK);
+
+      if (!tmp.wasFace) {
+        head.position.copy(target);
+        head.quaternion.copy(quat);
+        head.scale.copy(scale);
+      } else {
+        head.position.lerp(target, HEAD_FOLLOW);
+        head.quaternion.slerp(quat, HEAD_FOLLOW);
+        head.scale.lerp(scale, HEAD_SCALE_FOLLOW);
+      }
+      tmp.wasFace = true;
+      HEAD_FACING.center.copy(center);
+      HEAD_FACING.front.set(0, 0, 1).applyQuaternion(head.quaternion);
+      HEAD_FACING.right.set(1, 0, 0).applyQuaternion(head.quaternion);
+      HEAD_FACING.valid = true;
+    }
+
+    // -----------------------------------------------------------------------
+    // Flexible Throat/Neck: Attached right to underside of chin (2/3 height)
+    // -----------------------------------------------------------------------
+    if (P[0 * 4 + 3] >= THRESH && P[1 * 4 + 3] >= THRESH) {
+      const { shoulderPt, headBasePt, tangent0, tangent1, pA, pB, arrA, arrB } = tmp;
+
+      shoulderPt.set((P[0] + P[4]) / 2, (P[1] + P[5]) / 2, (P[2] + P[6]) / 2);
+
+      headBasePt.set(0, -head.scale.y * 0.95, -head.scale.z * 0.08)
+        .applyQuaternion(head.quaternion)
+        .add(head.position);
+
+      const curveLength = shoulderPt.distanceTo(headBasePt);
+      tangent0.set(0, 1, 0).multiplyScalar(curveLength * 0.65);
+      tangent1.set(0, 1, 0).applyQuaternion(head.quaternion).multiplyScalar(curveLength * 0.65);
+
+      const evalHermite = (t: number, out: THREE.Vector3) => {
+        const t2 = t * t;
+        const t3 = t2 * t;
+        const h00 = 2 * t3 - 3 * t2 + 1;
+        const h10 = t3 - 2 * t2 + t;
+        const h01 = -2 * t3 + 3 * t2;
+        const h11 = t3 - t2;
+        out.set(0, 0, 0)
+          .addScaledVector(shoulderPt, h00)
+          .addScaledVector(tangent0, h10)
+          .addScaledVector(headBasePt, h01)
+          .addScaledVector(tangent1, h11);
+      };
+
+      for (let i = 0; i < NECK_SEGMENTS; i++) {
+        const s = (i + 0.05) / NECK_SEGMENTS;
+        const e = (i + 0.95) / NECK_SEGMENTS;
+
+        evalHermite(s, pA);
+        evalHermite(e, pB);
+
+        arrA[0] = pA.x; arrA[1] = pA.y; arrA[2] = pA.z;
+        arrB[0] = pB.x; arrB[1] = pB.y; arrB[2] = pB.z;
+
+        const neckThickness = THREE.MathUtils.lerp(0.08, 0.07, i / NECK_SEGMENTS);
+        placeBone(neck, i, arrA, 0, arrB, 0, neckThickness);
+        neck.setColorAt(i, neckColor.set("#1c3863"));
+      }
+    } else {
+      hideAll(neck);
+    }
+    neck.instanceMatrix.needsUpdate = true;
+    if (neck.instanceColor) neck.instanceColor.needsUpdate = true;
+  });
+
+  return (
+    <group>
+      <mesh ref={headRef} geometry={headGeo} material={headMat} frustumCulled={false}>
+        <mesh geometry={earGeo} material={headMat} position={[0.99, 0, -0.04]} />
+        <mesh
+          geometry={earGeo}
+          material={headMat}
+          position={[-0.99, 0, -0.04]}
+          rotation={[0, 0, Math.PI]}
+        />
+      </mesh>
+      <instancedMesh
+        ref={neckRef}
+        args={[getBoneGeometry(), neckMat, NECK_SEGMENTS]}
+        frustumCulled={false}
+      />
+    </group>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Face Rig: Straight-Facing Eye Gaze & Natural Expression
+// ---------------------------------------------------------------------------
+export function FaceRig({ sampleRef }: { sampleRef: SampleRef }) {
+  const linesRef = useRef<THREE.LineSegments>(null);
+  const toCamVec = useMemo(() => new THREE.Vector3(), []);
+  const ptA = useMemo(() => new THREE.Vector3(), []);
+  const ptB = useMemo(() => new THREE.Vector3(), []);
+
+  const lineGeo = useMemo(() => {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute(
+      "position",
+      new THREE.BufferAttribute(new Float32Array(FACE_SEGMENTS * 6), 3).setUsage(
+        THREE.DynamicDrawUsage,
+      ),
+    );
+    return geo;
+  }, []);
+
+  const lineMat = useMemo(
+    () =>
+      new THREE.LineBasicMaterial({
+        color: "#6effe0",
+        transparent: true,
+        opacity: 0.98,
+        depthTest: false,
+        depthWrite: false,
+      }),
+    [],
+  );
+
+  useEffect(() => () => { lineGeo.dispose(); lineMat.dispose(); }, [lineGeo, lineMat]);
+
+  useFrame((state) => {
+    const lines = linesRef.current;
+    if (!lines) return;
+    const st = sampleRef.current;
+
+    if (HEAD_FACING.valid) {
+      toCamVec.subVectors(state.camera.position, HEAD_FACING.center).normalize();
+      const facing = HEAD_FACING.front.dot(toCamVec);
+      if (facing <= 0.0) {
+        lines.visible = false;
+        return;
+      }
+      lines.visible = true;
+      lineMat.opacity = THREE.MathUtils.clamp(facing * 2.2, 0.0, 0.98);
+    } else {
+      lines.visible = st.facePresent;
+    }
+
+    if (!st.facePresent) return;
+
+    const time = state.clock.getElapsedTime();
+    const positions = lineGeo.getAttribute("position") as THREE.BufferAttribute;
+    const face = st.face;
+    let segOffset = 0;
+
+    // Rotates face point down slightly to match head orientation
+    const rotatePoint = (x: number, y: number, z: number, out: THREE.Vector3) => {
+      if (!HEAD_FACING.valid) {
+        out.set(x, y, z);
+        return;
+      }
+      const cx = HEAD_FACING.center.x;
+      const cy = HEAD_FACING.center.y;
+      const cz = HEAD_FACING.center.z;
+      const dx = x - cx;
+      const dy = y - cy;
+      const dz = z - cz;
+
+      // Downward pitch rotation
+      const rY = dy * cosPitch - dz * sinPitch;
+      const rZ = dy * sinPitch + dz * cosPitch;
+      out.set(cx + dx, cy + rY, cz + rZ);
+    };
+
+    const addSegment = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number) => {
+      if (segOffset >= FACE_SEGMENTS) return;
+      rotatePoint(x0, y0, z0, ptA);
+      rotatePoint(x1, y1, z1, ptB);
+      positions.setXYZ(segOffset * 2, ptA.x, ptA.y, ptA.z);
+      positions.setXYZ(segOffset * 2 + 1, ptB.x, ptB.y, ptB.z);
+      segOffset++;
+    };
+
+    // 1. DATA-DRIVEN EYEBROWS
+    const brows = [
+      { pts: [4, 5, 6], valid: [4, 5, 6].every((i) => st.faceValid[i]) },
+      { pts: [7, 8, 9], valid: [7, 8, 9].every((i) => st.faceValid[i]) },
+    ];
+    for (const b of brows) {
+      if (b.valid) {
+        for (let s = 0; s < BROW_STEPS; s++) {
+          const t0 = s / BROW_STEPS;
+          const t1 = (s + 1) / BROW_STEPS;
+          const p0x = face[b.pts[0] * 3], p0y = face[b.pts[0] * 3 + 1], p0z = face[b.pts[0] * 3 + 2];
+          const p1x = face[b.pts[1] * 3], p1y = face[b.pts[1] * 3 + 1], p1z = face[b.pts[1] * 3 + 2];
+          const p2x = face[b.pts[2] * 3], p2y = face[b.pts[2] * 3 + 1], p2z = face[b.pts[2] * 3 + 2];
+
+          const x0 = (1 - t0) * (1 - t0) * p0x + 2 * (1 - t0) * t0 * p1x + t0 * t0 * p2x;
+          const y0 = (1 - t0) * (1 - t0) * p0y + 2 * (1 - t0) * t0 * p1y + t0 * t0 * p2y;
+          const z0 = (1 - t0) * (1 - t0) * p0z + 2 * (1 - t0) * t0 * p1z + t0 * t0 * p2z;
+
+          const x1 = (1 - t1) * (1 - t1) * p0x + 2 * (1 - t1) * t1 * p1x + t1 * t1 * p2x;
+          const y1 = (1 - t1) * (1 - t1) * p0y + 2 * (1 - t1) * t1 * p1y + t1 * t1 * p2y;
+          const z1 = (1 - t1) * (1 - t1) * p0z + 2 * (1 - t1) * t1 * p1z + t1 * t1 * p2z;
+
+          addSegment(x0, y0, z0 + 0.006, x1, y1, z1 + 0.006);
+        }
+      }
+    }
+
+    // 2. BIG ADORABLE EYES (Straight-Forward Gaze)
+    const eyesValid = [10, 11, 12, 13].every((i) => st.faceValid[i]);
+    if (eyesValid) {
+      const lX = (face[10 * 3] + face[11 * 3]) / 2;
+      const lY = (face[10 * 3 + 1] + face[11 * 3 + 1]) / 2;
+      const lZ = (face[10 * 3 + 2] + face[11 * 3 + 2]) / 2 + 0.008;
+
+      const rX = (face[12 * 3] + face[13 * 3]) / 2;
+      const rY = (face[12 * 3 + 1] + face[13 * 3 + 1]) / 2;
+      const rZ = (face[12 * 3 + 2] + face[13 * 3 + 2]) / 2 + 0.008;
+
+      const eyeDist = Math.hypot(rX - lX, rY - lY);
+      const eyeRadius = THREE.MathUtils.clamp(eyeDist * 0.44, 0.032, 0.07);
+
+      const lAperture = Math.hypot(face[10 * 3] - face[11 * 3], face[10 * 3 + 1] - face[11 * 3 + 1]);
+      const rAperture = Math.hypot(face[12 * 3] - face[13 * 3], face[12 * 3 + 1] - face[13 * 3 + 1]);
+
+      const normalOpen = eyeDist * 0.11;
+      let lOpen = THREE.MathUtils.clamp(lAperture / normalOpen, 0.03, 1.0);
+      let rOpen = THREE.MathUtils.clamp(rAperture / normalOpen, 0.03, 1.0);
+
+      const blinkCycle = Math.sin(time * 1.8);
+      if (blinkCycle > 0.96) {
+        const blinkAmount = (1 - (blinkCycle - 0.96) / 0.04);
+        lOpen *= blinkAmount;
+        rOpen *= blinkAmount;
+      }
+
+      const eyeData = [
+        { cx: lX, cy: lY, cz: lZ, open: lOpen, isLeft: true },
+        { cx: rX, cy: rY, cz: rZ, open: rOpen, isLeft: false },
+      ];
+
+      for (const e of eyeData) {
+        const h = eyeRadius * 0.9 * e.open;
+
+        for (let s = 0; s < EYE_STEPS; s++) {
+          const a0 = (s / EYE_STEPS) * Math.PI * 2;
+          const a1 = ((s + 1) / EYE_STEPS) * Math.PI * 2;
+          const x0 = e.cx + Math.cos(a0) * eyeRadius;
+          const y0 = e.cy + Math.sin(a0) * h;
+          const x1 = e.cx + Math.cos(a1) * eyeRadius;
+          const y1 = e.cy + Math.sin(a1) * h;
+          addSegment(x0, y0, e.cz, x1, y1, e.cz);
+        }
+
+        if (e.open > 0.25) {
+          const pupilRad = eyeRadius * 0.54 * e.open;
+          for (let s = 0; s < PUPIL_STEPS; s++) {
+            const a0 = (s / PUPIL_STEPS) * Math.PI * 2;
+            const a1 = ((s + 1) / PUPIL_STEPS) * Math.PI * 2;
+            addSegment(
+              e.cx + Math.cos(a0) * pupilRad,
+              e.cy + Math.sin(a0) * pupilRad,
+              e.cz + 0.001,
+              e.cx + Math.cos(a1) * pupilRad,
+              e.cy + Math.sin(a1) * pupilRad,
+              e.cz + 0.001,
+            );
+          }
+
+          // Center-leveled sparkle so gaze looks straight ahead
+          const spSize = eyeRadius * 0.28;
+          const spOx = e.cx + (e.isLeft ? -spSize * 0.5 : spSize * 0.5);
+          const spOy = e.cy + spSize * 0.25;
+          for (let s = 0; s < SPARKLE_STEPS; s++) {
+            const a0 = (s / SPARKLE_STEPS) * Math.PI * 2 + Math.PI / 4;
+            const a1 = ((s + 1) / SPARKLE_STEPS) * Math.PI * 2 + Math.PI / 4;
+            const r0 = s % 2 === 0 ? spSize : spSize * 0.35;
+            const r1 = (s + 1) % 2 === 0 ? spSize : spSize * 0.35;
+            addSegment(
+              spOx + Math.cos(a0) * r0,
+              spOy + Math.sin(a0) * r0,
+              e.cz + 0.002,
+              spOx + Math.cos(a1) * r1,
+              spOy + Math.sin(a1) * r1,
+              e.cz + 0.002,
+            );
+          }
+        }
+      }
+
+      // 3. MINIMAL BUTTON NOSE
+      if (st.faceValid[14]) {
+        const nx = face[14 * 3], ny = face[14 * 3 + 1], nz = face[14 * 3 + 2] + 0.008;
+        const nLen = eyeDist * 0.06;
+        for (let s = 0; s < NOSE_SEGMENTS; s++) {
+          const t0 = 1 - s / NOSE_SEGMENTS;
+          const t1 = 1 - (s + 1) / NOSE_SEGMENTS;
+          addSegment(nx, ny + nLen * t0, nz, nx, ny + nLen * t1, nz);
+        }
+      }
+    }
+
+    // 4. CLEAN DATA-DRIVEN LIPS
+    const mouthValid = [15, 16, 17, 18].every((i) => st.faceValid[i]);
+    if (mouthValid) {
+      const cL = { x: face[15 * 3], y: face[15 * 3 + 1], z: face[15 * 3 + 2] + 0.008 };
+      const cR = { x: face[16 * 3], y: face[16 * 3 + 1], z: face[16 * 3 + 2] + 0.008 };
+      const upLip = { x: face[17 * 3], y: face[17 * 3 + 1], z: face[17 * 3 + 2] + 0.008 };
+      const loLip = { x: face[18 * 3], y: face[18 * 3 + 1], z: face[18 * 3 + 2] + 0.008 };
+
+      for (let s = 0; s < LIP_STEPS; s++) {
+        const t0 = s / LIP_STEPS;
+        const t1 = (s + 1) / LIP_STEPS;
+
+        const evalQuad = (p0: typeof cL, p1: typeof upLip, p2: typeof cR, t: number) => {
+          const inv = 1 - t;
+          return {
+            x: inv * inv * p0.x + 2 * inv * t * p1.x + t * t * p2.x,
+            y: inv * inv * p0.y + 2 * inv * t * p1.y + t * t * p2.y,
+            z: inv * inv * p0.z + 2 * inv * t * p1.z + t * t * p2.z,
+          };
+        };
+
+        const u0 = evalQuad(cL, upLip, cR, t0);
+        const u1 = evalQuad(cL, upLip, cR, t1);
+        addSegment(u0.x, u0.y, u0.z, u1.x, u1.y, u1.z);
+
+        const l0 = evalQuad(cL, loLip, cR, t0);
+        const l1 = evalQuad(cL, loLip, cR, t1);
+        addSegment(l0.x, l0.y, l0.z, l1.x, l1.y, l1.z);
+      }
+
+      const mouthWidth = Math.hypot(cR.x - cL.x, cR.y - cL.y);
+      const tick = mouthWidth * 0.06;
+      addSegment(cL.x, cL.y, cL.z, cL.x - tick * 0.7, cL.y + tick * 0.7, cL.z);
+      addSegment(cR.x, cR.y, cR.z, cR.x + tick * 0.7, cR.y + tick * 0.7, cR.z);
+    }
+
+    for (let i = segOffset; i < FACE_SEGMENTS; i++) {
+      positions.setXYZ(i * 2, 0, 0, 0);
+      positions.setXYZ(i * 2 + 1, 0, 0, 0);
+    }
+
+    positions.needsUpdate = true;
+  });
+
+  return (
+    <lineSegments
+      ref={linesRef}
+      geometry={lineGeo}
+      material={lineMat}
+      frustumCulled={false}
+      renderOrder={10}
+    />
+  );
+}
+```
+
+---
+
 # FILE: `frontend\src\components\simulation\LandmarkSimulation.tsx`
 
 ```tsx
 "use client";
 import "@/lib/threeSetup";
 import React, {
-  Component,
   useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
   useState,
-  type ReactNode,
 } from "react";
 import * as THREE from "three";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import { Play, Pause, RotateCcw, Database } from "lucide-react";
 import { DhutiRig } from "./DhutiRig";
+import { ArmRig, HandRig } from "./HandRig";
 import { RoundAlpanaStage } from "./AlpanaStage";
-import { DHUTI_DROP, THRESH, TORSO_WORLD } from "./simulationConstants";
+import { TorsoRig } from "./TorsoRig";
+import { SIMULATION_FOV, SimulationRoom } from "./SimulationRoom";
 import {
-  POSE_BODY_PAIRS,
-  POSE_FACE_MARKERS,
-  POSE_FACE_PAIRS,
+  DHUTI_DROP,
+  HEAD_WIDTH_RATIO,
+  THRESH,
+  TORSO_WORLD,
+} from "./simulationConstants";
+import { FaceRig, HeadRig, FACE_POINTS, HEAD_LEN, type SampleRef, type SampleState } from "./HeadFaceRig";
+export type { SampleRef } from "./HeadFaceRig";
+import {
   POSE_POINTS,
   type PosePoint,
 } from "@/lib/pose";
@@ -13301,56 +12726,18 @@ import {
  * 1. EXISTING DATA / ALIGNMENT LOGIC (unchanged)
  * ========================================================================== */
 
-const HAND_CONN: [number, number][] = [
-  [0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 8], [5, 9], [9, 10],
-  [10, 11], [11, 12], [9, 13], [13, 14], [14, 15], [15, 16], [13, 17], [17, 18],
-  [18, 19], [19, 20], [0, 17],
-];
-
-const FACE_OVAL_INDICES = [
-  10, 338, 297, 332, 284, 251, 389, 356, 454, 323, 361, 288, 397, 365, 379, 378,
-  400, 377, 152, 148, 176, 149, 150, 136, 172, 58, 132, 93, 234, 127, 162, 21,
-  54, 103, 67, 109,
-];
-
 type Point2 = { x: number; y: number };
 
-const EMPTY_POSE: PosePoint[] = Array.from(
-  { length: POSE_POINTS },
-  () => [0, 0, 0, 0],
-);
-
-const BODY_GUIDE: PosePoint[] = EMPTY_POSE.map((point) => [...point] as PosePoint);
-const setGuidePoint = (index: number, x: number, y: number) => {
-  BODY_GUIDE[index] = [x, y, 0, 1];
-};
-setGuidePoint(0, 0, -2.2);
-setGuidePoint(2, -0.2, -2.25);
-setGuidePoint(5, 0.2, -2.25);
-setGuidePoint(7, -0.4, -2.1);
-setGuidePoint(8, 0.4, -2.1);
-setGuidePoint(9, -0.18, -1.95);
-setGuidePoint(10, 0.18, -1.95);
-setGuidePoint(11, -0.7, -1.25);
-setGuidePoint(12, 0.7, -1.25);
-setGuidePoint(13, -1.1, -0.65);
-setGuidePoint(14, 1.1, -0.65);
-setGuidePoint(15, -1.35, 0);
-setGuidePoint(16, 1.35, 0);
-setGuidePoint(23, -0.45, 0.55);
-setGuidePoint(24, 0.45, 0.55);
-setGuidePoint(25, -0.48, 1.65);
-setGuidePoint(26, 0.48, 1.65);
-setGuidePoint(27, -0.5, 2.8);
-setGuidePoint(28, 0.5, 2.8);
-
-const GUIDE_BODY_PAIRS = POSE_BODY_PAIRS.filter(
-  ([a, b]) => ![0, 2, 5, 7, 9, 10].includes(a) && ![0, 2, 5, 7, 9, 10].includes(b),
-);
-const POSE_SKELETON_PAIRS = POSE_BODY_PAIRS.filter(
-  ([a, b]) => !(a <= 10 && b <= 10),
-);
-
+const BODY_GUIDE: PosePoint[] = [
+  [-0.7, -1.25, 0, 1],
+  [0.7, -1.25, 0, 1],
+  [-1.1, -0.65, 0, 1],
+  [1.1, -0.65, 0, 1],
+  [-1.35, 0, 0, 1],
+  [1.35, 0, 0, 1],
+  [-0.45, 0.55, 0, 1],
+  [0.45, 0.55, 0, 1],
+];
 const POSE_DRAW_THRESHOLD = 0.01;
 
 const isMissingHand = (frame: number[][], offset: number) =>
@@ -13360,8 +12747,8 @@ const isMissingHand = (frame: number[][], offset: number) =>
 
 function handAnchor(frame: number[][]): Point2 {
   return isMissingHand(frame, 21)
-    ? { x: BODY_GUIDE[15][0], y: BODY_GUIDE[15][1] }
-    : { x: BODY_GUIDE[16][0], y: BODY_GUIDE[16][1] };
+    ? { x: BODY_GUIDE[4][0], y: BODY_GUIDE[4][1] }
+    : { x: BODY_GUIDE[5][0], y: BODY_GUIDE[5][1] };
 }
 
 function validPoint(point: number[] | undefined | null): point is number[] {
@@ -13377,12 +12764,12 @@ interface PoseAlignment {
 
 function getPoseAlignments(pose: PosePoint[][]): PoseAlignment[] {
   const measurements = pose.map((frame) => {
-    const shoulders = [frame[11], frame[12]];
-    const hips = [frame[23], frame[24]];
+    const shoulders = [frame[0], frame[1]];
+    const hips = [frame[6], frame[7]];
     const visible = [...shoulders, ...hips].filter(
       (point) => point && point[3] >= POSE_DRAW_THRESHOLD && validPoint(point),
     );
-    const centerPoints = visible.length ? visible : [frame[11], frame[12]].filter(Boolean);
+    const centerPoints = visible.length ? visible : [frame[0], frame[1]].filter(Boolean);
     const center = centerPoints.reduce(
       (sum, point) => ({ x: sum.x + point[0], y: sum.y + point[1] }),
       { x: 0, y: 0 },
@@ -13391,12 +12778,12 @@ function getPoseAlignments(pose: PosePoint[][]): PoseAlignment[] {
     center.y /= centerPoints.length || 1;
 
     const shoulderCenter = {
-      x: (frame[11]?.[0] + frame[12]?.[0]) / 2,
-      y: (frame[11]?.[1] + frame[12]?.[1]) / 2,
+      x: (frame[0]?.[0] + frame[1]?.[0]) / 2,
+      y: (frame[0]?.[1] + frame[1]?.[1]) / 2,
     };
     const hipCenter = {
-      x: (frame[23]?.[0] + frame[24]?.[0]) / 2,
-      y: (frame[23]?.[1] + frame[24]?.[1]) / 2,
+      x: (frame[6]?.[0] + frame[7]?.[0]) / 2,
+      y: (frame[6]?.[1] + frame[7]?.[1]) / 2,
     };
     const torsoLength = Math.hypot(
       shoulderCenter.x - hipCenter.x,
@@ -13428,207 +12815,21 @@ function stabilizePoint(point: number[], alignment: PoseAlignment): Point2 {
   };
 }
 
-function averagePoints(points: number[][]): Point2 | null {
-  const valid = points.filter(validPoint);
-  if (valid.length === 0) return null;
-  const total = valid.reduce(
-    (sum, point) => ({ x: sum.x + point[0], y: sum.y + point[1] }),
-    { x: 0, y: 0 },
-  );
-  return { x: total.x / valid.length, y: total.y / valid.length };
-}
-
-function sortedPair(points: Point2[]): Point2[] {
-  return [...points].sort((a, b) => a.x - b.x);
-}
-
-function alignFaceMeshToPose(
-  face: number[][],
-  pose: PosePoint[],
-): Point2[] {
-  const sourceNose = face[4];
-  const targetNose = pose[0];
-  if (!validPoint(sourceNose) || !validPoint(targetNose)) return [];
-
-  const faceEyes = [
-    averagePoints([face[33], face[133]].filter(validPoint)),
-    averagePoints([face[362], face[263]].filter(validPoint)),
-  ].filter((point): point is Point2 => point !== null);
-  const poseEyes = [
-    averagePoints([pose[1], pose[2], pose[3]].filter(validPoint)),
-    averagePoints([pose[4], pose[5], pose[6]].filter(validPoint)),
-  ].filter((point): point is Point2 => point !== null);
-
-  const anchors: [Point2, Point2][] = [[
-    { x: sourceNose[0], y: sourceNose[1] },
-    { x: targetNose[0], y: targetNose[1] },
-  ]];
-  const sourceEyes = sortedPair(faceEyes);
-  const targetEyes = sortedPair(poseEyes);
-  for (let index = 0; index < Math.min(sourceEyes.length, targetEyes.length); index++) {
-    anchors.push([sourceEyes[index], targetEyes[index]]);
-  }
-  const sourceMouth = sortedPair(
-    [face[61], face[291]].filter(validPoint).map(([x, y]) => ({ x, y })),
-  );
-  const targetMouth = sortedPair(
-    [pose[9], pose[10]].filter(validPoint).map((point) => ({ x: point[0], y: point[1] })),
-  );
-  for (let index = 0; index < Math.min(sourceMouth.length, targetMouth.length); index++) {
-    anchors.push([sourceMouth[index], targetMouth[index]]);
-  }
-
-  if (anchors.length < 2) return [];
-
-  const sourceCenter = anchors.reduce(
-    (sum, [source]) => ({ x: sum.x + source.x, y: sum.y + source.y }),
-    { x: 0, y: 0 },
-  );
-  const targetCenter = anchors.reduce(
-    (sum, [, target]) => ({ x: sum.x + target.x, y: sum.y + target.y }),
-    { x: 0, y: 0 },
-  );
-  sourceCenter.x /= anchors.length;
-  sourceCenter.y /= anchors.length;
-  targetCenter.x /= anchors.length;
-  targetCenter.y /= anchors.length;
-
-  let denominator = 0;
-  let coefficientA = 0;
-  let coefficientB = 0;
-  for (const [source, target] of anchors) {
-    const x = source.x - sourceCenter.x;
-    const y = source.y - sourceCenter.y;
-    const targetX = target.x - targetCenter.x;
-    const targetY = target.y - targetCenter.y;
-    denominator += x * x + y * y;
-    coefficientA += x * targetX + y * targetY;
-    coefficientB += x * targetY - y * targetX;
-  }
-  if (denominator < 1e-8) return [];
-  coefficientA /= denominator;
-  coefficientB /= denominator;
-
-  return face.map((point) => {
-    if (!validPoint(point)) return { x: Number.NaN, y: Number.NaN };
-    const [x, y] = point;
-    const centeredX = x - sourceCenter.x;
-    const centeredY = y - sourceCenter.y;
-    return {
-      x:
-        targetCenter.x +
-        coefficientA * centeredX -
-        coefficientB * centeredY,
-      y:
-        targetCenter.y +
-        coefficientB * centeredX +
-        coefficientA * centeredY,
-    };
-  });
-}
-
 /* ==========================================================================
  * 2. 3D: CONSTANTS, TYPES, FACE TOPOLOGY
  * ========================================================================== */
 
-type PairList = ReadonlyArray<readonly [number, number]>;
-
 const Z_POSE = 0.15;
 const Z_HAND = 0.5;
-const Z_FACE = 0.5;
 const Z_LIMIT = 0.4;
 const SNAP_MAX_TORSOS = 1.0;
-const FOV = 38;
-const HEAD_LEN = 11;
 
 /* Keep the dhuti knee-length and independent of leg landmarks so pose noise
  * cannot stretch or shorten the garment. */
 const COLOR = {
-  torso: "#243B73",
-  arm: "#3E5A9A",
-  leg: "#6870C9",
-  other: "#3E5A9A",
-  joint: "#6B85BD",
-  volume: "#243B73",
   handLeft: "#5EEAD4",
   handRight: "#C4B5FD",
-  face: "#38BDF8",
-  faceKey: "#BAE6FD",
-  dhuti: "#F1F0E8",
-  dhutiBand: "#D4D5D0",
-  gold: "#C79A32",
 } as const;
-
-const isHandStub = (i: number) => i >= 17 && i <= 22;
-const isLowerBodyBone = ([a, b]: readonly [number, number]) =>
-  a >= 23 || b >= 23;
-const RIG_POSE_PAIRS: PairList = POSE_SKELETON_PAIRS.filter(
-  ([a, b]) =>
-    !isHandStub(a) &&
-    !isHandStub(b) &&
-    !isLowerBodyBone([a, b]),
-);
-const RIG_GUIDE_PAIRS: PairList = GUIDE_BODY_PAIRS.filter(
-  ([a, b]) =>
-    !isHandStub(a) &&
-    !isHandStub(b) &&
-    !isLowerBodyBone([a, b]),
-);
-const POSE_FACE_JOINTS: number[] = Array.from(
-  new Set<number>([...POSE_FACE_MARKERS, ...POSE_FACE_PAIRS.flat()]),
-);
-
-const BODY_JOINT_RADIUS: Record<number, number> = {
-  11: 0.105, 12: 0.105, 13: 0.06, 14: 0.06, 15: 0.046, 16: 0.046,
-  23: 0.08, 24: 0.08, 25: 0.066, 26: 0.066, 27: 0.05, 28: 0.05,
-};
-const DEFAULT_BODY_JOINT_RADIUS = 0.034;
-const bodyJointRadius = (i: number) => BODY_JOINT_RADIUS[i] ?? DEFAULT_BODY_JOINT_RADIUS;
-
-const FINGER_TIPS = [4, 8, 12, 16, 20];
-const HAND_JOINT_RADIUS: number[] = Array.from({ length: 21 }, (_, i) =>
-  i === 0 ? 0.032 : FINGER_TIPS.includes(i) ? 0.019 : [1, 5, 9, 13, 17].includes(i) ? 0.024 : 0.02,
-);
-const HAND_BONE_RADIUS: number[] = HAND_CONN.map(
-  ([a, b]) => Math.min(HAND_JOINT_RADIUS[a], HAND_JOINT_RADIUS[b]) * 0.62,
-);
-const PALM_FAN = [0, 1, 5, 9, 13, 17];
-const PALM_INDICES = [0, 1, 2, 0, 2, 3, 0, 3, 4, 0, 4, 5];
-
-const FACE_LOOPS: { idx: number[]; closed: boolean }[] = [
-  { idx: FACE_OVAL_INDICES, closed: true },
-  { idx: [33, 160, 158, 133, 153, 144], closed: true },
-  { idx: [362, 385, 387, 263, 373, 380], closed: true },
-  { idx: [61, 146, 91, 181, 84, 17, 314, 405, 321, 375, 291, 409, 270, 269, 267, 0, 37, 39, 40, 185], closed: true },
-  { idx: [78, 95, 88, 178, 87, 14, 317, 402, 318, 324, 308, 415, 310, 311, 312, 13, 82, 81, 80, 191], closed: true },
-  { idx: [70, 63, 105, 66, 107], closed: false },
-  { idx: [336, 296, 334, 293, 300], closed: false },
-  { idx: [168, 6, 197, 195, 5, 4], closed: false },
-  { idx: [98, 97, 2, 326, 327], closed: false },
-];
-const FACE_SLOTS: number[] = [];
-const FACE_SLOT_OF = new Map<number, number>();
-const slotOf = (landmark: number): number => {
-  let slot = FACE_SLOT_OF.get(landmark);
-  if (slot === undefined) {
-    slot = FACE_SLOTS.length;
-    FACE_SLOTS.push(landmark);
-    FACE_SLOT_OF.set(landmark, slot);
-  }
-  return slot;
-};
-const FACE_SEGMENTS: number[] = [];
-for (const { idx, closed } of FACE_LOOPS) {
-  for (let k = 0; k < idx.length - 1; k++) FACE_SEGMENTS.push(slotOf(idx[k]), slotOf(idx[k + 1]));
-  if (closed) FACE_SEGMENTS.push(slotOf(idx[idx.length - 1]), slotOf(idx[0]));
-}
-const FACE_OVAL_SLOTS = FACE_OVAL_INDICES.map(slotOf);
-const FACE_KEY_SLOTS = [33, 133, 362, 263, 4, 61, 291, 13, 14, 105, 334, 152].map(slotOf);
-const EYE_L = slotOf(33);
-const EYE_R = slotOf(263);
-const SLOT_NOSE = slotOf(4);
-const SLOT_TEMPLE_A = slotOf(234);
-const SLOT_TEMPLE_B = slotOf(454);
 
 interface Bounds {
   minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number;
@@ -13656,7 +12857,7 @@ interface SolvedFrame {
   pose: Float32Array;
   hands: Float32Array;
   handPresent: [boolean, boolean];
-  dense: boolean;
+  facePresent: boolean;
   face: Float32Array;
   head: Float32Array;
 }
@@ -13681,14 +12882,14 @@ function medianTorso(pose: PosePoint[][] | undefined, alignments: PoseAlignment[
   if (!pose?.length || !alignments) return TORSO_WORLD;
   const values: number[] = [];
   pose.forEach((frame, i) => {
-    const ok = [11, 12, 23, 24].every(
+    const ok = [0, 1, 6, 7].every(
       (k) => frame[k] && validPoint(frame[k]) && frame[k][3] >= THRESH,
     );
     if (!ok) return;
     const length =
       Math.hypot(
-        (frame[11][0] + frame[12][0]) / 2 - (frame[23][0] + frame[24][0]) / 2,
-        (frame[11][1] + frame[12][1]) / 2 - (frame[23][1] + frame[24][1]) / 2,
+        (frame[0][0] + frame[1][0]) / 2 - (frame[6][0] + frame[7][0]) / 2,
+        (frame[0][1] + frame[1][1]) / 2 - (frame[6][1] + frame[7][1]) / 2,
       ) * (alignments[i]?.scale ?? 1);
     if (Number.isFinite(length) && length > 0.02) values.push(length);
   });
@@ -13700,66 +12901,48 @@ function medianTorso(pose: PosePoint[][] | undefined, alignments: PoseAlignment[
 interface SolveContext {
   scale: number;
   bounds: Bounds;
-  hasDenseConnections: boolean;
 }
 
 function poseHeadFallback(pose: Float32Array, head: Float32Array): void {
   const vis = (i: number) => pose[i * 4 + 3] >= THRESH;
-  let cx: number, cy: number, cz: number, w: number, roll = 0;
-  if (vis(7) && vis(8)) {
-    const dx = pose[8 * 4] - pose[7 * 4];
-    const dy = pose[8 * 4 + 1] - pose[7 * 4 + 1];
-    const dz = pose[8 * 4 + 2] - pose[7 * 4 + 2];
-    w = Math.max(Math.hypot(dx, dy, dz) * 0.95, 0.2);
-    cx = (pose[7 * 4] + pose[8 * 4]) / 2;
-    cy = (pose[7 * 4 + 1] + pose[8 * 4 + 1]) / 2;
-    cz = (pose[7 * 4 + 2] + pose[8 * 4 + 2]) / 2;
-    roll = dx < 0 ? Math.atan2(-dy, -dx) : Math.atan2(dy, dx);
-  } else if (vis(0)) {
-    w = 0.54;
-    cx = pose[0];
-    cy = pose[1] + 0.04;
-    cz = pose[2] - 0.4 * w * 1.1;
-  } else {
-    return;
-  }
-  w *= 0.85;
+  if (!vis(0) || !vis(1)) return;
+  const shoulderWidth = Math.hypot(
+    pose[4] - pose[0],
+    pose[5] - pose[1],
+    pose[6] - pose[2],
+  );
+  const dx = pose[4] - pose[0];
+  const dy = pose[5] - pose[1];
+  const cx = (pose[0] + pose[4]) / 2;
+  const shoulderY = (pose[1] + pose[5]) / 2;
+  const torsoLength = vis(6) && vis(7)
+    ? Math.hypot(
+        cx - (pose[6 * 4] + pose[7 * 4]) / 2,
+        shoulderY - (pose[6 * 4 + 1] + pose[7 * 4 + 1]) / 2,
+        (pose[2] + pose[6]) / 2 - (pose[6 * 4 + 2] + pose[7 * 4 + 2]) / 2,
+      )
+    : 0;
+  const width = Math.max(
+    torsoLength > 0.1 ? torsoLength * HEAD_WIDTH_RATIO : shoulderWidth * 0.62,
+    0.2,
+  );
+  const cy = shoulderY + width * 0.58;
+  const cz = (pose[2] + pose[6]) / 2;
+  const roll = Math.atan2(dx < 0 ? -dy : dy, Math.abs(dx));
+  const w = width;
   const h = w * 1.2;
   const d = w * 0.8;
-  head.set([1, cx, cy, cz, w, h, d, cx, cy - h * 0.5, 0, roll]);
+  head.set([1, cx, cy, cz, w, h, d, cx, shoulderY + NECK_LENGTH, cz, roll]);
 }
 
 const NECK_LENGTH = 0.2;
-const NECK_RADIUS = 0.1;
-const NECK_SEGMENTS = 5;
-
-function seatHead(pose: Float32Array, face: Float32Array, head: Float32Array): void {
-  if (head[0] === 0 || pose[11 * 4 + 3] < THRESH || pose[12 * 4 + 3] < THRESH) return;
-  const shoulderX = (pose[11 * 4] + pose[12 * 4]) / 2;
-  const shoulderY = (pose[11 * 4 + 1] + pose[12 * 4 + 1]) / 2;
-  const dx = head[7] - shoulderX;
-  const dy = head[8] - shoulderY - NECK_LENGTH;
-  head[1] -= dx; head[7] -= dx;
-  head[2] -= dy; head[8] -= dy;
-  for (let k = 0; k < FACE_SLOTS.length; k++) {
-    if (face[k * 4 + 3] !== 1) continue;
-    face[k * 4] -= dx;
-    face[k * 4 + 1] -= dy;
-  }
-  for (let i = 0; i <= 10; i++) {
-    if (pose[i * 4 + 3] < THRESH) continue;
-    pose[i * 4] -= dx;
-    pose[i * 4 + 1] -= dy;
-  }
-}
 
 function solveFrame(
   ctx: SolveContext,
   frame: number[][],
   poseFrame: PosePoint[] | undefined,
   alignment: PoseAlignment | undefined,
-  alignedFace: Point2[] | undefined,
-  rawFace: number[][] | undefined,
+  faceAvatar: number[][] | undefined,
 ): SolvedFrame {
   const S = ctx.scale;
   const hasPose = Boolean(poseFrame);
@@ -13767,7 +12950,7 @@ function solveFrame(
 
   let zc = 0;
   if (hasPose) {
-    const zs = [11, 12]
+    const zs = [0, 1]
       .map((i) => pf[i])
       .filter((p) => p && validPoint(p) && p[3] >= THRESH && Number.isFinite(p[2]));
     if (zs.length) zc = zs.reduce((s, p) => s + p[2], 0) / zs.length;
@@ -13780,7 +12963,7 @@ function solveFrame(
     const p = pf[i];
     if (!p || !validPoint(p) || !(p[3] >= THRESH)) continue;
     const xy = alignment ? stabilizePoint(p, alignment) : { x: p[0], y: p[1] };
-    const isArm = i >= 13 && i <= 22;
+    const isArm = i >= 2 && i <= 5;
     const rawZ = hasPose && isArm && Number.isFinite(p[2]) ? (p[2] - zc) * zScale : 0;
     const z = Math.max(-zLimit, Math.min(zLimit, rawZ));
     poseMpZ[i] = z;
@@ -13795,7 +12978,7 @@ function solveFrame(
   ([0, 21] as const).forEach((off, slot) => {
     if (isMissingHand(frame, off)) return;
     handPresent[slot] = true;
-    const wristIdx = slot === 0 ? 15 : 16;
+    const wristIdx = slot === 0 ? 4 : 5;
     const ref = [wristIdx, wristIdx - 2].find((i) => pose[i * 4 + 3] >= THRESH);
     const baseZ = ref !== undefined ? poseMpZ[ref] : 0;
     for (let j = 0; j < 21; j++) {
@@ -13823,55 +13006,82 @@ function solveFrame(
     }
   });
 
-  const face = new Float32Array(FACE_SLOTS.length * 4);
+  const face = new Float32Array(FACE_POINTS * 4);
   const head = new Float32Array(HEAD_LEN);
-  let dense = ctx.hasDenseConnections;
-  if (ctx.hasDenseConnections && alignedFace?.length && rawFace) {
-    dense = true;
-    let ratio = 1;
-    const r1 = rawFace[234], r2 = rawFace[454], a1 = alignedFace[234], a2 = alignedFace[454];
-    if (validPoint(r1) && validPoint(r2) && a1 && a2 && Number.isFinite(a1.x) && Number.isFinite(a2.x)) {
-      const rawWidth = Math.hypot(r2[0] - r1[0], r2[1] - r1[1]);
-      if (rawWidth > 1e-4) ratio = Math.hypot(a2.x - a1.x, a2.y - a1.y) / rawWidth;
-    }
-    const noseZ = Number.isFinite(rawFace[4]?.[2]) ? rawFace[4][2] : 0;
-    const baseZ = pose[3] >= THRESH ? poseMpZ[0] : 0;
-    for (let k = 0; k < FACE_SLOTS.length; k++) {
-      const ap = alignedFace[FACE_SLOTS[k]];
-      const rp = rawFace[FACE_SLOTS[k]];
-      if (!ap || !Number.isFinite(ap.x) || !Number.isFinite(ap.y) || !rp) continue;
-      const rz = Number.isFinite(rp[2]) ? rp[2] - noseZ : 0;
-      writeWorld(face, k * 4, ap.x, ap.y, baseZ + rz * ratio * Z_FACE, S);
-      face[k * 4 + 3] = 1;
-    }
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, sumZ = 0, n = 0;
-    for (const slot of FACE_OVAL_SLOTS) {
-      const o = slot * 4;
-      if (face[o + 3] < 1) continue;
-      minX = Math.min(minX, face[o]); maxX = Math.max(maxX, face[o]);
-      minY = Math.min(minY, face[o + 1]); maxY = Math.max(maxY, face[o + 1]);
-      sumZ += face[o + 2]; n++;
-    }
-    if (n >= 8) {
-      const w = (maxX - minX) * 0.9, h = (maxY - minY) * 0.95, d = w * 0.8;
-      const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2, cz = sumZ / n - 0.3 * d;
-      let roll = 0;
-      if (face[EYE_L * 4 + 3] === 1 && face[EYE_R * 4 + 3] === 1) {
-        let dx = face[EYE_R * 4] - face[EYE_L * 4];
-        let dy = face[EYE_R * 4 + 1] - face[EYE_L * 4 + 1];
-        if (dx < 0) { dx = -dx; dy = -dy; }
-        roll = Math.atan2(dy, dx);
+  poseHeadFallback(pose, head);
+  let facePresent = false;
+  if (faceAvatar?.length === FACE_POINTS && head[0] > 0) {
+    const leftTemple = faceAvatar[2];
+    const rightTemple = faceAvatar[3];
+    const forehead = faceAvatar[0];
+    const chin = faceAvatar[1];
+    if (
+      validPoint(leftTemple) &&
+      validPoint(rightTemple) &&
+      validPoint(forehead) &&
+      validPoint(chin)
+    ) {
+      const sourceWidth = Math.hypot(
+        rightTemple[0] - leftTemple[0],
+        rightTemple[1] - leftTemple[1],
+      );
+      const sourceHeight = Math.abs(forehead[1] - chin[1]);
+      if (sourceWidth > 1e-5 && sourceHeight > 1e-5) {
+        const faceCenter = alignment
+          ? stabilizePoint([
+              (leftTemple[0] + rightTemple[0]) / 2,
+              (forehead[1] + chin[1]) / 2,
+            ], alignment)
+          : {
+              x: (leftTemple[0] + rightTemple[0]) / 2,
+              y: (forehead[1] + chin[1]) / 2,
+            };
+        const faceScale =
+          head[4] /
+          (sourceWidth * (alignment?.scale ?? 1) * S);
+        const faceHeightScale =
+          head[5] /
+          (sourceHeight * (alignment?.scale ?? 1) * S);
+        const cos = Math.cos(head[10]);
+        const sin = Math.sin(head[10]);
+        const noseZ = Number.isFinite(faceAvatar[14]?.[2]) ? faceAvatar[14][2] : 0;
+        const stabilizedChin = alignment ? stabilizePoint(chin, alignment) : {
+          x: chin[0],
+          y: chin[1],
+        };
+        const chinX = (stabilizedChin.x - faceCenter.x) * S * faceScale;
+        const chinY = -(stabilizedChin.y - faceCenter.y) * S * faceHeightScale;
+        const faceOriginX = head[7] - (chinX * cos - chinY * sin);
+        const faceOriginY = head[8] - (chinX * sin + chinY * cos);
+        let validCount = 0;
+        for (let index = 0; index < FACE_POINTS; index++) {
+          const point = faceAvatar[index];
+          if (!validPoint(point) || !Number.isFinite(point[2])) continue;
+          const stabilized = alignment ? stabilizePoint(point, alignment) : {
+            x: point[0],
+            y: point[1],
+          };
+          const localX = (stabilized.x - faceCenter.x) * S * faceScale;
+          const localY = -(stabilized.y - faceCenter.y) * S * faceHeightScale;
+          const offset = index * 4;
+          face[offset] = faceOriginX + localX * cos - localY * sin;
+          face[offset + 1] = faceOriginY + localX * sin + localY * cos;
+          face[offset + 2] =
+            head[3] +
+            head[6] * 0.52 +
+            (noseZ - point[2]) * S * faceScale * 0.25;
+          face[offset + 3] = 1;
+          validCount++;
+        }
+        facePresent = validCount >= Math.ceil(FACE_POINTS * 0.75);
       }
-      head.set([1, cx, cy, cz, w, h, d, cx, minY, 0, roll]);
     }
   }
-  if (head[0] === 0 && !ctx.hasDenseConnections) poseHeadFallback(pose, head);
-  seatHead(pose, face, head);
 
   /* Reject stray landmarks while retaining the upper-body and hand range. */
   const b = ctx.bounds;
   let ccx = 0, ccy = 0, ccz = 0, ccn = 0;
-  for (const i of [11, 12, 23, 24]) {
+  for (const i of [0, 1, 6, 7]) {
     if (pose[i * 4 + 3] < THRESH) continue;
     ccx += pose[i * 4]; ccy += pose[i * 4 + 1]; ccz += pose[i * 4 + 2]; ccn++;
   }
@@ -13881,7 +13091,7 @@ function solveFrame(
     Math.abs(z - ccz) <= maxTorso * TORSO_WORLD;
   for (let i = 0; i < POSE_POINTS; i++) {
     if (
-      i < 23 && pose[i * 4 + 3] >= THRESH && !isHandStub(i) &&
+      pose[i * 4 + 3] >= THRESH &&
       inReach(pose[i * 4], pose[i * 4 + 1], pose[i * 4 + 2], 3.4)
     ) {
       growBounds(b, pose[i * 4], pose[i * 4 + 1], pose[i * 4 + 2]);
@@ -13899,35 +13109,31 @@ function solveFrame(
     growBounds(b, head[1] - head[4] / 2, head[2] - head[5] / 2, head[3]);
     growBounds(b, head[1] + head[4] / 2, head[2] + head[5] / 2, head[3] + head[6] / 2);
   }
-  void SLOT_NOSE; void SLOT_TEMPLE_A; void SLOT_TEMPLE_B;
-  return { hasPose, pose, hands, handPresent, dense, face, head };
+  return { hasPose, pose, hands, handPresent, facePresent, face, head };
 }
 
 function solveSequence(
   frames: number[][][],
   pose: PosePoint[][] | undefined,
   alignments: PoseAlignment[] | undefined,
-  alignedFaces: Point2[][] | undefined,
-  faceMesh: number[][][] | undefined,
-  hasDenseConnections: boolean,
+  faceAvatar: number[][][] | undefined,
 ): SolvedSequence {
   const ctx: SolveContext = {
     scale: TORSO_WORLD / medianTorso(pose, alignments),
     bounds: emptyBounds(),
-    hasDenseConnections,
   };
   const solved = frames.map((frame, f) =>
-    solveFrame(ctx, frame, pose?.[f], alignments?.[f], alignedFaces?.[f], faceMesh?.[f]),
+    solveFrame(ctx, frame, pose?.[f], alignments?.[f], faceAvatar?.[f]),
   );
 
   const hemHeights = solved.flatMap(({ pose: framePose }) => {
     if (
-      framePose[23 * 4 + 3] < THRESH ||
-      framePose[24 * 4 + 3] < THRESH
+      framePose[6 * 4 + 3] < THRESH ||
+      framePose[7 * 4 + 3] < THRESH
     ) {
       return [];
     }
-    return [(framePose[23 * 4 + 1] + framePose[24 * 4 + 1]) / 2 - DHUTI_DROP];
+    return [(framePose[6 * 4 + 1] + framePose[7 * 4 + 1]) / 2 - DHUTI_DROP];
   });
   if (hemHeights.length) {
     ctx.bounds.minY = Math.min(
@@ -13935,10 +13141,10 @@ function solveSequence(
       hemHeights.reduce((lowest, height) => Math.min(lowest, height), Infinity) - 0.44,
     );
     const hips = solved.flatMap(({ pose: framePose }) =>
-      framePose[23 * 4 + 3] >= THRESH && framePose[24 * 4 + 3] >= THRESH
+      framePose[6 * 4 + 3] >= THRESH && framePose[7 * 4 + 3] >= THRESH
         ? [{
-            x: (framePose[23 * 4] + framePose[24 * 4]) / 2,
-            z: (framePose[23 * 4 + 2] + framePose[24 * 4 + 2]) / 2,
+            x: (framePose[6 * 4] + framePose[7 * 4]) / 2,
+            z: (framePose[6 * 4 + 2] + framePose[7 * 4 + 2]) / 2,
           }]
         : [],
     );
@@ -13958,26 +13164,7 @@ function solveSequence(
  * 4. 3D: FRAME SAMPLING
  * ========================================================================== */
 
-interface SampleState {
-  pose: Float32Array;
-  poseInit: Uint8Array;
-  hands: [Float32Array, Float32Array];
-  handValid: [Uint8Array, Uint8Array];
-  handInit: Uint8Array;
-  handAlpha: Float32Array;
-  face: Float32Array;
-  faceValid: Uint8Array;
-  faceInit: Uint8Array;
-  head: Float32Array;
-  headValid: boolean;
-  headInit: boolean;
-  dense: boolean;
-  hasPose: boolean;
-}
-export type SampleRef = { current: SampleState };
-
 function createSampleState(): SampleState {
-  const faceCount = FACE_SLOTS.length;
   return {
     pose: new Float32Array(POSE_POINTS * 4),
     poseInit: new Uint8Array(POSE_POINTS),
@@ -13985,13 +13172,13 @@ function createSampleState(): SampleState {
     handValid: [new Uint8Array(21), new Uint8Array(21)],
     handInit: new Uint8Array(2),
     handAlpha: new Float32Array(2),
-    face: new Float32Array(faceCount * 3),
-    faceValid: new Uint8Array(faceCount),
-    faceInit: new Uint8Array(faceCount),
+    face: new Float32Array(FACE_POINTS * 3),
+    faceValid: new Uint8Array(FACE_POINTS),
+    faceInit: new Uint8Array(FACE_POINTS),
     head: new Float32Array(HEAD_LEN),
     headValid: false,
     headInit: false,
-    dense: false,
+    facePresent: false,
     hasPose: false,
   };
 }
@@ -14069,34 +13256,29 @@ function sampleFrame(
     st.handInit[h] = 1;
   }
 
-  const selectedFrame = a < 0.5 ? f0 : f1;
-  st.dense = selectedFrame.dense;
-  if (st.dense) {
-    for (let k = 0; k < FACE_SLOTS.length; k++) {
-      if (!blendSource(f0.face, f1.face, k, a, 0.5)) {
-        st.faceValid[k] = 0;
-        st.faceInit[k] = 0;
-        continue;
-      }
-      st.faceValid[k] = 1;
-      easeInto(st.face, k * 3, st.faceInit[k] === 1, kxy, kz);
-      st.faceInit[k] = 1;
+  st.facePresent = f0.facePresent || f1.facePresent;
+  for (let k = 0; k < FACE_POINTS; k++) {
+    if (!blendSource(f0.face, f1.face, k, a, 0.5)) {
+      st.faceValid[k] = 0;
+      st.faceInit[k] = 0;
+      continue;
     }
+    st.faceValid[k] = 1;
+    easeInto(st.face, k * 3, st.faceInit[k] === 1, kxy, kz);
+    st.faceInit[k] = 1;
   }
 
   const v0 = f0.head[0] > 0;
   const v1 = f1.head[0] > 0;
-  st.headValid = st.dense ? selectedFrame.head[0] > 0 : v0 || v1;
+  st.headValid = v0 || v1;
   if (st.headValid) {
     const kh = snap ? 1 : 1 - Math.exp(-delta * 25);
     for (let k = 1; k < HEAD_LEN; k++) {
-      const t = st.dense
-        ? selectedFrame.head[k]
-        : v0 && v1
-          ? f0.head[k] + (f1.head[k] - f0.head[k]) * a
-          : v0
-            ? f0.head[k]
-            : f1.head[k];
+      const t = v0 && v1
+        ? f0.head[k] + (f1.head[k] - f0.head[k]) * a
+        : v0
+          ? f0.head[k]
+          : f1.head[k];
       st.head[k] = st.headInit ? st.head[k] + (t - st.head[k]) * kh : t;
     }
     st.headInit = true;
@@ -14109,645 +13291,11 @@ function sampleFrame(
  * 5. 3D: SHARED THREE HELPERS
  * ========================================================================== */
 
-const _m = new THREE.Matrix4();
-const _q = new THREE.Quaternion();
 const _p = new THREE.Vector3();
-const _s = new THREE.Vector3();
 const _d = new THREE.Vector3();
-const _up = new THREE.Vector3(0, 1, 0);
-const _c = new THREE.Color();
-const _zero = new THREE.Matrix4().makeScale(0, 0, 0);
-const _sa = new Float32Array(3);
-const _sb = new Float32Array(3);
-
-let boneGeometry: THREE.CylinderGeometry | null = null;
-let jointGeometry: THREE.SphereGeometry | null = null;
-let headGeometry: THREE.SphereGeometry | null = null;
-const getBoneGeometry = () => (boneGeometry ??= new THREE.CylinderGeometry(0.78, 1, 1, 14, 1, false));
-const getJointGeometry = () => (jointGeometry ??= new THREE.SphereGeometry(1, 18, 14));
-const getHeadGeometry = () => (headGeometry ??= new THREE.SphereGeometry(1, 36, 26));
-
-function placeBone(
-  mesh: THREE.InstancedMesh, index: number,
-  A: ArrayLike<number>, ao: number, B: ArrayLike<number>, bo: number, radius: number,
-): void {
-  _d.set(B[bo] - A[ao], B[bo + 1] - A[ao + 1], B[bo + 2] - A[ao + 2]);
-  const length = _d.length();
-  if (length < 1e-5) {
-    mesh.setMatrixAt(index, _zero);
-    return;
-  }
-  _d.multiplyScalar(1 / length);
-  _q.setFromUnitVectors(_up, _d);
-  _p.set((A[ao] + B[bo]) / 2, (A[ao + 1] + B[bo + 1]) / 2, (A[ao + 2] + B[bo + 2]) / 2);
-  _s.set(radius, length, radius);
-  _m.compose(_p, _q, _s);
-  mesh.setMatrixAt(index, _m);
-}
-
-function placeJoint(
-  mesh: THREE.InstancedMesh, index: number, P: ArrayLike<number>, o: number, radius: number,
-): void {
-  _p.set(P[o], P[o + 1], P[o + 2]);
-  _q.identity();
-  _s.setScalar(radius);
-  _m.compose(_p, _q, _s);
-  mesh.setMatrixAt(index, _m);
-}
-
-function hideAll(mesh: THREE.InstancedMesh | null): void {
-  if (!mesh) return;
-  for (let i = 0; i < mesh.count; i++) mesh.setMatrixAt(i, _zero);
-  mesh.instanceMatrix.needsUpdate = true;
-}
-
-function initTint(mesh: THREE.InstancedMesh | null, colors?: THREE.Color[]): void {
-  if (!mesh) return;
-  for (let i = 0; i < mesh.count; i++) mesh.setColorAt(i, colors?.[i] ?? _c.set("#ffffff"));
-  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-}
-
-const visTint = (v: number) => 0.4 + 0.6 * Math.min(1, Math.max(0.2, v));
-
 /* ==========================================================================
  * 6. 3D: RIG COMPONENTS
  * ========================================================================== */
-
-function BodyRig({ sampleRef, pairs }: { sampleRef: SampleRef; pairs: PairList }) {
-  const bonesRef = useRef<THREE.InstancedMesh>(null);
-  const jointsRef = useRef<THREE.InstancedMesh>(null);
-  const joints = useMemo(
-    () => Array.from(new Set(pairs.flat())).filter(
-      (index) =>
-        index !== 23 &&
-        index !== 24 &&
-        index !== 25 &&
-        index !== 26 &&
-        index !== 27 &&
-        index !== 28,
-    ),
-    [pairs],
-  );
-  const radii = useMemo(
-    () => pairs.map(([a, b]) => ((bodyJointRadius(a) + bodyJointRadius(b)) / 2) * 0.58),
-    [pairs],
-  );
-  const baseColors = useMemo(
-    () =>
-      pairs.map(([a, b]) => {
-        const torso = [11, 12, 23, 24];
-        if (torso.includes(a) && torso.includes(b)) return new THREE.Color(COLOR.torso);
-        if (a >= 11 && a <= 16 && b >= 11 && b <= 16) return new THREE.Color(COLOR.arm);
-        if (a >= 23 || b >= 23) return new THREE.Color(COLOR.leg);
-        return new THREE.Color(COLOR.other);
-      }),
-    [pairs],
-  );
-  const boneMat = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: "#ffffff", metalness: 0.38, roughness: 0.34 }),
-    [],
-  );
-  const jointMat = useMemo(
-    () => new THREE.MeshStandardMaterial({ color: "#ffffff", metalness: 0.3, roughness: 0.3 }),
-    [],
-  );
-  useEffect(() => () => { boneMat.dispose(); jointMat.dispose(); }, [boneMat, jointMat]);
-  useLayoutEffect(() => {
-    hideAll(bonesRef.current);
-    hideAll(jointsRef.current);
-    initTint(bonesRef.current, baseColors);
-    initTint(jointsRef.current);
-  }, [baseColors, joints]);
-
-  useFrame(() => {
-    const bones = bonesRef.current;
-    const jointMesh = jointsRef.current;
-    if (!bones || !jointMesh) return;
-    const P = sampleRef.current.pose;
-    for (let i = 0; i < pairs.length; i++) {
-      const a = pairs[i][0], b = pairs[i][1];
-      const va = P[a * 4 + 3], vb = P[b * 4 + 3];
-      if (!(va >= THRESH && vb >= THRESH)) {
-        bones.setMatrixAt(i, _zero);
-        continue;
-      }
-      placeBone(bones, i, P, a * 4, P, b * 4, radii[i]);
-      _c.copy(baseColors[i]).multiplyScalar(visTint(Math.min(va, vb)));
-      bones.setColorAt(i, _c);
-    }
-    bones.instanceMatrix.needsUpdate = true;
-    if (bones.instanceColor) bones.instanceColor.needsUpdate = true;
-
-    for (let i = 0; i < joints.length; i++) {
-      const idx = joints[i];
-      const v = P[idx * 4 + 3];
-      if (!(v >= THRESH)) {
-        jointMesh.setMatrixAt(i, _zero);
-        continue;
-      }
-      placeJoint(jointMesh, i, P, idx * 4, bodyJointRadius(idx));
-      _c.set(COLOR.joint).multiplyScalar(visTint(v));
-      jointMesh.setColorAt(i, _c);
-    }
-    jointMesh.instanceMatrix.needsUpdate = true;
-    if (jointMesh.instanceColor) jointMesh.instanceColor.needsUpdate = true;
-  });
-
-  return (
-    <group>
-      <instancedMesh
-        ref={bonesRef}
-        args={[getBoneGeometry(), boneMat, pairs.length]}
-        frustumCulled={false}
-        castShadow
-        receiveShadow
-      />
-      <instancedMesh
-        ref={jointsRef}
-        args={[getJointGeometry(), jointMat, joints.length]}
-        frustumCulled={false}
-        castShadow
-        receiveShadow
-      />
-    </group>
-  );
-}
-
-const TORSO_RING_PROFILE = [0.72, 0.9, 0.99, 1.04, 1.03, 0.96, 0.8];
-const TORSO_RINGS = TORSO_RING_PROFILE.length;
-const TORSO_SEGMENTS = 16;
-const TORSO_CAPS = 2;
-const TORSO_CAP_TOP = TORSO_RINGS * TORSO_SEGMENTS;
-const TORSO_CAP_BOTTOM = TORSO_CAP_TOP + 1;
-const TORSO_INDICES = (() => {
-  const indices: number[] = [];
-  for (let ring = 0; ring < TORSO_RINGS - 1; ring++) {
-    const upper = ring * TORSO_SEGMENTS;
-    const lower = (ring + 1) * TORSO_SEGMENTS;
-    for (let segment = 0; segment < TORSO_SEGMENTS; segment++) {
-      const next = (segment + 1) % TORSO_SEGMENTS;
-      indices.push(
-        upper + segment, lower + segment, lower + next,
-        upper + segment, lower + next, upper + next,
-      );
-    }
-  }
-  for (let segment = 0; segment < TORSO_SEGMENTS; segment++) {
-    const next = (segment + 1) % TORSO_SEGMENTS;
-    indices.push(TORSO_CAP_TOP, next, segment);
-    const bottom = (TORSO_RINGS - 1) * TORSO_SEGMENTS;
-    indices.push(TORSO_CAP_BOTTOM, bottom + segment, bottom + next);
-  }
-  return indices;
-})();
-
-function TorsoRig({
-  sampleRef,
-  playbackRef,
-}: {
-  sampleRef: SampleRef;
-  playbackRef: React.MutableRefObject<PlaybackState>;
-}) {
-  const meshRef = useRef<THREE.Mesh>(null);
-  const idleTime = useRef(0);
-  const geometry = useMemo(() => {
-    const g = new THREE.BufferGeometry();
-    g.setAttribute(
-      "position",
-      new THREE.BufferAttribute(
-        new Float32Array((TORSO_RINGS * TORSO_SEGMENTS + TORSO_CAPS) * 3),
-        3,
-      )
-        .setUsage(THREE.DynamicDrawUsage),
-    );
-    g.setIndex(TORSO_INDICES);
-    return g;
-  }, []);
-  const material = useMemo(
-    () =>
-      new THREE.MeshStandardMaterial({
-        color: COLOR.volume,
-        emissive: "#080f29",
-        emissiveIntensity: 0.1,
-        roughness: 0.38,
-        metalness: 0.34,
-        side: THREE.DoubleSide, flatShading: false,
-      }),
-    [],
-  );
-  useEffect(() => () => { geometry.dispose(); material.dispose(); }, [geometry, material]);
-
-  useFrame((_, delta) => {
-    const mesh = meshRef.current;
-    if (!mesh) return;
-    if (!playbackRef.current.playing) idleTime.current += Math.min(delta, 0.1);
-    const P = sampleRef.current.pose;
-    const ok = P[11 * 4 + 3] >= THRESH && P[12 * 4 + 3] >= THRESH && P[23 * 4 + 3] >= THRESH && P[24 * 4 + 3] >= THRESH;
-    mesh.visible = ok;
-    if (!ok) return;
-    const shoulderCenterX = (P[11 * 4] + P[12 * 4]) / 2;
-    const shoulderCenterY = (P[11 * 4 + 1] + P[12 * 4 + 1]) / 2;
-    const shoulderCenterZ = (P[11 * 4 + 2] + P[12 * 4 + 2]) / 2;
-    const hipCenterX = (P[23 * 4] + P[24 * 4]) / 2;
-    const hipCenterY = (P[23 * 4 + 1] + P[24 * 4 + 1]) / 2 - 0.12;
-    const hipCenterZ = (P[23 * 4 + 2] + P[24 * 4 + 2]) / 2;
-    const shoulderHalfWidth = Math.max(
-      Math.hypot(
-        P[11 * 4] - P[12 * 4],
-        P[11 * 4 + 1] - P[12 * 4 + 1],
-        P[11 * 4 + 2] - P[12 * 4 + 2],
-      ) * 0.52,
-      0.12,
-    );
-    const hipHalfWidth = Math.max(Math.abs(P[23 * 4] - P[24 * 4]) * 0.52, 0.1);
-    const pos = geometry.getAttribute("position") as THREE.BufferAttribute;
-    for (let ring = 0; ring < TORSO_RINGS; ring++) {
-      const t = ring / (TORSO_RINGS - 1);
-      const profile = TORSO_RING_PROFILE[ring];
-      const centerX = THREE.MathUtils.lerp(shoulderCenterX, hipCenterX, t);
-      const centerY = THREE.MathUtils.lerp(shoulderCenterY, hipCenterY, t);
-      const centerZ = THREE.MathUtils.lerp(shoulderCenterZ, hipCenterZ, t);
-      const idleBreath = playbackRef.current.playing
-        ? 1
-        : 1 + Math.sin(idleTime.current * 1.35) * 0.003;
-      const halfWidth =
-        THREE.MathUtils.lerp(shoulderHalfWidth, hipHalfWidth, t) * profile * idleBreath;
-      const depth = Math.max(halfWidth * 0.62, 0.08);
-      for (let segment = 0; segment < TORSO_SEGMENTS; segment++) {
-        const angle = (segment / TORSO_SEGMENTS) * Math.PI * 2;
-        const index = ring * TORSO_SEGMENTS + segment;
-        pos.setXYZ(
-          index,
-          centerX + Math.cos(angle) * halfWidth,
-          centerY,
-          centerZ + Math.sin(angle) * depth,
-        );
-      }
-    }
-    pos.setXYZ(TORSO_CAP_TOP, shoulderCenterX, shoulderCenterY, shoulderCenterZ);
-    pos.setXYZ(TORSO_CAP_BOTTOM, hipCenterX, hipCenterY, hipCenterZ);
-    pos.needsUpdate = true;
-    geometry.computeVertexNormals();
-  });
-
-  return (
-    <mesh
-      ref={meshRef}
-      geometry={geometry}
-      material={material}
-      frustumCulled={false}
-      renderOrder={-1}
-      castShadow
-      receiveShadow
-    />
-  );
-}
-
-function HeadRig({ sampleRef }: { sampleRef: SampleRef }) {
-  const headRef = useRef<THREE.Mesh>(null);
-  const neckRef = useRef<THREE.InstancedMesh>(null);
-  const neckStart = useRef(new Float32Array(3));
-  const neckEnd = useRef(new Float32Array(3));
-  const headMat = useMemo(
-    () =>
-      new THREE.MeshStandardMaterial({
-        color: "#172a47",
-        transparent: true,
-        opacity: 0.13,
-        roughness: 0.55,
-        metalness: 0.05,
-        depthWrite: false,
-      }),
-    [],
-  );
-  const neckMat = useMemo(
-    () => new THREE.MeshStandardMaterial({
-      color: "#5678bd",
-      metalness: 0.34,
-      roughness: 0.3,
-      emissive: "#10213f",
-      emissiveIntensity: 0.08,
-    }),
-    [],
-  );
-  useEffect(() => () => { headMat.dispose(); neckMat.dispose(); }, [headMat, neckMat]);
-  useLayoutEffect(() => hideAll(neckRef.current), []);
-
-  useFrame(() => {
-    const head = headRef.current;
-    const neck = neckRef.current;
-    if (!head || !neck) return;
-    const st = sampleRef.current;
-    head.visible = st.headValid;
-    if (!st.headValid) {
-      hideAll(neck);
-      return;
-    }
-    const H = st.head;
-    head.position.set(H[1], H[2], H[3]);
-    head.scale.set(H[4] / 2, H[5] / 2, H[6] / 2);
-    head.rotation.z = H[10];
-
-    const P = st.pose;
-    if (P[11 * 4 + 3] >= THRESH && P[12 * 4 + 3] >= THRESH) {
-      _sa[0] = (P[11 * 4] + P[12 * 4]) / 2;
-      _sa[1] = (P[11 * 4 + 1] + P[12 * 4 + 1]) / 2;
-      _sa[2] = (P[11 * 4 + 2] + P[12 * 4 + 2]) / 2;
-      _sb[0] = H[7]; _sb[1] = H[8]; _sb[2] = H[9];
-      const dx = _sb[0] - _sa[0];
-      const dy = _sb[1] - _sa[1];
-      const dz = _sb[2] - _sa[2];
-      for (let index = 0; index < NECK_SEGMENTS; index++) {
-        const start = (index + 0.08) / NECK_SEGMENTS;
-        const end = (index + 0.92) / NECK_SEGMENTS;
-        neckStart.current[0] = _sa[0] + dx * start;
-        neckStart.current[1] = _sa[1] + dy * start;
-        neckStart.current[2] = _sa[2] + dz * start;
-        neckEnd.current[0] = _sa[0] + dx * end;
-        neckEnd.current[1] = _sa[1] + dy * end;
-        neckEnd.current[2] = _sa[2] + dz * end;
-        placeBone(
-          neck,
-          index,
-          neckStart.current,
-          0,
-          neckEnd.current,
-          0,
-          NECK_RADIUS * (0.9 + 0.1 * Math.sin((index / (NECK_SEGMENTS - 1)) * Math.PI)),
-        );
-        neck.setColorAt(index, _c.set(index === 0 || index === NECK_SEGMENTS - 1 ? "#64cbd6" : "#274566"));
-      }
-    } else {
-      hideAll(neck);
-    }
-    neck.instanceMatrix.needsUpdate = true;
-    if (neck.instanceColor) neck.instanceColor.needsUpdate = true;
-  });
-
-  return (
-    <group>
-      <mesh
-        ref={headRef}
-        geometry={getHeadGeometry()}
-        material={headMat}
-        frustumCulled={false}
-        renderOrder={-1}
-        castShadow
-      />
-      <instancedMesh
-        ref={neckRef}
-        args={[getBoneGeometry(), neckMat, NECK_SEGMENTS]}
-        frustumCulled={false}
-        castShadow
-      />
-    </group>
-  );
-}
-
-function FaceRig({ sampleRef }: { sampleRef: SampleRef }) {
-  const linesRef = useRef<THREE.LineSegments>(null);
-  const keysRef = useRef<THREE.InstancedMesh>(null);
-  const stubBonesRef = useRef<THREE.InstancedMesh>(null);
-  const stubJointsRef = useRef<THREE.InstancedMesh>(null);
-
-  const lineGeo = useMemo(() => {
-    const g = new THREE.BufferGeometry();
-    g.setAttribute(
-      "position",
-      new THREE.BufferAttribute(new Float32Array(FACE_SEGMENTS.length * 3), 3).setUsage(THREE.DynamicDrawUsage),
-    );
-    return g;
-  }, []);
-  const lineMat = useMemo(
-    () => new THREE.LineBasicMaterial({ color: COLOR.face, transparent: true, opacity: 0.8 }),
-    [],
-  );
-  const keyMat = useMemo(() => new THREE.MeshStandardMaterial({ color: COLOR.faceKey, roughness: 0.4, metalness: 0.1 }), []);
-  const stubMat = useMemo(() => new THREE.MeshStandardMaterial({ color: COLOR.face, roughness: 0.45, metalness: 0.2 }), []);
-  useEffect(
-    () => () => { lineGeo.dispose(); lineMat.dispose(); keyMat.dispose(); stubMat.dispose(); },
-    [lineGeo, lineMat, keyMat, stubMat],
-  );
-  useLayoutEffect(() => {
-    hideAll(keysRef.current);
-    hideAll(stubBonesRef.current);
-    hideAll(stubJointsRef.current);
-  }, []);
-
-  useFrame(() => {
-    const lines = linesRef.current, keys = keysRef.current;
-    const stubBones = stubBonesRef.current, stubJoints = stubJointsRef.current;
-    if (!lines || !keys || !stubBones || !stubJoints) return;
-    const st = sampleRef.current;
-    const dense = st.dense;
-    lines.visible = dense;
-    keys.visible = dense;
-    stubBones.visible = !dense;
-    stubJoints.visible = !dense;
-
-    if (dense) {
-      const pos = lineGeo.getAttribute("position") as THREE.BufferAttribute;
-      const F = st.face;
-      for (let s = 0; s < FACE_SEGMENTS.length; s += 2) {
-        const a = FACE_SEGMENTS[s], b = FACE_SEGMENTS[s + 1];
-        const i = s;
-        if (st.faceValid[a] && st.faceValid[b]) {
-          pos.setXYZ(i, F[a * 3], F[a * 3 + 1], F[a * 3 + 2]);
-          pos.setXYZ(i + 1, F[b * 3], F[b * 3 + 1], F[b * 3 + 2]);
-        } else {
-          pos.setXYZ(i, 0, 0, 0);
-          pos.setXYZ(i + 1, 0, 0, 0);
-        }
-      }
-      pos.needsUpdate = true;
-      for (let k = 0; k < FACE_KEY_SLOTS.length; k++) {
-        const slot = FACE_KEY_SLOTS[k];
-        if (st.faceValid[slot]) placeJoint(keys, k, F, slot * 3, slot === SLOT_NOSE ? 0.016 : 0.011);
-        else keys.setMatrixAt(k, _zero);
-      }
-      keys.instanceMatrix.needsUpdate = true;
-    } else {
-      const P = st.pose;
-      for (let i = 0; i < POSE_FACE_PAIRS.length; i++) {
-        const a = POSE_FACE_PAIRS[i][0], b = POSE_FACE_PAIRS[i][1];
-        if (P[a * 4 + 3] >= THRESH && P[b * 4 + 3] >= THRESH) placeBone(stubBones, i, P, a * 4, P, b * 4, 0.007);
-        else stubBones.setMatrixAt(i, _zero);
-      }
-      for (let i = 0; i < POSE_FACE_JOINTS.length; i++) {
-        const idx = POSE_FACE_JOINTS[i];
-        if (P[idx * 4 + 3] >= THRESH) placeJoint(stubJoints, i, P, idx * 4, idx === 0 ? 0.02 : 0.013);
-        else stubJoints.setMatrixAt(i, _zero);
-      }
-      stubBones.instanceMatrix.needsUpdate = true;
-      stubJoints.instanceMatrix.needsUpdate = true;
-    }
-  });
-
-  return (
-    <group>
-      <lineSegments ref={linesRef} geometry={lineGeo} material={lineMat} frustumCulled={false} />
-      <instancedMesh ref={keysRef} args={[getJointGeometry(), keyMat, FACE_KEY_SLOTS.length]} frustumCulled={false} />
-      <instancedMesh ref={stubBonesRef} args={[getBoneGeometry(), stubMat, POSE_FACE_PAIRS.length]} frustumCulled={false} />
-      <instancedMesh ref={stubJointsRef} args={[getJointGeometry(), stubMat, POSE_FACE_JOINTS.length]} frustumCulled={false} />
-    </group>
-  );
-}
-
-function HandRig({ slot, color, sampleRef }: { slot: 0 | 1; color: string; sampleRef: SampleRef }) {
-  const groupRef = useRef<THREE.Group>(null);
-  const bonesRef = useRef<THREE.InstancedMesh>(null);
-  const jointsRef = useRef<THREE.InstancedMesh>(null);
-  const palmRef = useRef<THREE.Mesh>(null);
-  const correction = useRef(new THREE.Vector3());
-
-  const mats = useMemo(
-    () => ({
-      bone: new THREE.MeshStandardMaterial({ color, metalness: 0.2, roughness: 0.4, emissive: color, emissiveIntensity: 0.12 }),
-      joint: new THREE.MeshStandardMaterial({
-        color: new THREE.Color(color).lerp(new THREE.Color("#ffffff"), 0.35),
-        metalness: 0.2, roughness: 0.32, emissive: color, emissiveIntensity: 0.1,
-      }),
-      palm: new THREE.MeshStandardMaterial({
-        color, transparent: true, opacity: 0.2, roughness: 0.8, metalness: 0, side: THREE.DoubleSide, depthWrite: false,
-      }),
-    }),
-    [color],
-  );
-  const palmGeo = useMemo(() => {
-    const g = new THREE.BufferGeometry();
-    g.setAttribute(
-      "position",
-      new THREE.BufferAttribute(new Float32Array(PALM_FAN.length * 3), 3).setUsage(THREE.DynamicDrawUsage),
-    );
-    g.setIndex(PALM_INDICES);
-    return g;
-  }, []);
-  useEffect(
-    () => () => { mats.bone.dispose(); mats.joint.dispose(); mats.palm.dispose(); palmGeo.dispose(); },
-    [mats, palmGeo],
-  );
-  useLayoutEffect(() => {
-    hideAll(bonesRef.current);
-    hideAll(jointsRef.current);
-  }, []);
-
-  useFrame(() => {
-    const group = groupRef.current, bones = bonesRef.current, joints = jointsRef.current, palm = palmRef.current;
-    if (!group || !bones || !joints || !palm) return;
-    const st = sampleRef.current;
-    const alpha = st.handAlpha[slot];
-    group.visible = alpha > 0.01;
-    if (!group.visible) return;
-    const pts = st.hands[slot];
-    const valid = st.handValid[slot];
-    const fading = alpha < 0.985;
-    mats.bone.transparent = fading;
-    mats.bone.opacity = alpha;
-    mats.joint.transparent = fading;
-    mats.joint.opacity = alpha;
-    mats.palm.opacity = alpha * 0.22;
-
-    correction.current.set(0, 0, 0);
-    const P = st.pose;
-    if (
-      P[11 * 4 + 3] >= THRESH && P[12 * 4 + 3] >= THRESH &&
-      P[23 * 4 + 3] >= THRESH && P[24 * 4 + 3] >= THRESH &&
-      valid[0]
-    ) {
-      const shoulderY = (P[11 * 4 + 1] + P[12 * 4 + 1]) / 2;
-      const hipY = (P[23 * 4 + 1] + P[24 * 4 + 1]) / 2;
-      const shoulderCenterX = (P[11 * 4] + P[12 * 4]) / 2;
-      const shoulderCenterZ = (P[11 * 4 + 2] + P[12 * 4 + 2]) / 2;
-      const hipCenterX = (P[23 * 4] + P[24 * 4]) / 2;
-      const hipCenterZ = (P[23 * 4 + 2] + P[24 * 4 + 2]) / 2;
-      const wristT = THREE.MathUtils.clamp(
-        (shoulderY - pts[1]) / Math.max(shoulderY - hipY, 1e-5),
-        0,
-        1,
-      );
-      const wristX = pts[0] - THREE.MathUtils.lerp(shoulderCenterX, hipCenterX, wristT);
-      const wristZ = pts[2] - THREE.MathUtils.lerp(shoulderCenterZ, hipCenterZ, wristT);
-      const directionLength = Math.hypot(wristX, wristZ);
-      const directionX = directionLength > 1e-5 ? wristX / directionLength : (slot === 0 ? -1 : 1);
-      const directionZ = directionLength > 1e-5 ? wristZ / directionLength : 0;
-      let requiredOffset = 0;
-      const shoulderWidth = Math.max(Math.hypot(
-        P[11 * 4] - P[12 * 4],
-        P[11 * 4 + 2] - P[12 * 4 + 2],
-      ) * 0.52, 0.12);
-      const hipWidth = Math.max(Math.abs(P[23 * 4] - P[24 * 4]) * 0.52, 0.1);
-
-      for (let joint = 0; joint < 21; joint++) {
-        if (!valid[joint]) continue;
-        const offset = joint * 3;
-        const t = THREE.MathUtils.clamp(
-          (shoulderY - pts[offset + 1]) / Math.max(shoulderY - hipY, 1e-5),
-          0,
-          1,
-        );
-        if (pts[offset + 1] > shoulderY + 0.08 || pts[offset + 1] < hipY - 0.08) continue;
-        const profile = t < 0.2
-          ? THREE.MathUtils.lerp(0.72, 1.16, t / 0.2)
-          : t < 0.6
-            ? THREE.MathUtils.lerp(1.16, 1.14, (t - 0.2) / 0.4)
-            : THREE.MathUtils.lerp(1.14, 1.04, (t - 0.6) / 0.4);
-        const radiusX = Math.max(THREE.MathUtils.lerp(shoulderWidth, hipWidth, t) * profile, 0.09);
-        const radiusZ = Math.max(radiusX * 0.62, 0.08);
-        const relativeX = pts[offset] - THREE.MathUtils.lerp(shoulderCenterX, hipCenterX, t);
-        const relativeZ = pts[offset + 2] - THREE.MathUtils.lerp(shoulderCenterZ, hipCenterZ, t);
-        const a = directionX * directionX / (radiusX * radiusX) +
-          directionZ * directionZ / (radiusZ * radiusZ);
-        const b = 2 * (
-          relativeX * directionX / (radiusX * radiusX) +
-          relativeZ * directionZ / (radiusZ * radiusZ)
-        );
-        const c = relativeX * relativeX / (radiusX * radiusX) +
-          relativeZ * relativeZ / (radiusZ * radiusZ) - 1;
-        const discriminant = b * b - 4 * a * c;
-        if (c < 0 && discriminant >= 0 && a > 0) {
-          requiredOffset = Math.max(requiredOffset, (-b + Math.sqrt(discriminant)) / (2 * a));
-        }
-      }
-
-      if (requiredOffset > 0) {
-        const clearance = requiredOffset + 0.025;
-        correction.current.set(directionX * clearance, 0, directionZ * clearance);
-      }
-    }
-    group.position.copy(correction.current);
-
-    for (let i = 0; i < HAND_CONN.length; i++) {
-      const c = HAND_CONN[i];
-      if (valid[c[0]] && valid[c[1]]) placeBone(bones, i, pts, c[0] * 3, pts, c[1] * 3, HAND_BONE_RADIUS[i]);
-      else bones.setMatrixAt(i, _zero);
-    }
-    bones.instanceMatrix.needsUpdate = true;
-    for (let j = 0; j < 21; j++) {
-      if (valid[j]) placeJoint(joints, j, pts, j * 3, HAND_JOINT_RADIUS[j]);
-      else joints.setMatrixAt(j, _zero);
-    }
-    joints.instanceMatrix.needsUpdate = true;
-
-    palm.visible = valid[0] === 1;
-    if (palm.visible) {
-      const pos = palmGeo.getAttribute("position") as THREE.BufferAttribute;
-      for (let k = 0; k < PALM_FAN.length; k++) {
-        const j = valid[PALM_FAN[k]] ? PALM_FAN[k] : 0;
-        pos.setXYZ(k, pts[j * 3], pts[j * 3 + 1], pts[j * 3 + 2]);
-      }
-      pos.needsUpdate = true;
-      palmGeo.computeVertexNormals();
-    }
-  });
-
-  return (
-    <group ref={groupRef} renderOrder={2}>
-      <instancedMesh ref={bonesRef} args={[getBoneGeometry(), mats.bone, HAND_CONN.length]} frustumCulled={false} renderOrder={2} />
-      <instancedMesh ref={jointsRef} args={[getJointGeometry(), mats.joint, 21]} frustumCulled={false} renderOrder={2} />
-      <mesh ref={palmRef} geometry={palmGeo} material={mats.palm} frustumCulled={false} renderOrder={1} />
-    </group>
-  );
-}
 
 /* ==========================================================================
  * 7. 3D: PLAYBACK, CAMERA, FLOOR, SCENE
@@ -14830,7 +13378,7 @@ function computeFraming(b: Bounds, aspect: number): { center: THREE.Vector3; dis
   const halfW = Math.max((b.maxX - b.minX) / 2, 0.3);
   const halfH = Math.max((b.maxY - b.minY) / 2, 0.3);
   const halfD = Math.max((b.maxZ - b.minZ) / 2, 0);
-  const t = Math.tan(THREE.MathUtils.degToRad(FOV) / 2);
+  const t = Math.tan(THREE.MathUtils.degToRad(SIMULATION_FOV) / 2);
   const distance =
     Math.max((halfH * 1.08) / t, (halfW * 1.08) / (t * Math.max(aspect, 0.2))) + halfD + 0.15;
   return { center, distance };
@@ -14839,10 +13387,13 @@ function computeFraming(b: Bounds, aspect: number): { center: THREE.Vector3; dis
 type OrbitControlsHandle = React.ElementRef<typeof OrbitControls>;
 
 function CameraRig({
-  bounds, command, horizontalOnly, sampleRef, viewResetToken,
+  bounds, command, defaultCameraDistanceScale, defaultCameraVerticalOffset,
+  horizontalOnly, sampleRef, viewResetToken,
 }: {
   bounds: Bounds;
   command: ViewCommand;
+  defaultCameraDistanceScale: number;
+  defaultCameraVerticalOffset: number;
   horizontalOnly: boolean;
   sampleRef: SampleRef;
   viewResetToken: number;
@@ -14863,17 +13414,29 @@ function CameraRig({
   const framingRef = useRef(framing);
   framingRef.current = framing;
 
-  const placeFront = useCallback(() => {
+  const getDefaultView = useCallback(() => {
     const { center, distance } = framingRef.current;
-    camera.position.copy(center).addScaledVector(VIEW_DIRS.front, distance);
+    const viewDistance = distance * defaultCameraDistanceScale;
+    const target = center.clone();
+    target.y +=
+      defaultCameraVerticalOffset *
+      2 *
+      viewDistance *
+      Math.tan(THREE.MathUtils.degToRad(SIMULATION_FOV) / 2);
+    return { target, distance: viewDistance };
+  }, [defaultCameraDistanceScale, defaultCameraVerticalOffset]);
+
+  const placeFront = useCallback(() => {
+    const { target, distance } = getDefaultView();
+    camera.position.copy(target).addScaledVector(VIEW_DIRS.front, distance);
     const ctl = controlsRef.current;
     if (ctl) {
-      ctl.target.copy(center);
+      ctl.target.copy(target);
       ctl.update();
     } else {
-      camera.lookAt(center);
+      camera.lookAt(target);
     }
-  }, [camera]);
+  }, [camera, getDefaultView]);
 
   useLayoutEffect(() => {
     interacted.current = false;
@@ -14901,10 +13464,10 @@ function CameraRig({
 
   useEffect(() => {
     if (command.nonce === 0) return;
-    const { center, distance: base } = framingRef.current;
+    const { target, distance: base } = getDefaultView();
     const ctl = controlsRef.current;
-    const target = ctl ? ctl.target.clone() : center.clone();
-    const offset = camera.position.clone().sub(target);
+    const currentTarget = ctl ? ctl.target.clone() : target.clone();
+    const offset = camera.position.clone().sub(currentTarget);
     const current = offset.length() || base;
     switch (command.kind) {
       case "front":
@@ -14912,8 +13475,8 @@ function CameraRig({
       case "angle":
         focusRef.current = null;
         goal.current = {
-          pos: center.clone().addScaledVector(VIEW_DIRS[command.kind], current),
-          target: center.clone(),
+          pos: target.clone().addScaledVector(VIEW_DIRS[command.kind], current),
+          target: target.clone(),
         };
         break;
       case "reset":
@@ -14921,12 +13484,12 @@ function CameraRig({
         focusRef.current = null;
         focusInit.current = false;
         goal.current = null;
-        camera.position.copy(center).addScaledVector(VIEW_DIRS.front, base);
+        camera.position.copy(target).addScaledVector(VIEW_DIRS.front, base);
         if (ctl) {
-          ctl.target.copy(center);
+          ctl.target.copy(target);
           ctl.update();
         } else {
-          camera.lookAt(center);
+          camera.lookAt(target);
         }
         break;
       case "focusHands":
@@ -14940,25 +13503,25 @@ function CameraRig({
         focusInit.current = false;
         break;
     }
-  }, [command, camera]);
+  }, [command, camera, getDefaultView]);
 
   useEffect(() => {
     if (lastViewResetToken.current === viewResetToken) return;
     lastViewResetToken.current = viewResetToken;
-    const { center, distance } = framingRef.current;
+    const { target, distance } = getDefaultView();
     interacted.current = false;
     focusRef.current = null;
     focusInit.current = false;
     goal.current = null;
-    camera.position.copy(center).addScaledVector(VIEW_DIRS.front, distance);
+    camera.position.copy(target).addScaledVector(VIEW_DIRS.front, distance);
     const controls = controlsRef.current;
     if (controls) {
-      controls.target.copy(center);
+      controls.target.copy(target);
       controls.update();
     } else {
-      camera.lookAt(center);
+      camera.lookAt(target);
     }
-  }, [viewResetToken, camera]);
+  }, [viewResetToken, camera, getDefaultView]);
 
   useFrame((_, delta) => {
     const ctl = controlsRef.current;
@@ -15044,42 +13607,28 @@ function CameraRig({
   );
 }
 
-interface ViewerProps {
+function SceneContent({
+  seq, fps, playheadRef, playbackRef, command, onFrame,
+  loop, onComplete, restartToken, defaultCameraDistanceScale, defaultCameraVerticalOffset,
+  horizontalOnly, viewResetToken,
+}: {
   seq: SolvedSequence;
   fps: number;
-  hasPoseData: boolean;
   playheadRef: React.MutableRefObject<number>;
   playbackRef: React.MutableRefObject<PlaybackState>;
   command: ViewCommand;
   onFrame: (frame: number) => void;
-  onFail: () => void;
   loop: boolean;
   onComplete?: () => void;
   restartToken: number;
+  defaultCameraDistanceScale: number;
+  defaultCameraVerticalOffset: number;
   horizontalOnly: boolean;
   viewResetToken: number;
-}
-
-function SceneContent({
-  seq, fps, hasPoseData, playheadRef, playbackRef, command, onFrame,
-  loop, onComplete, restartToken, horizontalOnly, viewResetToken,
-}: Omit<ViewerProps, "onFail">) {
+}) {
   const sampleRef = useMemo<SampleRef>(() => ({ current: createSampleState() }), [seq]);
   return (
     <>
-      <color attach="background" args={["#2B3D5B"]} />
-      <hemisphereLight args={["#eaf0ff", "#182642", 0.82]} />
-      <directionalLight
-        position={[3, 5, 4]}
-        intensity={1.45}
-        color="#f5f4f1"
-        castShadow
-        shadow-mapSize={[2048, 2048]}
-        shadow-bias={-0.0004}
-        shadow-normalBias={0.025}
-      />
-      <directionalLight position={[-4, 3, -4]} intensity={0.72} color="#9cbcff" />
-      <directionalLight position={[3, 2, -2]} intensity={0.26} color="#55DDE0" />
       <PlaybackDriver
         seq={seq} sampleRef={sampleRef} playheadRef={playheadRef}
         playbackRef={playbackRef} fps={fps} onFrame={onFrame} loop={loop}
@@ -15088,6 +13637,8 @@ function SceneContent({
       <CameraRig
         bounds={seq.bounds}
         command={command}
+        defaultCameraDistanceScale={defaultCameraDistanceScale}
+        defaultCameraVerticalOffset={defaultCameraVerticalOffset}
         horizontalOnly={horizontalOnly}
         sampleRef={sampleRef}
         viewResetToken={viewResetToken}
@@ -15095,7 +13646,7 @@ function SceneContent({
       <RoundAlpanaStage seq={seq} />
       <TorsoRig sampleRef={sampleRef} playbackRef={playbackRef} />
       <HeadRig sampleRef={sampleRef} />
-      <BodyRig sampleRef={sampleRef} pairs={hasPoseData ? RIG_POSE_PAIRS : RIG_GUIDE_PAIRS} />
+      <ArmRig sampleRef={sampleRef} />
       <DhutiRig sampleRef={sampleRef} />
       <FaceRig sampleRef={sampleRef} />
       <HandRig slot={0} color={COLOR.handLeft} sampleRef={sampleRef} />
@@ -15103,49 +13654,6 @@ function SceneContent({
     </>
   );
 }
-
-class ViewerBoundary extends Component<
-  { children: ReactNode; onError: () => void },
-  { failed: boolean }
-> {
-  state = { failed: false };
-  static getDerivedStateFromError() {
-    return { failed: true };
-  }
-  componentDidCatch() {
-    this.props.onError();
-  }
-  render() {
-    return this.state.failed ? null : this.props.children;
-  }
-}
-
-const Skeleton3DViewer = React.memo(function Skeleton3DViewer({ onFail, ...scene }: ViewerProps) {
-  return (
-    <div className="absolute inset-0">
-      <ViewerBoundary onError={onFail}>
-        <Canvas
-          dpr={[1, 2]}
-          shadows="percentage"
-          gl={{
-            antialias: true,
-            alpha: true,
-            powerPreference: "high-performance",
-            toneMapping: THREE.ACESFilmicToneMapping,
-          }}
-          camera={{ fov: FOV, near: 0.05, far: 200, position: [0, 0, 6] }}
-          onCreated={({ gl }) => {
-            gl.toneMappingExposure = 1.05;
-            gl.shadowMap.type = THREE.PCFShadowMap;
-            gl.domElement.addEventListener("webglcontextlost", onFail, { once: true });
-          }}
-        >
-          <SceneContent {...scene} />
-        </Canvas>
-      </ViewerBoundary>
-    </div>
-  );
-});
 
 function detectWebGL(): boolean {
   try {
@@ -15165,9 +13673,10 @@ function detectWebGL(): boolean {
 interface LandmarkSimulationProps {
   frames?: number[][][];
   pose?: PosePoint[][];
-  faceMesh?: number[][][];
-  faceMeshError?: string;
+  faceAvatar?: number[][][];
   fps?: number;
+  defaultCameraDistanceScale?: number;
+  defaultCameraVerticalOffset?: number;
   title?: string;
   minimal?: boolean;
   loop?: boolean;
@@ -15191,9 +13700,10 @@ const VIEW_BUTTONS: { label: string; kind: ViewKind }[] = [
 export function LandmarkSimulation({
   frames,
   pose,
-  faceMesh,
-  faceMeshError,
+  faceAvatar,
   fps = 15,
+  defaultCameraDistanceScale = 1,
+  defaultCameraVerticalOffset = 0,
   title,
   minimal = false,
   loop = true,
@@ -15222,31 +13732,12 @@ export function LandmarkSimulation({
     () => (pose?.length ? getPoseAlignments(pose) : undefined),
     [pose],
   );
-  const alignedFaceFrames = useMemo(
-    () =>
-      faceMesh?.map((faceFrame, index) => {
-        const targetPose = pose?.[index] ?? BODY_GUIDE;
-        const aligned = alignFaceMeshToPose(faceFrame, targetPose);
-        const alignment = poseAlignments?.[index];
-        return alignment
-          ? aligned.map((point) => stabilizePoint([point.x, point.y], alignment))
-          : aligned;
-      }),
-    [faceMesh, pose, poseAlignments],
-  );
   const seq = useMemo(
     () =>
       frames?.length
-        ? solveSequence(
-            frames,
-            pose,
-            poseAlignments,
-            alignedFaceFrames,
-            faceMesh,
-            Boolean(faceMesh?.some((frame) => frame.length > 0)),
-          )
+        ? solveSequence(frames, pose, poseAlignments, faceAvatar)
         : null,
-    [frames, pose, poseAlignments, alignedFaceFrames, faceMesh],
+    [frames, pose, poseAlignments, faceAvatar],
   );
 
   const mode: "pending" | "3d" | "unavailable" =
@@ -15256,7 +13747,7 @@ export function LandmarkSimulation({
   const currentHandsCount = currentFrameData
     ? [0, 21].filter((offset) => !isMissingHand(currentFrameData, offset)).length
     : 0;
-  const currentFaceMeshCount = alignedFaceFrames?.[currentFrame]?.length ?? 0;
+  const currentFaceAvatarCount = faceAvatar?.[currentFrame]?.length ?? 0;
   const displayTitle = title?.replace(/^.*onnx_models[\\/]\d+[:/\\]?/i, "") ?? title;
 
   useEffect(() => {
@@ -15329,22 +13820,15 @@ export function LandmarkSimulation({
         ) : (
           <span className="shrink-0 text-[#818CF8]">Body guide</span>
         )}
-        {currentFaceMeshCount > 0 ? (
+        {currentFaceAvatarCount > 0 ? (
           <>
             <span className="shrink-0" aria-hidden="true">|</span>
-            <span className="shrink-0 text-sky-300">Face: {currentFaceMeshCount}</span>
+            <span className="shrink-0 text-sky-300">Face: {currentFaceAvatarCount}</span>
           </>
-        ) : faceMesh ? (
+        ) : faceAvatar ? (
           <>
             <span className="shrink-0" aria-hidden="true">|</span>
             <span className="shrink-0 text-text-muted">No face</span>
-          </>
-        ) : faceMeshError ? (
-          <>
-            <span className="shrink-0" aria-hidden="true">|</span>
-            <span className="shrink-0 text-status-unknown" title={faceMeshError}>
-              Face mesh unavailable
-            </span>
           </>
         ) : null}
         {displayTitle && (
@@ -15361,21 +13845,23 @@ export function LandmarkSimulation({
         ? "absolute inset-0 flex items-center justify-center canvas-grid-bg overflow-hidden"
         : "relative aspect-video w-full bg-background flex items-center justify-center canvas-grid-bg overflow-hidden"}>
         {mode === "3d" && seq && (
-          <Skeleton3DViewer
-            seq={seq}
-            fps={fps}
-            hasPoseData={Boolean(pose?.length)}
-            playheadRef={playheadRef}
-            playbackRef={playbackRef}
-            command={viewCommand}
-            onFrame={handleFrame}
-            onFail={handleFail}
-            loop={loop}
-            onComplete={onComplete}
-            restartToken={restartToken}
-            horizontalOnly={horizontalOnly}
-            viewResetToken={viewResetToken}
-          />
+          <SimulationRoom onFail={handleFail}>
+            <SceneContent
+              seq={seq}
+              fps={fps}
+              defaultCameraDistanceScale={defaultCameraDistanceScale}
+              defaultCameraVerticalOffset={defaultCameraVerticalOffset}
+              playheadRef={playheadRef}
+              playbackRef={playbackRef}
+              command={viewCommand}
+              onFrame={handleFrame}
+              loop={loop}
+              onComplete={onComplete}
+              restartToken={restartToken}
+              horizontalOnly={horizontalOnly}
+              viewResetToken={viewResetToken}
+            />
+          </SimulationRoom>
         )}
         {mode === "unavailable" && (
           <div className="px-6 text-center text-[11px] text-text-muted">
@@ -15452,12 +13938,981 @@ export function LandmarkSimulation({
 
 ---
 
+# FILE: `frontend\src\components\simulation\RigUtils.ts`
+
+```typescript
+import * as THREE from "three";
+
+const matrix = new THREE.Matrix4();
+const quaternion = new THREE.Quaternion();
+const position = new THREE.Vector3();
+const scale = new THREE.Vector3();
+const direction = new THREE.Vector3();
+const up = new THREE.Vector3(0, 1, 0);
+
+export const ZERO_MATRIX = new THREE.Matrix4().makeScale(0, 0, 0);
+
+let boneGeometry: THREE.CylinderGeometry | null = null;
+let jointGeometry: THREE.SphereGeometry | null = null;
+let headGeometry: THREE.SphereGeometry | null = null;
+
+export const getBoneGeometry = () =>
+  (boneGeometry ??= new THREE.CylinderGeometry(0.78, 1, 1, 14, 1, false));
+export const getJointGeometry = () =>
+  (jointGeometry ??= new THREE.SphereGeometry(1, 18, 14));
+export const getHeadGeometry = () =>
+  (headGeometry ??= new THREE.SphereGeometry(1, 36, 26));
+
+export function placeBone(
+  mesh: THREE.InstancedMesh,
+  index: number,
+  start: ArrayLike<number>,
+  startOffset: number,
+  end: ArrayLike<number>,
+  endOffset: number,
+  radius: number,
+): void {
+  direction.set(
+    end[endOffset] - start[startOffset],
+    end[endOffset + 1] - start[startOffset + 1],
+    end[endOffset + 2] - start[startOffset + 2],
+  );
+  const length = direction.length();
+  if (length < 1e-5) {
+    mesh.setMatrixAt(index, ZERO_MATRIX);
+    return;
+  }
+  direction.multiplyScalar(1 / length);
+  quaternion.setFromUnitVectors(up, direction);
+  position.set(
+    (start[startOffset] + end[endOffset]) / 2,
+    (start[startOffset + 1] + end[endOffset + 1]) / 2,
+    (start[startOffset + 2] + end[endOffset + 2]) / 2,
+  );
+  scale.set(radius, length, radius);
+  matrix.compose(position, quaternion, scale);
+  mesh.setMatrixAt(index, matrix);
+}
+
+export function placeJoint(
+  mesh: THREE.InstancedMesh,
+  index: number,
+  points: ArrayLike<number>,
+  offset: number,
+  radius: number,
+): void {
+  position.set(points[offset], points[offset + 1], points[offset + 2]);
+  quaternion.identity();
+  scale.setScalar(radius);
+  matrix.compose(position, quaternion, scale);
+  mesh.setMatrixAt(index, matrix);
+}
+
+export function hideAll(mesh: THREE.InstancedMesh | null): void {
+  if (!mesh) return;
+  for (let index = 0; index < mesh.count; index++) {
+    mesh.setMatrixAt(index, ZERO_MATRIX);
+  }
+  mesh.instanceMatrix.needsUpdate = true;
+}
+```
+
+---
+
 # FILE: `frontend\src\components\simulation\simulationConstants.ts`
 
 ```typescript
 export const THRESH = 0.01;
 export const TORSO_WORLD = 1.8;
 export const DHUTI_DROP = TORSO_WORLD * 1.25;
+export const TORSO_SHOULDER_HALF_WIDTH_RATIO = 0.29;
+export const TORSO_HIP_HALF_WIDTH_RATIO = 0.23;
+export const DHUTI_HALF_WIDTH_RATIO = 0.24;
+export const HEAD_WIDTH_RATIO = 0.34;
+export const TORSO_WIDTH_SCALE = 1.1;
+```
+
+---
+
+# FILE: `frontend\src\components\simulation\SimulationRoom.tsx`
+
+```tsx
+"use client";
+
+import "@/lib/threeSetup";
+import { Component, useMemo, type ReactNode } from "react";
+import * as THREE from "three";
+import { Canvas } from "@react-three/fiber";
+
+export const SIMULATION_FOV = 38;
+
+/**
+ * World-space Y of your EXISTING floor / platform top (where the avatar's feet are).
+ * If plants or the spotlight still float or sink, nudge this: lower = everything moves down.
+ */
+export const ROOM_FLOOR_Y = -4.2;
+
+/**
+ * Sconce placement. They are NOT attached to any wall I draw: put them on your original wall.
+ *  - SCONCE_RADIUS: distance from the room centre to your original wall (smaller = closer to camera)
+ *  - SCONCE_ANGLE:  how far left/right of centre (radians)
+ *  - SCONCE_Y:      height above the floor
+ */
+const SCONCE_RADIUS = 7.65;
+const SCONCE_ANGLE = 0.72;
+const SCONCE_Y = 6.05;
+
+/** Spotlight: height of the lamp above the floor, and cone radius where it meets the floor. */
+const SPOT_HEIGHT = 8.0;
+const SPOT_FLOOR_RADIUS = 3.2;
+
+/** Plant size multiplier. */
+const PLANT_SCALE = 1.7;
+
+const WARM = "#ffcf94";
+const GOLD = "#b8892f";
+
+/* ---------- helpers ---------- */
+
+function useGlowTexture() {
+  return useMemo(() => {
+    if (typeof document === "undefined") return null;
+    const c = document.createElement("canvas");
+    c.width = c.height = 256;
+    const g = c.getContext("2d")!;
+    const grad = g.createRadialGradient(128, 128, 0, 128, 128, 128);
+    grad.addColorStop(0, "rgba(255,255,255,1)");
+    grad.addColorStop(0.35, "rgba(255,255,255,0.35)");
+    grad.addColorStop(1, "rgba(255,255,255,0)");
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 256, 256);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  }, []);
+}
+
+/** A curved, tapered leaf blade with a centre fold and a dark-base to light-tip gradient. */
+function makeLeafGeometry(length: number, width: number, bend: number) {
+  const g = new THREE.PlaneGeometry(1, 1, 6, 18);
+  const pos = g.attributes.position;
+  const colors = new Float32Array(pos.count * 3);
+  const R = length / bend;
+  const base = new THREE.Color("#1f7a33");
+  const tip = new THREE.Color("#6fcf5f");
+  const c = new THREE.Color();
+  for (let i = 0; i < pos.count; i++) {
+    const u = pos.getX(i);
+    const t = Math.min(Math.max(pos.getY(i) + 0.5, 0), 1);
+    const profile = Math.pow(Math.sin(Math.PI * Math.pow(t, 0.7)), 0.85);
+    const x = u * 2 * width * profile;
+    const a = t * bend;
+    const y = R * Math.sin(a);
+    // tip arcs away (-z) so the +z face is the lit top side; edges lift for a V-shaped fold
+    const z = -R * (1 - Math.cos(a)) + Math.abs(x) * 0.35;
+    pos.setXYZ(i, x, y, z);
+    c.copy(base).lerp(tip, t);
+    // slightly lighter midrib
+    c.offsetHSL(0, 0, Math.max(0, 0.05 - Math.abs(u) * 0.2));
+    colors[i * 3] = c.r;
+    colors[i * 3 + 1] = c.g;
+    colors[i * 3 + 2] = c.b;
+  }
+  g.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  g.computeVertexNormals();
+  return g;
+}
+
+/* ---------- room pieces ---------- */
+
+function Sconce({ side }: { side: -1 | 1 }) {
+  const y = ROOM_FLOOR_Y + SCONCE_Y;
+  const th = Math.PI + side * SCONCE_ANGLE;
+  const x = Math.sin(th) * SCONCE_RADIUS;
+  const z = Math.cos(th) * SCONCE_RADIUS;
+  const glow = useGlowTexture();
+  return (
+    <group position={[x, y, z]} rotation={[0, th, 0]}>
+      <mesh>
+        <cylinderGeometry args={[0.16, 0.16, 0.5, 24]} />
+        <meshStandardMaterial color="#1c2230" metalness={0.8} roughness={0.35} />
+      </mesh>
+      {/* warm light slits top and bottom */}
+      <mesh position={[0, 0.26, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[0.15, 24]} />
+        <meshBasicMaterial color={WARM} toneMapped={false} />
+      </mesh>
+      <mesh position={[0, -0.26, 0]} rotation={[Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[0.15, 24]} />
+        <meshBasicMaterial color={WARM} toneMapped={false} />
+      </mesh>
+      {/* very subtle glow */}
+      {glow && (
+        <>
+          <sprite position={[0, 0.7, 0.1]} scale={[1.0, 1.6, 1]}>
+            <spriteMaterial map={glow} color={WARM} transparent opacity={0.12} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+          </sprite>
+          <sprite position={[0, -0.7, 0.1]} scale={[1.0, 1.6, 1]}>
+            <spriteMaterial map={glow} color={WARM} transparent opacity={0.1} blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false} />
+          </sprite>
+        </>
+      )}
+      <pointLight position={[0, 0.4, 0.5]} color={WARM} intensity={1.2} distance={4} decay={2} />
+      <pointLight position={[0, -0.4, 0.5]} color={WARM} intensity={0.6} distance={3} decay={2} />
+    </group>
+  );
+}
+
+function Plant({ position, seed = 0 }: { position: [number, number, number]; seed?: number }) {
+  const y = ROOM_FLOOR_Y;
+
+  // Smooth egg-shaped ceramic tub (spline profile), with a short hidden skirt under the floor line.
+  const potGeo = useMemo(() => {
+    // taller, slightly tapered egg: height 1.0, widest ~0.4 radius
+    const curve = new THREE.SplineCurve([
+      new THREE.Vector2(0.0, 0.0),
+      new THREE.Vector2(0.25, 0.0),
+      new THREE.Vector2(0.31, 0.1),
+      new THREE.Vector2(0.37, 0.35),
+      new THREE.Vector2(0.4, 0.6),
+      new THREE.Vector2(0.38, 0.85),
+      new THREE.Vector2(0.34, 1.0),
+    ]);
+    const profile = curve.getPoints(40);
+    // hidden skirt below the floor line so the tub always reaches the ground
+    profile.unshift(new THREE.Vector2(0.25, -0.4), new THREE.Vector2(0.0, -0.4));
+    // inner lip + soil level
+    profile.push(new THREE.Vector2(0.31, 1.0), new THREE.Vector2(0.3, 0.94), new THREE.Vector2(0.0, 0.94));
+    const geo = new THREE.LatheGeometry(profile, 64);
+    geo.computeVertexNormals();
+    return geo;
+  }, []);
+
+  const leafSet = useMemo(() => {
+    const rand = (n: number) => {
+      const s = Math.sin((n + seed) * 127.1) * 43758.5453;
+      return s - Math.floor(s);
+    };
+    const n = 13;
+    return Array.from({ length: n }, (_, i) => {
+      const length = 0.95 + rand(i + 40) * 0.5;
+      return {
+        yaw: (i / n) * Math.PI * 2 + rand(i) * 0.5,
+        tilt: 0.12 + rand(i + 20) * 0.6,
+        geo: makeLeafGeometry(length, 0.2 + rand(i + 60) * 0.06, 0.8 + rand(i + 80) * 0.7),
+      };
+    });
+  }, [seed]);
+
+  return (
+    <group position={[position[0], y, position[2]]} scale={PLANT_SCALE}>
+      <mesh geometry={potGeo} castShadow receiveShadow>
+        <meshPhysicalMaterial color="#f1eee7" roughness={0.42} metalness={0} clearcoat={0.35} clearcoatRoughness={0.5} />
+      </mesh>
+      {/* gold base band */}
+      <mesh position={[0, 0.035, 0]}>
+        <cylinderGeometry args={[0.255, 0.27, 0.07, 64]} />
+        <meshStandardMaterial color={GOLD} metalness={0.85} roughness={0.35} />
+      </mesh>
+      {/* soil */}
+      <mesh position={[0, 0.945, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+        <circleGeometry args={[0.31, 48]} />
+        <meshStandardMaterial color="#2a1f18" roughness={1} />
+      </mesh>
+
+      {/* leaves */}
+      <group position={[0, 0.94, 0]}>
+        {leafSet.map((l, i) => (
+          <group key={i} rotation={[0, l.yaw, 0]}>
+            <group rotation={[-l.tilt, 0, 0]}>
+              <mesh geometry={l.geo} castShadow>
+                <meshStandardMaterial
+                  vertexColors
+                  side={THREE.DoubleSide}
+                  roughness={0.5}
+                  metalness={0}
+                  emissive="#1d6a2c"
+                  emissiveIntensity={0.55}
+                />
+              </mesh>
+            </group>
+          </group>
+        ))}
+      </group>
+    </group>
+  );
+}
+
+/** Soft light beam: fades toward its edges and toward the floor, so it has no hard outline. */
+function SpotBeam({ top, bottom, topRadius, bottomRadius }: { top: number; bottom: number; topRadius: number; bottomRadius: number }) {
+  const uniforms = useMemo(
+    () => ({ uColor: { value: new THREE.Color("#cfdcff") }, uStrength: { value: 0.4 } }),
+    []
+  );
+  const height = top - bottom;
+  return (
+    <mesh position={[0, bottom + height / 2, 0]} renderOrder={1}>
+      <cylinderGeometry args={[topRadius, bottomRadius, height, 64, 1, true]} />
+      <shaderMaterial
+        uniforms={uniforms}
+        transparent
+        depthWrite={false}
+        side={THREE.DoubleSide}
+        blending={THREE.AdditiveBlending}
+        toneMapped={false}
+        vertexShader={`
+          varying vec3 vN;
+          varying vec3 vV;
+          varying float vH;
+          void main() {
+            vN = normalize(normalMatrix * normal);
+            vec4 mv = modelViewMatrix * vec4(position, 1.0);
+            vV = normalize(-mv.xyz);
+            vH = uv.y; // 1 at the lamp, 0 at the floor
+            gl_Position = projectionMatrix * mv;
+          }
+        `}
+        fragmentShader={`
+          uniform vec3 uColor;
+          uniform float uStrength;
+          varying vec3 vN;
+          varying vec3 vV;
+          varying float vH;
+          void main() {
+            float facing = abs(dot(normalize(vN), normalize(vV)));
+            float edge = pow(facing, 1.5);                 // soft sides
+            float down = smoothstep(0.0, 0.3, vH);         // fades out just above the floor
+            float up = 0.5 + 0.5 * smoothstep(0.3, 1.0, vH); // brighter near the lamp
+            float a = edge * down * up * uStrength;
+            gl_FragColor = vec4(uColor * a, a);
+          }
+        `}
+      />
+    </mesh>
+  );
+}
+
+/** Spotlight above the avatar. */
+function Spotlight() {
+  const y = ROOM_FLOOR_Y;
+  const top = y + SPOT_HEIGHT;
+  return (
+    <group>
+      <spotLight
+        position={[0, top, 1.2]}
+        angle={0.4}
+        penumbra={1}
+        intensity={90}
+        distance={16}
+        decay={1.6}
+        color="#dfe8ff"
+        castShadow
+        shadow-mapSize={[2048, 2048]}
+        shadow-bias={-0.0003}
+        shadow-normalBias={0.02}
+      />
+      <SpotBeam top={top} bottom={y - 0.2} topRadius={0.3} bottomRadius={SPOT_FLOOR_RADIUS} />
+    </group>
+  );
+}
+
+function Room() {
+  return (
+    <group>
+      <Spotlight />
+      <Sconce side={-1} />
+      <Sconce side={1} />
+      <Plant position={[-4.3, 0, -2.8]} seed={1} />
+      <Plant position={[4.3, 0, -2.8]} seed={7} />
+    </group>
+  );
+}
+
+/* ---------- canvas wrapper ---------- */
+
+interface SimulationRoomProps {
+  children: ReactNode;
+  onFail: () => void;
+}
+
+class RoomErrorBoundary extends Component<
+  { children: ReactNode; onError: () => void },
+  { failed: boolean }
+> {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  componentDidCatch() {
+    this.props.onError();
+  }
+
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
+
+export function SimulationRoom({ children, onFail }: SimulationRoomProps) {
+  return (
+    <div className="absolute inset-0">
+      <RoomErrorBoundary onError={onFail}>
+        <Canvas
+          dpr={[1, 2]}
+          shadows="percentage"
+          gl={{
+            antialias: true,
+            alpha: true,
+            powerPreference: "high-performance",
+            toneMapping: THREE.ACESFilmicToneMapping,
+          }}
+          camera={{ fov: SIMULATION_FOV, near: 0.05, far: 200, position: [0, 0, 6] }}
+          onCreated={({ gl }) => {
+            gl.toneMappingExposure = 1.05;
+            gl.shadowMap.type = THREE.PCFShadowMap;
+            gl.domElement.addEventListener("webglcontextlost", onFail, { once: true });
+          }}
+        >
+          <color attach="background" args={["#1b2740"]} />
+          <fog attach="fog" args={["#1b2740", 12, 26]} />
+
+          <hemisphereLight args={["#eaf0ff", "#182642", 0.7]} />
+          <directionalLight
+            position={[3, 5, 4]}
+            intensity={1.2}
+            color="#f5f4f1"
+            castShadow
+            shadow-mapSize={[2048, 2048]}
+            shadow-bias={-0.0004}
+            shadow-normalBias={0.025}
+          />
+          <directionalLight position={[-4, 3, -4]} intensity={0.6} color="#9cbcff" />
+          <directionalLight position={[3, 2, -2]} intensity={0.26} color="#55DDE0" />
+
+          <Room />
+          {children}
+        </Canvas>
+      </RoomErrorBoundary>
+    </div>
+  );
+}
+```
+
+---
+
+# FILE: `frontend\src\components\simulation\TorsoRig.tsx`
+
+```tsx
+"use client";
+
+import { useEffect, useMemo, useRef } from "react";
+import * as THREE from "three";
+import { useFrame } from "@react-three/fiber";
+import type { SampleRef } from "./HeadFaceRig";
+import { THRESH, TORSO_WORLD } from "./simulationConstants";
+
+// ============================================================
+// DESIGN CONTROLS
+// ============================================================
+
+export const DEFAULT_TOP_Y_OFFSET = 0.12;
+export const DEFAULT_TOP_WIDTH_SCALE = 0.68;
+export const DEFAULT_BOTTOM_WIDTH_SCALE = 0.70;
+
+const RINGS = 32;
+const SEGMENTS = 48;
+const MAX_TORSO_LEAN = THREE.MathUtils.degToRad(6);
+const ABS_BANDS = 4;
+
+// ORIGINAL PALETTE: warm ivory ceramic + charcoal + amber accents
+const COLORS = {
+  ivory: new THREE.Color("#EDE6DA"),
+  ivoryDark: new THREE.Color("#BDB3A2"),
+  charcoal: new THREE.Color("#2A2A2E"),
+  graphite: new THREE.Color("#45454D"),
+  amber: new THREE.Color("#FF9F1C"),
+};
+
+const TORSO_INDICES = (() => {
+  const indices: number[] = [];
+
+  for (let r = 0; r < RINGS - 1; r++) {
+    const r0 = r * SEGMENTS;
+    const r1 = (r + 1) * SEGMENTS;
+
+    for (let s = 0; s < SEGMENTS; s++) {
+      const next = (s + 1) % SEGMENTS;
+
+      indices.push(r0 + s, r1 + s, r1 + next);
+      indices.push(r0 + s, r1 + next, r0 + next);
+    }
+  }
+
+  const bottomCenter = RINGS * SEGMENTS;
+  const bottomRing = (RINGS - 1) * SEGMENTS;
+
+  for (let s = 0; s < SEGMENTS; s++) {
+    const next = (s + 1) % SEGMENTS;
+    indices.push(bottomCenter, bottomRing + s, bottomRing + next);
+  }
+
+  return indices;
+})();
+
+interface PlaybackRef {
+  current: { playing: boolean };
+}
+
+interface TorsoRigProps {
+  sampleRef: SampleRef;
+  playbackRef: PlaybackRef;
+  topYOffset?: number;
+  topWidth?: number;
+  bottomWidth?: number;
+}
+
+export function TorsoRig({
+  sampleRef,
+  playbackRef,
+  topYOffset = DEFAULT_TOP_Y_OFFSET,
+  topWidth = DEFAULT_TOP_WIDTH_SCALE,
+  bottomWidth = DEFAULT_BOTTOM_WIDTH_SCALE,
+}: TorsoRigProps) {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const reactorRef = useRef<THREE.Group>(null);
+  const idleTime = useRef(0);
+
+  // ============================================================
+  // DYNAMIC TORSO GEOMETRY
+  // ============================================================
+
+  const geometry = useMemo(() => {
+    const g = new THREE.BufferGeometry();
+    const vertCount = RINGS * SEGMENTS + 1;
+
+    const positions = new Float32Array(vertCount * 3);
+    const colors = new Float32Array(vertCount * 3);
+    const uvs = new Float32Array(vertCount * 2);
+
+    g.setAttribute(
+      "position",
+      new THREE.BufferAttribute(positions, 3).setUsage(
+        THREE.DynamicDrawUsage,
+      ),
+    );
+
+    g.setAttribute(
+      "color",
+      new THREE.BufferAttribute(colors, 3).setUsage(
+        THREE.DynamicDrawUsage,
+      ),
+    );
+
+    for (let r = 0; r < RINGS; r++) {
+      const t = r / (RINGS - 1);
+
+      for (let s = 0; s < SEGMENTS; s++) {
+        const idx = (r * SEGMENTS + s) * 2;
+        uvs[idx] = s / SEGMENTS;
+        uvs[idx + 1] = 1 - t;
+      }
+    }
+
+    g.setAttribute("uv", new THREE.BufferAttribute(uvs, 2));
+    g.setIndex(TORSO_INDICES);
+
+    return g;
+  }, []);
+
+  // ============================================================
+  // SOFT CERAMIC / MATTE MATERIAL
+  // ============================================================
+
+  const material = useMemo(
+    () =>
+      new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        metalness: 0.2,
+        roughness: 0.55,
+        side: THREE.DoubleSide,
+      }),
+    [],
+  );
+
+  // ============================================================
+  // CHEST PIECE: vertical light bar in a charcoal housing
+  // ============================================================
+
+  const reactor = useMemo(() => {
+    const group = new THREE.Group();
+
+    const housingMaterial = new THREE.MeshStandardMaterial({
+      color: "#2A2A2E",
+      metalness: 0.6,
+      roughness: 0.35,
+    });
+
+    const barMaterial = new THREE.MeshStandardMaterial({
+      color: "#FFD08A",
+      emissive: "#FF9F1C",
+      emissiveIntensity: 2.6,
+      metalness: 0.1,
+      roughness: 0.3,
+    });
+
+    // Housing plate
+    const housing = new THREE.Mesh(
+      new THREE.BoxGeometry(0.05, 0.12, 0.016),
+      housingMaterial,
+    );
+    group.add(housing);
+
+    // Main light bar
+    const bar = new THREE.Mesh(
+      new THREE.BoxGeometry(0.012, 0.088, 0.006),
+      barMaterial,
+    );
+    bar.position.z = 0.011;
+    group.add(bar);
+
+    // Three small indicator dots beside the bar
+    for (let i = 0; i < 3; i++) {
+      const dot = new THREE.Mesh(
+        new THREE.SphereGeometry(0.0038, 12, 12),
+        barMaterial,
+      );
+      dot.position.set(0.017, 0.03 - i * 0.03, 0.01);
+      group.add(dot);
+    }
+
+    // Corner rivets
+    for (let sx = -1; sx <= 1; sx += 2) {
+      for (let sy = -1; sy <= 1; sy += 2) {
+        const rivet = new THREE.Mesh(
+          new THREE.SphereGeometry(0.0025, 8, 8),
+          housingMaterial,
+        );
+        rivet.position.set(sx * 0.021, sy * 0.053, 0.009);
+        group.add(rivet);
+      }
+    }
+
+    return group;
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      geometry.dispose();
+      material.dispose();
+      reactor.traverse((obj) => {
+        if (obj instanceof THREE.Mesh) {
+          obj.geometry.dispose();
+
+          if (Array.isArray(obj.material)) {
+            obj.material.forEach((m) => m.dispose());
+          } else {
+            obj.material.dispose();
+          }
+        }
+      });
+    };
+  }, [geometry, material, reactor]);
+
+  // ============================================================
+  // ANIMATION AND PROCEDURAL SCULPTING
+  // ============================================================
+
+  useFrame((_, delta) => {
+    const mesh = meshRef.current;
+    const reactorGroup = reactorRef.current;
+
+    if (!mesh || !reactorGroup) return;
+
+    if (!playbackRef.current.playing) {
+      idleTime.current += Math.min(delta, 0.1);
+    }
+
+    const P = sampleRef.current.pose;
+
+    const ok =
+      P[0 * 4 + 3] >= THRESH &&
+      P[1 * 4 + 3] >= THRESH &&
+      P[6 * 4 + 3] >= THRESH &&
+      P[7 * 4 + 3] >= THRESH;
+
+    mesh.visible = ok;
+    reactorGroup.visible = ok;
+
+    if (!ok) return;
+
+    // LANDMARKS
+
+    const shoulderL = new THREE.Vector3(P[0], P[1], P[2]);
+    const shoulderR = new THREE.Vector3(P[4], P[5], P[6]);
+
+    const shoulderCenter = new THREE.Vector3(
+      (P[0] + P[4]) / 2,
+      (P[1] + P[5]) / 2,
+      (P[2] + P[6]) / 2,
+    );
+
+    const hipL = new THREE.Vector3(P[24], P[25] - 0.18, P[26]);
+    const hipR = new THREE.Vector3(P[28], P[29] - 0.18, P[30]);
+
+    const hipCenter = new THREE.Vector3()
+      .addVectors(hipL, hipR)
+      .multiplyScalar(0.5);
+
+    const torsoAxis = new THREE.Vector3().subVectors(shoulderCenter, hipCenter);
+    const horizontalLength = Math.hypot(torsoAxis.x, torsoAxis.z);
+    const maxHorizontalOffset = Math.abs(torsoAxis.y) * Math.tan(MAX_TORSO_LEAN);
+    if (horizontalLength > maxHorizontalOffset && horizontalLength > 0) {
+      const correction = maxHorizontalOffset / horizontalLength;
+      shoulderCenter.x = hipCenter.x + torsoAxis.x * correction;
+      shoulderCenter.z = hipCenter.z + torsoAxis.z * correction;
+    }
+
+    // ANATOMICAL AXES
+
+    const up = new THREE.Vector3()
+      .subVectors(shoulderCenter, hipCenter)
+      .normalize();
+
+    let right = new THREE.Vector3().subVectors(shoulderR, shoulderL);
+
+    right.addScaledVector(up, -right.dot(up)).normalize();
+
+    if (right.lengthSq() < 0.001) {
+      right.set(1, 0, 0);
+    }
+
+    const forward = new THREE.Vector3().crossVectors(right, up).normalize();
+
+    if (forward.z < 0) {
+      forward.negate();
+      right.negate();
+    }
+
+    const refScale = TORSO_WORLD * 0.22;
+
+    const breathing = playbackRef.current.playing
+      ? 1
+      : 1 + Math.sin(idleTime.current * 1.35) * 0.003;
+
+    const pos = geometry.getAttribute("position") as THREE.BufferAttribute;
+    const vertexColors = geometry.getAttribute("color") as THREE.BufferAttribute;
+
+    // ============================================================
+    // VERTEX GENERATION
+    // ============================================================
+
+    for (let ring = 0; ring < RINGS; ring++) {
+      const t = ring / (RINGS - 1);
+
+      const center = new THREE.Vector3().lerpVectors(
+        shoulderCenter,
+        hipCenter,
+        t,
+      );
+
+      let widthRatio = 1;
+      let depthRatio = 1;
+
+      if (t < 0.2) {
+        const st = t / 0.2;
+        widthRatio = THREE.MathUtils.lerp(topWidth, topWidth * 1.25, st);
+        depthRatio = THREE.MathUtils.lerp(0.42, 0.52, st);
+      } else if (t < 0.7) {
+        const mt = (t - 0.2) / 0.5;
+        const peak = bottomWidth * 1.52;
+        widthRatio = THREE.MathUtils.lerp(topWidth * 1.25, peak, mt);
+        depthRatio = THREE.MathUtils.lerp(0.52, 0.68, mt);
+      } else {
+        const wt = (t - 0.7) / 0.3;
+        const peak = bottomWidth * 1.52;
+        widthRatio = THREE.MathUtils.lerp(peak, bottomWidth, wt);
+        depthRatio = THREE.MathUtils.lerp(0.68, 0.46, wt);
+      }
+
+      const halfW = refScale * widthRatio * breathing;
+      const baseDepth = Math.max(halfW * depthRatio, 0.07);
+
+      for (let s = 0; s < SEGMENTS; s++) {
+        const angle = (s / SEGMENTS) * Math.PI * 2;
+
+        const cos = Math.cos(angle);
+        const sin = Math.sin(angle);
+
+        let yLift = 0;
+
+        if (t < 0.25) {
+          const fade = 1 - t / 0.25;
+          const arch = Math.pow(Math.abs(cos), 1.2);
+
+          yLift = (topYOffset + arch * 0.03) * fade;
+
+          if (sin > 0 && Math.abs(cos) < 0.35) {
+            yLift -= 0.02 * (1 - Math.abs(cos) / 0.35) * fade;
+          }
+        }
+
+        let depth = baseDepth;
+        let effectiveWidth = halfW;
+
+        // --------------------------------------------------------
+        // CHEST: broad, flat breastplate with a shallow center ridge
+        // --------------------------------------------------------
+
+        if (t >= 0.14 && t <= 0.42 && sin > 0.05) {
+          const chestT = Math.sin(((t - 0.14) / 0.28) * Math.PI);
+
+          const plate = 0.014 * chestT * sin;
+          const ridge =
+            Math.abs(cos) < 0.1
+              ? 0.006 * (1 - Math.abs(cos) / 0.1) * chestT
+              : 0;
+
+          depth += plate + ridge;
+        }
+
+        // --------------------------------------------------------
+        // ABDOMEN: four rounded bands separated by recessed grooves
+        // --------------------------------------------------------
+
+        if (t > 0.42 && t <= 0.82) {
+          const progress = (t - 0.42) / 0.4;
+          const phase = (progress * ABS_BANDS) % 1;
+
+          const band = Math.sin(phase * Math.PI) * 0.01;
+          const groove = phase < 0.1 ? -0.008 : 0;
+
+          depth += (band + groove) * Math.max(0.2, sin);
+        }
+
+        // --------------------------------------------------------
+        // 3D POSITION
+        // --------------------------------------------------------
+
+        const vert = new THREE.Vector3()
+          .copy(center)
+          .addScaledVector(right, cos * effectiveWidth)
+          .addScaledVector(forward, sin * depth)
+          .addScaledVector(up, yLift);
+
+        const index = ring * SEGMENTS + s;
+
+        pos.setXYZ(index, vert.x, vert.y, vert.z);
+
+        // --------------------------------------------------------
+        // COLOUR DESIGN
+        // --------------------------------------------------------
+
+        const colour = COLORS.ivory.clone();
+
+        // Graphite shoulder caps
+        if (t < 0.12) {
+          colour.copy(COLORS.graphite);
+        }
+
+        // Amber collar line
+        if (t < 0.03) {
+          colour.copy(COLORS.amber);
+        }
+
+        // Charcoal side panels
+        if (Math.abs(cos) > 0.88 && t < 0.78) {
+          colour.copy(COLORS.charcoal);
+        }
+
+        // Thin amber seam where side panels meet the front
+        if (Math.abs(cos) > 0.84 && Math.abs(cos) <= 0.88 && t > 0.14 && t < 0.78) {
+          colour.copy(COLORS.amber);
+        }
+
+        // Dark grooves between abdominal bands
+        if (t > 0.42 && t <= 0.82) {
+          const phase = (((t - 0.42) / 0.4) * ABS_BANDS) % 1;
+
+          if (phase < 0.1 && Math.abs(cos) <= 0.84) {
+            colour.copy(COLORS.charcoal);
+          }
+        }
+
+        // Worn lower edge
+        if (t > 0.94) {
+          colour.copy(COLORS.ivoryDark);
+        }
+
+        // Subtle shading across the curved surface
+        const shade = 0.96 + Math.max(0, sin) * 0.06;
+        colour.multiplyScalar(shade);
+
+        vertexColors.setXYZ(index, colour.r, colour.g, colour.b);
+      }
+    }
+
+    // Bottom cap
+    const bottomCap = RINGS * SEGMENTS;
+
+    pos.setXYZ(bottomCap, hipCenter.x, hipCenter.y, hipCenter.z);
+
+    vertexColors.setXYZ(
+      bottomCap,
+      COLORS.charcoal.r,
+      COLORS.charcoal.g,
+      COLORS.charcoal.b,
+    );
+
+    pos.needsUpdate = true;
+    vertexColors.needsUpdate = true;
+
+    geometry.computeVertexNormals();
+
+    // ============================================================
+    // CHEST PIECE POSITION AND ORIENTATION
+    // ============================================================
+
+    const reactorPosition = new THREE.Vector3().lerpVectors(
+      shoulderCenter,
+      hipCenter,
+      0.255,
+    );
+
+    const reactorWidth = refScale * topWidth * 1.25;
+
+    reactorPosition.addScaledVector(forward, reactorWidth * 0.52);
+    reactorPosition.addScaledVector(up, -0.005);
+
+    reactorGroup.position.copy(reactorPosition);
+
+    // Align the housing's long axis with the torso's up direction
+    const basis = new THREE.Matrix4().makeBasis(
+      new THREE.Vector3().crossVectors(up, forward).normalize(),
+      up,
+      forward,
+    );
+    reactorGroup.quaternion.setFromRotationMatrix(basis);
+
+    reactorGroup.scale.setScalar(TORSO_WORLD * 0.38);
+  });
+
+  return (
+    <group>
+      <mesh
+        ref={meshRef}
+        geometry={geometry}
+        material={material}
+        frustumCulled={false}
+        renderOrder={-1}
+        castShadow
+        receiveShadow
+      />
+
+      <primitive ref={reactorRef} object={reactor} />
+    </group>
+  );
+}
 ```
 
 ---
@@ -15490,175 +14945,6 @@ export function SignCardSkeleton() {
       <div className="pt-2 border-t border-border flex justify-between">
         <div className="h-3 w-16 rounded bg-surface-elevated" />
         <div className="h-3 w-10 rounded bg-surface-elevated" />
-      </div>
-    </div>
-  );
-}
-```
-
----
-
-# FILE: `frontend\src\components\verification\EvidencePanel.tsx`
-
-```tsx
-"use client";
-import React from "react";
-import { VerificationEvidence } from "@/lib/types";
-import { AlertCircle, Check, X, HelpCircle, BarChart2 } from "lucide-react";
-
-interface EvidencePanelProps {
-  evidence: VerificationEvidence;
-  submittedLabel: string;
-  signerId: string;
-  onAction?: (action: "accepted" | "rejected" | "needs_review", notes?: string) => void;
-}
-
-export function EvidencePanel({
-  evidence,
-  submittedLabel,
-  signerId,
-  onAction,
-}: EvidencePanelProps) {
-  const [notes, setNotes] = React.useState("");
-
-  return (
-    <div className="bg-surface border border-border rounded-lg p-6 space-y-6">
-      {/* Permanent Warning Banner per Section 8.6 */}
-      <div className="p-3.5 rounded bg-status-pending/10 border border-status-pending/30 flex items-start space-x-3 text-xs text-status-pending">
-        <AlertCircle size={16} className="shrink-0 mt-0.5" />
-        <span className="leading-relaxed font-mono">
-          Validation scores are advisory evidence only. They do not automatically approve or reject this submission. Human review required.
-        </span>
-      </div>
-
-      {/* Header Info */}
-      <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-border">
-        <div>
-          <div className="text-xs font-mono uppercase text-text-muted">SUBMITTED GLOSS</div>
-          <div className="text-xl font-bold font-sans text-text-primary mt-0.5">{submittedLabel}</div>
-        </div>
-        <div>
-          <div className="text-xs font-mono uppercase text-text-muted">SIGNER ID</div>
-          <div className="text-sm font-mono text-text-secondary mt-0.5">{signerId}</div>
-        </div>
-      </div>
-
-      {/* Reasoning Layer per Section 8.6 */}
-      <div className="bg-surface-elevated/70 border border-border p-4 rounded-md space-y-2.5">
-        <div className="text-xs font-mono uppercase tracking-wider text-text-secondary mb-2 flex items-center space-x-1.5">
-          <BarChart2 size={13} className="text-accent-secondary" />
-          <span>Automated Reasoning Analysis</span>
-        </div>
-        <div className="grid grid-cols-2 gap-y-2 text-xs font-mono">
-          <span className="text-text-muted">HANDSHAPE MATCH</span>
-          <span className="text-text-primary font-medium text-right">{evidence.reasoning.handshape_match}</span>
-
-          <span className="text-text-muted">MOVEMENT MATCH</span>
-          <span className="text-text-primary font-medium text-right">{evidence.reasoning.movement_match}</span>
-
-          <span className="text-text-muted">TEMPORAL PATTERN</span>
-          <span className="text-text-primary font-medium text-right">{evidence.reasoning.temporal_match}</span>
-
-          <span className="text-text-muted">NMM DETECTED</span>
-          <span className="text-text-primary font-medium text-right">{evidence.reasoning.nmm_detected}</span>
-
-          <span className="text-text-muted">TOP CANDIDATE</span>
-          <span className="text-accent-primary font-semibold text-right">{evidence.reasoning.top_candidate}</span>
-        </div>
-      </div>
-
-      {/* Scores & Progress */}
-      <div className="space-y-3">
-        <div className="text-xs font-mono uppercase tracking-wider text-text-secondary">
-          Algorithmic Confidence Metrics (/100)
-        </div>
-        {[
-          { label: "Geometry Alignment", val: evidence.geometry_score },
-          { label: "Temporal Cadence", val: evidence.temporal_score },
-          { label: "Cluster Similarity", val: evidence.similarity_score },
-          { label: "Signer Label Agreement", val: evidence.label_agreement },
-        ].map((item) => (
-          <div key={item.label} className="space-y-1">
-            <div className="flex justify-between text-xs font-mono text-text-secondary">
-              <span>{item.label}</span>
-              <span className="text-text-primary font-semibold">{item.val}%</span>
-            </div>
-            <div className="h-1.5 w-full bg-surface-elevated rounded-full overflow-hidden">
-              <div
-                className="h-full bg-accent-primary rounded-full"
-                style={{ width: `${item.val}%` }}
-              />
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Symbolic Tags */}
-      <div>
-        <div className="text-xs font-mono uppercase tracking-wider text-text-secondary mb-2">
-          Extracted Kinematic Tags
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          {evidence.symbolic_tags.map((tag) => (
-            <span
-              key={tag}
-              className="px-2 py-0.5 rounded text-[11px] font-mono bg-surface-elevated border border-border text-text-primary"
-            >
-              {tag}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {/* Movement Description */}
-      <div>
-        <div className="text-xs font-mono uppercase tracking-wider text-text-secondary mb-1">
-          Trajectory Analysis
-        </div>
-        <p className="text-xs text-text-secondary leading-relaxed bg-surface-elevated/40 p-3 rounded border border-border">
-          {evidence.movement_description}
-        </p>
-      </div>
-
-      {/* Reviewer Notes */}
-      <div>
-        <label className="block text-xs font-mono uppercase tracking-wider text-text-secondary mb-1.5">
-          Reviewer Evaluation Notes
-        </label>
-        <textarea
-          rows={2}
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          placeholder="Document any spatial divergence or regional dialect variations..."
-          className="w-full p-2.5 bg-background border border-border rounded text-text-primary font-mono text-xs focus:outline-none focus:border-accent-primary"
-        />
-      </div>
-
-      {/* 3 Action Buttons per Section 8.6 */}
-      <div className="grid grid-cols-3 gap-3 pt-2">
-        <button
-          onClick={() => onAction?.("accepted", notes)}
-          className="flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded bg-status-approved/20 border border-status-approved text-status-approved hover:bg-status-approved hover:text-black font-mono text-xs font-semibold uppercase transition-colors"
-        >
-          <Check size={14} />
-          <span>Accept</span>
-        </button>
-
-        <button
-          onClick={() => onAction?.("rejected", notes)}
-          className="flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded bg-status-error/20 border border-status-error text-status-error hover:bg-status-error hover:text-white font-mono text-xs font-semibold uppercase transition-colors"
-        >
-          <X size={14} />
-          <span>Reject</span>
-        </button>
-
-        <button
-          onClick={() => onAction?.("needs_review", notes)}
-          className="flex items-center justify-center space-x-1.5 py-2.5 px-3 rounded bg-status-unknown/20 border border-status-unknown text-status-unknown hover:bg-status-unknown hover:text-white font-mono text-xs font-semibold uppercase transition-colors"
-        >
-          <HelpCircle size={14} />
-          <span>Needs Review</span>
-        </button>
       </div>
     </div>
   );
@@ -15740,78 +15026,6 @@ export function useCamera() {
 
 ---
 
-# FILE: `frontend\src\hooks\useRecording.ts`
-
-```typescript
-"use client";
-import { useState, useRef, useCallback } from "react";
-
-export function useRecording(stream: MediaStream | null) {
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
-  const [recordedUrl, setRecordedUrl] = useState<string | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const chunksRef = useRef<Blob[]>([]);
-
-  const startRecording = useCallback(() => {
-    if (!stream) return;
-    chunksRef.current = [];
-    
-    // Choose compatible mimeType
-    const mimeTypes = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm", "video/mp4"];
-    const supportedType = mimeTypes.find((t) => MediaRecorder.isTypeSupported(t)) || "video/webm";
-
-    try {
-      const recorder = new MediaRecorder(stream, { mimeType: supportedType });
-      recorder.ondataavailable = (event) => {
-        if (event.data && event.data.size > 0) {
-          chunksRef.current.push(event.data);
-        }
-      };
-
-      recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: supportedType });
-        setRecordedBlob(blob);
-        const url = URL.createObjectURL(blob);
-        setRecordedUrl(url);
-        setIsRecording(false);
-      };
-
-      mediaRecorderRef.current = recorder;
-      recorder.start(100);
-      setIsRecording(true);
-    } catch (e) {
-      console.error("Failed to start MediaRecorder:", e);
-    }
-  }, [stream]);
-
-  const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-      mediaRecorderRef.current.stop();
-    }
-  }, []);
-
-  const clearRecording = useCallback(() => {
-    if (recordedUrl) {
-      URL.revokeObjectURL(recordedUrl);
-    }
-    setRecordedBlob(null);
-    setRecordedUrl(null);
-  }, [recordedUrl]);
-
-  return {
-    isRecording,
-    startRecording,
-    stopRecording,
-    recordedBlob,
-    recordedUrl,
-    clearRecording,
-  };
-}
-```
-
----
-
 # FILE: `frontend\src\hooks\useSystemStatus.ts`
 
 ```typescript
@@ -15876,17 +15090,8 @@ export const APP_CONFIG = {
 export const NAVIGATION_LINKS = [
   { label: "Text → Sign", href: "/text-to-sign" },
   { label: "Sign → Text", href: "/sign-to-text" },
-  { label: "Contribute", href: "/contribute" },
   { label: "About", href: "/about" },
 ];
-
-export const PIPELINE_STAGES = [
-  { id: "camera", label: "CAMERA" },
-  { id: "landmarks", label: "LANDMARKS" },
-  { id: "recognition", label: "RECOGNITION" },
-  { id: "nlg", label: "NLG" },
-  { id: "tts", label: "TTS" },
-] as const;
 ```
 
 ---
@@ -15894,46 +15099,24 @@ export const PIPELINE_STAGES = [
 # FILE: `frontend\src\lib\pose.ts`
 
 ```typescript
-/**
- * frontend/src/lib/pose.ts
- * Client-side mirror of backend/pose.py.
- *
- * The replay canvas and the extractor must agree on what the pose block IS --
- * which landmarks exist, which edges are body geometry -- or the overlay will
- * draw a skeleton the model never saw. The two files are kept deliberately
- * small and parallel; the authoritative copy is the Python one, because that is
- * the side that writes the numbers.
- */
+export const POSE_POINTS = 8;
 
-/** BlazePose landmark count. Each point is (x, y, z, visibility). */
-export const POSE_POINTS = 33;
-
-/**
- * Body skeleton edges. Fingertips and feet are omitted: the fingers belong to
- * the 2x21 hand block and the toes are invisible in a signing distance shot.
- */
-export const POSE_BODY_PAIRS: [number, number][] = [
-  [11, 12],                                    // shoulders
-  [11, 13], [13, 15],                          // left arm
-  [12, 14], [14, 16],                          // right arm
-  [11, 23], [12, 24], [23, 24],                // torso
-  [23, 25], [25, 27],                          // left leg
-  [24, 26], [26, 28],                          // right leg
-  [0, 9], [0, 10], [9, 10],                    // nose <-> mouth corners
-  [2, 5], [7, 8],                              // eyes and mouth midline
-];
-
-/** Nose + mouth corners: the landmarks the NMM detector reads. */
-export const POSE_FACE_MARKERS: number[] = [0, 9, 10];
-
-/** Landmark connections that make the available BlazePose face points legible. */
-export const POSE_FACE_PAIRS: [number, number][] = [
-  [7, 3], [3, 2], [2, 1], [1, 0], [0, 4], [4, 5], [5, 6], [6, 8],
-  [0, 9], [0, 10], [9, 10],
-];
-
-/** A single pose landmark as delivered by /api/simulation/frames. */
 export type PosePoint = [number, number, number, number];
+
+export const POSE_BODY_PAIRS: [number, number][] = [
+  [0, 1],
+  [0, 2],
+  [2, 4],
+  [1, 3],
+  [3, 5],
+  [0, 6],
+  [1, 7],
+  [6, 7],
+];
+
+export const POSE_FACE_MARKERS: number[] = [];
+
+export const POSE_FACE_PAIRS: [number, number][] = [];
 ```
 
 ---
@@ -15993,14 +15176,6 @@ export interface ApiError {
   code?: string;
 }
 
-export interface PaginatedResponse<T> {
-  items: T[];
-  total: number;
-  page: number;
-  limit: number;
-  total_pages: number;
-}
-
 // --- System Health ---
 export type InferenceMode = "local" | "cloud";
 
@@ -16012,75 +15187,6 @@ export interface SystemHealth {
   inference_mode: InferenceMode;
   dataset_version: string;
   model_version: string;
-}
-
-// --- Pipeline & Recognition ---
-export type PipelineStage = "camera" | "landmarks" | "recognition" | "nlg" | "tts";
-export type PipelineStatus = "active" | "idle" | "error" | "waiting";
-
-export interface NMMFlags {
-  question: boolean;
-  wh_question: boolean;
-  negation: boolean;
-  affirmation: boolean;
-  emphasis: boolean;
-  head_tilt?: boolean;
-}
-
-// --- Dataset & Contributions ---
-export interface Sign {
-  id: string;
-  label: string;
-  bengali_meaning: string;
-  category: string;
-  type: "word" | "phrase" | "sentence";
-  approved_samples: number;
-  pending_samples: number;
-  rejected_samples: number;
-  has_landmarks: boolean;
-  language: "WBSL" | "ISL" | "BdSL";
-}
-
-export interface ContributionSession {
-  session_id: string;
-  signer_id: string;
-  created_at: string;
-  status: "active" | "completed" | "interrupted";
-}
-
-export interface Contribution {
-  sample_id: string;
-  session_id: string;
-  label: string;
-  signer_id: string;
-  split: "train" | "val" | "test";
-  source: "original" | "community" | "unknown_queue_promoted";
-  verification: "pending" | "accepted" | "rejected" | "needs_review";
-  verified_by: string | null;
-  captured_at: string;
-  frames: number;
-  landmark_path: string;
-  video_url?: string;
-  upload_status: "pending" | "uploading" | "success" | "failed";
-}
-
-export interface VerificationEvidence {
-  geometry_score: number;
-  temporal_score: number;
-  similarity_score: number;
-  label_agreement: number;
-  synthetic_score: number;
-  model_predictions: { label: string; confidence: number }[];
-  numerical_features: Record<string, number>;
-  symbolic_tags: string[];
-  movement_description: string;
-  reasoning: {
-    handshape_match: string;
-    movement_match: string;
-    temporal_match: string;
-    nmm_detected: string;
-    top_candidate: string;
-  };
 }
 ```
 
@@ -16176,73 +15282,6 @@ export function attachAuthInterceptor() {
 
 ---
 
-# FILE: `frontend\src\services\contributions.ts`
-
-```typescript
-import apiClient from "./api";
-import { Contribution, ContributionSession, VerificationEvidence } from "@/lib/types";
-
-export const contributionService = {
-  createSession: async (signerId: string): Promise<ContributionSession> => {
-    const res = await apiClient.post<ContributionSession>("/contributions/session", { signer_id: signerId });
-    return res.data;
-  },
-
-  submitSample: async (sessionId: string, formData: FormData): Promise<{ sample_id: string; status: string; frames: number }> => {
-    const res = await apiClient.post(`/contributions/session/${sessionId}/samples`, formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-      timeout: 120000,
-    });
-    return res.data;
-  },
-
-  getContributions: async (): Promise<Contribution[]> => {
-    const res = await apiClient.get<Contribution[]>("/admin/contributions");
-    return res.data;
-  },
-
-  getEvidence: async (sampleId: string): Promise<VerificationEvidence> => {
-    const res = await apiClient.get<VerificationEvidence>(`/admin/contributions/${sampleId}/evidence`);
-    return res.data;
-  },
-
-  verifyContribution: async (sampleId: string, action: "accepted" | "rejected" | "needs_review", notes?: string): Promise<{ success: boolean }> => {
-    const res = await apiClient.post(`/admin/contributions/${sampleId}/verify`, { action, notes });
-    return res.data;
-  },
-
-};
-```
-
----
-
-# FILE: `frontend\src\services\dataset.ts`
-
-```typescript
-import apiClient from "./api";
-import { Sign, PaginatedResponse } from "@/lib/types";
-
-export const datasetService = {
-  getSigns: async (params?: {
-    page?: number;
-    limit?: number;
-    search?: string;
-    category?: string;
-    language?: string;
-  }): Promise<PaginatedResponse<Sign>> => {
-    const response = await apiClient.get<PaginatedResponse<Sign>>("/dataset/signs", { params });
-    return response.data;
-  },
-
-  getSignById: async (id: string): Promise<Sign> => {
-    const res = await apiClient.get<Sign>(`/dataset/signs/${id}`);
-    return res.data;
-  },
-};
-```
-
----
-
 # FILE: `frontend\src\services\nlg.ts`
 
 ```typescript
@@ -16290,157 +15329,29 @@ export const nlgService = {
 ```typescript
 import apiClient from "./api";
 
-export interface DatasetStats {
-  total_signs: number;
-  total_approved_samples: number;
-  total_pending_samples: number;
-  total_rejected_samples: number;
-  languages: string[];
-  categories: string[];
-  dataset_version: string;
-  model_version: string;
-}
-
 export interface AdminStats {
   total_signs: number;
-  total_approved_samples: number;
-  total_pending_samples: number;
-  total_rejected_samples: number;
-  model_active: string;
+  avatar_classes: number;
+  model_active: string | null;
   model_classes: number;
   contract?: {
     kind?: string;
     feature_width?: number;
+    frames?: number;
   };
   llm_available: boolean;
   llm_model: string;
   inference_mode: string;
+  ai_mode: string;
   dataset_version: string;
 }
 
 export const statsService = {
-  getDatasetStats: async (): Promise<DatasetStats> => {
-    const res = await apiClient.get<DatasetStats>("/dataset/stats");
-    return res.data;
-  },
-
   getAdminStats: async (): Promise<AdminStats> => {
     const res = await apiClient.get<AdminStats>("/admin/stats");
     return res.data;
   },
 };
-```
-
----
-
-# FILE: `frontend\src\store\recording-store.ts`
-
-```typescript
-import { create } from "zustand";
-
-export type RecordingState =
-  | "CONSENT_GATE"
-  | "SIGN_SELECTED"
-  | "REFERENCE_VIEW"
-  | "READY_TO_RECORD"
-  | "COUNTDOWN"
-  | "RECORDING"
-  | "RECORDED"
-  | "NMM_TAGGING"
-  | "PREVIEW"
-  | "SUBMITTING_LANDMARKS"
-  | "SUBMITTING_VIDEO"
-  | "SUBMITTED"
-  | "UPLOAD_FAILED";
-
-interface RecordingStore {
-  state: RecordingState;
-  sessionId: string | null;
-  currentSignId: string | null;
-  currentSignLabel: string | null;
-  signerId: string | null;
-  consentGiven: boolean;
-  recordVideo: boolean;
-  samplesRecorded: number;
-  uploadQueue: { blob: Blob; metadata: any; status: "pending" | "uploading" | "failed" }[];
-  nmmTags: {
-    question: boolean;
-    wh_question: boolean;
-    negation: boolean;
-    affirmation: boolean;
-    emphasis: boolean;
-    head_tilt: boolean;
-  };
-
-  setSession: (sessionId: string) => void;
-  setState: (state: RecordingState) => void;
-  setConsent: (signerId: string, recordVideo: boolean) => void;
-  selectSign: (signId: string, label: string) => void;
-  toggleNMMTag: (tag: keyof RecordingStore["nmmTags"]) => void;
-  resetNMMTags: () => void;
-  incrementSamples: () => void;
-  addToUploadQueue: (blob: Blob, metadata: any) => void;
-  updateUploadStatus: (index: number, status: "uploading" | "failed" | "pending") => void;
-  resetSession: () => void;
-}
-
-export const useRecordingStore = create<RecordingStore>((set) => ({
-  state: "CONSENT_GATE",
-  sessionId: null,
-  currentSignId: null,
-  currentSignLabel: null,
-  signerId: null,
-  consentGiven: false,
-  recordVideo: false,
-  samplesRecorded: 0,
-  uploadQueue: [],
-  nmmTags: {
-    question: false,
-    wh_question: false,
-    negation: false,
-    affirmation: false,
-    emphasis: false,
-    head_tilt: false,
-  },
-
-  setSession: (sessionId) => set({ sessionId }),
-  setState: (state) => set({ state }),
-  setConsent: (signerId, recordVideo) =>
-    set({ consentGiven: true, signerId, recordVideo, state: "SIGN_SELECTED" }),
-  selectSign: (signId, label) =>
-    set({ currentSignId: signId, currentSignLabel: label, state: "REFERENCE_VIEW" }),
-  toggleNMMTag: (tag) =>
-    set((s) => ({ nmmTags: { ...s.nmmTags, [tag]: !s.nmmTags[tag] } })),
-  resetNMMTags: () =>
-    set({
-      nmmTags: {
-        question: false,
-        wh_question: false,
-        negation: false,
-        affirmation: false,
-        emphasis: false,
-        head_tilt: false,
-      },
-    }),
-  incrementSamples: () => set((s) => ({ samplesRecorded: s.samplesRecorded + 1 })),
-  addToUploadQueue: (blob, metadata) =>
-    set((s) => ({ uploadQueue: [...s.uploadQueue, { blob, metadata, status: "pending" }] })),
-  updateUploadStatus: (index, status) =>
-    set((s) => {
-      const q = [...s.uploadQueue];
-      if (q[index]) q[index].status = status;
-      return { uploadQueue: q };
-    }),
-  resetSession: () =>
-    set({
-      state: "CONSENT_GATE",
-      currentSignId: null,
-      currentSignLabel: null,
-      samplesRecorded: 0,
-      sessionId: null,
-      uploadQueue: [],
-    }),
-}));
 ```
 
 ---
@@ -18123,6 +17034,7 @@ Reads  model_training_zone/dataset_train/features/<id>/<GLOSS>.npy  (N, 64, 98)
         sign_daily_classes.json     gloss names in output order
         daily_report.json           best val acc, top-3, per-class P/R/F1, ONNX diff
         confusion_matrix.json       validation confusion matrix
+        training_data/features/    copied per-gloss training clips and extraction report
         avatar/                     (filled later by avatar_extract.py)
 
 Compatible with extract.py conventions:
@@ -18599,6 +17511,7 @@ def main():
     (staging / "daily_report.json").write_text(
         json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
     (staging / "avatar").mkdir(exist_ok=True)
+    shutil.copytree(fdir, staging / "training_data" / "features")
 
     if final_dir.exists():
         shutil.rmtree(final_dir)
@@ -18958,94 +17871,115 @@ models/onnx_models/
 # FILE: `start.ps1`
 
 ```powershell
-$root = "D:\Download\Projects\WBSL Bridge"
+$root = $PSScriptRoot
 $python = Join-Path $root ".venv\Scripts\python.exe"
 $requirements = Join-Path $root "requirements.txt"
-
+$envFile = Join-Path $root ".env"
 $backendScript  = Join-Path $env:TEMP "wbsl-backend.ps1"
 $frontendScript = Join-Path $env:TEMP "wbsl-frontend.ps1"
 $aiScript       = Join-Path $env:TEMP "wbsl-ai.ps1"
 $backendPort    = 8200
 
 if (-not (Test-Path -LiteralPath $python -PathType Leaf)) {
-    throw "The project Python environment is missing. Run: py -3.11 -m venv .venv; .\.venv\Scripts\python.exe -m pip install -r requirements.txt"
+    throw "Python environment missing. Run: py -3.11 -m venv .venv; .\.venv\Scripts\python.exe -m pip install -r requirements.txt"
 }
-
 if (-not (Test-Path -LiteralPath $requirements -PathType Leaf)) {
-    throw "Python dependency manifest not found: $requirements"
+    throw "requirements.txt not found: $requirements"
+}
+if (-not (Test-Path -LiteralPath $envFile -PathType Leaf)) {
+    throw ".env file not found at project root. Create it from the template."
 }
 
-$backendListeners = @(
-    Get-NetTCPConnection -State Listen -LocalPort $backendPort -ErrorAction SilentlyContinue
-)
+$envVars = @{}
+Get-Content $envFile | ForEach-Object {
+    $line = $_.Trim()
+    if ($line -and -not $line.StartsWith("#")) {
+        $parts = $line -split "=", 2
+        if ($parts.Length -eq 2) { $envVars[$parts[0].Trim()] = $parts[1].Trim() }
+    }
+}
+foreach ($name in $envVars.Keys) {
+    [Environment]::SetEnvironmentVariable($name, $envVars[$name], "Process")
+}
+
+$aiMode = $envVars["AI_MODE"]
+if (-not $aiMode) { throw "AI_MODE not set in .env." }
+if ($aiMode -ne "online" -and $aiMode -ne "offline") { throw "Invalid AI_MODE '$aiMode'." }
+
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host " WBSL BRIDGE - STARTUP" -ForegroundColor Cyan
+Write-Host " AI Mode: $aiMode" -ForegroundColor Yellow
+Write-Host "========================================" -ForegroundColor Cyan
+
+$backendListeners = @(Get-NetTCPConnection -State Listen -LocalPort $backendPort -ErrorAction SilentlyContinue)
 $backendAlreadyRunning = $false
 foreach ($listener in $backendListeners) {
-    $listenerProcess = Get-CimInstance Win32_Process `
-        -Filter "ProcessId = $($listener.OwningProcess)" -ErrorAction Stop
-
-    if ($listenerProcess.CommandLine -match 'backend\.main:app') {
-        $backendAlreadyRunning = $true
-        continue
-    }
-
-    throw "Port $backendPort is already in use by $($listenerProcess.Name) (PID $($listenerProcess.ProcessId)). Close that process before starting WBSL Bridge."
+    $listenerProcess = Get-CimInstance Win32_Process -Filter "ProcessId = $($listener.OwningProcess)" -ErrorAction Stop
+    if ($listenerProcess.CommandLine -match 'backend\.main:app') { $backendAlreadyRunning = $true; continue }
+    throw "Port $backendPort in use by $($listenerProcess.Name) (PID $($listenerProcess.ProcessId))."
 }
 
-# Backend
-@"
-Set-Location '$root'
-& '$python' -m uvicorn backend.main:app --reload --port $backendPort
-"@ | Set-Content -Path $backendScript -Encoding UTF8
+if ($aiMode -eq "offline") {
+    $offlineModel = $envVars["AI_OFFLINE_MODEL_NAME"]
+    if (-not $offlineModel) { throw "AI_OFFLINE_MODEL_NAME not set in .env" }
+    $modelPath = Join-Path $root "models\llm\$offlineModel"
+    if (-not (Test-Path -LiteralPath $modelPath -PathType Leaf)) {
+        Write-Host "WARNING: Offline model not found at $modelPath" -ForegroundColor Yellow
+    }
+    $aiScriptContent = @'
+Set-Location '__ROOT__'
+$kobold = Join-Path (Get-Location) 'models\llm\koboldcpp.exe'
+$model = '__MODEL_PATH__'
+$args = @('--model', $model, '--port', '5001', '--jinja', '--jinjathink', 'false', '--threads', '8', '--contextsize', '4096')
+Write-Host "Starting KoboldCpp (offline) with: __MODEL_NAME__" -ForegroundColor Green
+& $kobold @args
+'@
+    $aiScriptContent = $aiScriptContent.Replace('__ROOT__', $root).Replace('__MODEL_PATH__', $modelPath).Replace('__MODEL_NAME__', $offlineModel)
+    Set-Content -Path $aiScript -Value $aiScriptContent -Encoding UTF8
+} else {
+    $onlineModel = $envVars["AI_ONLINE_MODEL_NAME"]
+    $aiScriptContent = @'
+Set-Location '__ROOT__'
+Write-Host "Online mode - using OpenRouter API" -ForegroundColor Green
+Write-Host "Model: __MODEL_NAME__" -ForegroundColor Yellow
+Write-Host "No local AI server needed. Press Ctrl+C to close."
+while ($true) { Start-Sleep -Seconds 60 }
+'@
+    $aiScriptContent = $aiScriptContent.Replace('__ROOT__', $root).Replace('__MODEL_NAME__', $onlineModel)
+    Set-Content -Path $aiScript -Value $aiScriptContent -Encoding UTF8
+}
 
-# Frontend
-@"
-Set-Location '$root\frontend'
-`$env:Path = 'C:\Program Files\nodejs;' + `$env:Path
+$backendScriptContent = @'
+Set-Location '__ROOT__'
+& '__PYTHON__' -m uvicorn backend.main:app --reload --port __BACKEND_PORT__
+'@
+$backendScriptContent = $backendScriptContent.Replace('__ROOT__', $root).Replace('__PYTHON__', $python).Replace('__BACKEND_PORT__', [string]$backendPort)
+Set-Content -Path $backendScript -Value $backendScriptContent -Encoding UTF8
+
+$frontendScriptContent = @'
+Set-Location '__FRONTEND__'
+$env:Path = 'C:\Program Files\nodejs;' + $env:Path
 npm run dev
-"@ | Set-Content -Path $frontendScript -Encoding UTF8
+'@
+$frontendScriptContent = $frontendScriptContent.Replace('__FRONTEND__', (Join-Path $root 'frontend'))
+Set-Content -Path $frontendScript -Value $frontendScriptContent -Encoding UTF8
 
-# AI Server
-@"
-Set-Location '$root'
-
-`$kobold = Join-Path (Get-Location) 'models\llm\koboldcpp.exe'
-`$model = Join-Path (Get-Location) 'models\llm\gemma-4-E4B-it-Q4_K_M.gguf'
-
-`$args = @(
-    '--model', `$model
-    '--jinja'
-    '--jinjathink', 'false'
-    '--threads', '8'
-)
-
-& `$kobold @args
-"@ | Set-Content -Path $aiScript -Encoding UTF8
-
-# Windows Terminal
 $wtArgs = @("-w", "0")
 $tabs = [System.Collections.Generic.List[object]]::new()
 
 if ($backendAlreadyRunning) {
-    Write-Host "Backend is already listening on port $backendPort; reusing it."
+    Write-Host "Backend already listening on port $backendPort; reusing it." -ForegroundColor Green
 } else {
     $tabs.Add(@{ Title = "Backend"; Directory = $root; Script = $backendScript })
 }
-$tabs.Add(@{ Title = "AI Server"; Directory = $root; Script = $aiScript })
+$tabs.Add(@{ Title = "AI Server ($aiMode)"; Directory = $root; Script = $aiScript })
 $tabs.Add(@{ Title = "Frontend"; Directory = "$root\frontend"; Script = $frontendScript })
 
 for ($i = 0; $i -lt $tabs.Count; $i++) {
-    if ($i -gt 0) {
-        $wtArgs += ";"
-    }
-
+    if ($i -gt 0) { $wtArgs += ";" }
     $tab = $tabs[$i]
-    $wtArgs += @(
-        "new-tab", "--title", $tab.Title,
-        "-d", $tab.Directory,
-        "powershell", "-NoExit", "-File", $tab.Script
-    )
+    $wtArgs += @("new-tab", "--title", $tab.Title, "-d", $tab.Directory, "powershell", "-NoExit", "-File", $tab.Script)
 }
-
 & wt.exe @wtArgs
 ```
 

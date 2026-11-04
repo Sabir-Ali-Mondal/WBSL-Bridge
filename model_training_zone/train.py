@@ -12,6 +12,7 @@ Reads  model_training_zone/dataset_train/features/<id>/<GLOSS>.npy  (N, 64, 98)
         sign_daily_classes.json     gloss names in output order
         daily_report.json           best val acc, top-3, per-class P/R/F1, ONNX diff
         confusion_matrix.json       validation confusion matrix
+        training_data/features/    copied per-gloss training clips and extraction report
         avatar/                     (filled later by avatar_extract.py)
 
 Compatible with extract.py conventions:
@@ -488,6 +489,7 @@ def main():
     (staging / "daily_report.json").write_text(
         json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
     (staging / "avatar").mkdir(exist_ok=True)
+    shutil.copytree(fdir, staging / "training_data" / "features")
 
     if final_dir.exists():
         shutil.rmtree(final_dir)

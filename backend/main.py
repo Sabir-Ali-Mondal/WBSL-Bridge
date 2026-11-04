@@ -554,57 +554,175 @@ def admin_avatar_list():
     }
 
 
-# ─────────────────────────────────────────────
-# DATASET / SIGNS
-# ─────────────────────────────────────────────
-@app.get("/api/dataset/signs")
-def get_signs(
+@app.get("/api/admin/model/training-data")
+def admin_training_data(
     page: int = 1,
-    limit: int = 20,
+    limit: int = 12,
     search: str = "",
     category: str = "",
-    language: str = "",
+    dialect: str = "",
 ):
-    filtered = sign_catalog
-    if search:
-        q = search.lower()
-        filtered = [
-            s for s in filtered
-            if q in s["label"].lower() or q in s["bengali_meaning"]
-        ]
-    if category:
-        filtered = [s for s in filtered if s["category"].lower() == category.lower()]
-    if language:
-        filtered = [s for s in filtered if s["language"] == language]
+    """Paginate the training clips archived with the active model."""
+    if category and category.lower() not in {"alphabet", "word"}:
+        raise HTTPException(422, "category must be 'Alphabet' or 'Word'.")
+    run_dir = _active_run_dir()
+    feature_dir = run_dir / "training_data" / "features" if run_dir else None
+    metadata_file = feature_dir / "extract_report.json" if feature_dir else None
+    metadata = {}
+    if metadata_file and metadata_file.is_file():
+        try:
+            metadata = json.loads(metadata_file.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            logging.exception("Could not read archived extraction report %s", metadata_file)
+            raise HTTPException(500, "Could not read the active model's training-data metadata.") from exc
 
-    total = len(filtered)
+    dataset_name = re.split(r"[\\/]", str(metadata.get("dataset", "")))[-1]
+    dataset_dialect = (
+        dataset_name[:-6]
+        if dataset_name.upper().endswith("_VIDEO")
+        else dataset_name or "Unspecified"
+    )
+    clips_by_gloss = {}
+    for source in metadata.get("videos", []):
+        if source.get("status") != "kept":
+            continue
+        gloss = source.get("gloss")
+        if not gloss:
+            continue
+        clips_by_gloss.setdefault(gloss, []).append({
+            "row": source.get("row"),
+            "source_video": source.get("path"),
+            "dialect": source.get("dialect") or dataset_dialect,
+        })
+
+    available = []
+    if feature_dir and feature_dir.is_dir():
+        for gloss in _available_model_classes():
+            path = feature_dir / f"{gloss}.npy"
+            if not path.is_file():
+                continue
+            try:
+                clips = np.load(path, mmap_mode="r", allow_pickle=False)
+            except (OSError, ValueError) as exc:
+                logging.exception("Could not read archived training data %s", path)
+                raise HTTPException(500, f"Could not read archived training data for {gloss}.") from exc
+            if clips.ndim != 3 or clips.shape[1:] != (N_FRAMES, N_FEATURES):
+                raise HTTPException(500, f"Archived training data for {gloss} has an invalid shape.")
+            sign_category = "Alphabet" if len(gloss) == 1 and gloss.isalpha() else "Word"
+            gloss_dialects = sorted({
+                source["dialect"] for source in clips_by_gloss.get(gloss, [])
+            }) or [dataset_dialect]
+            if (
+                search.lower() in gloss.lower()
+                and (not category or sign_category.lower() == category.lower())
+                and (not dialect or dialect in gloss_dialects)
+            ):
+                available.append({
+                    "gloss": gloss,
+                    "category": sign_category,
+                    "dialects": gloss_dialects,
+                    "clip_count": int(clips.shape[0]),
+                })
+
+    available_dialects = sorted({
+        source["dialect"]
+        for sources in clips_by_gloss.values()
+        for source in sources
+    }) or [dataset_dialect]
+    if dialect and dialect not in available_dialects:
+        raise HTTPException(422, "dialect must match a dialect available in the active model's training data.")
+    total = len(available)
+    page = max(1, page)
+    limit = max(1, min(limit, 1000))
     start = (page - 1) * limit
-    end = start + limit
     return {
-        "items": filtered[start:end],
+        "items": available[start : start + limit],
         "total": total,
         "page": page,
         "limit": limit,
         "total_pages": max(1, (total + limit - 1) // limit),
+        "model_id": run_dir.name if run_dir else None,
+        "dialects": available_dialects,
     }
 
 
-@app.get("/api/dataset/signs/{sign_id}")
-def get_sign_by_id(sign_id: str):
-    for s in sign_catalog:
-        if s["id"] == sign_id:
-            return s
-    raise HTTPException(status_code=404, detail="Sign not found")
-
-
-@app.get("/api/dataset/stats")
-def dataset_stats():
+@app.get("/api/admin/model/training-data/{gloss}/clips/{clip_index}")
+def admin_training_clip(gloss: str, clip_index: int):
+    """Load one feature sequence from the active model's archived dataset."""
+    if gloss not in _available_model_classes():
+        raise HTTPException(404, "Training gloss not found for the active model.")
+    run_dir = _active_run_dir()
+    path = run_dir / "training_data" / "features" / f"{gloss}.npy" if run_dir else None
+    if not path or not path.is_file():
+        raise HTTPException(404, "This model does not have archived training data.")
+    try:
+        clips = np.load(path, mmap_mode="r", allow_pickle=False)
+    except (OSError, ValueError) as exc:
+        logging.exception("Could not read archived training data %s", path)
+        raise HTTPException(500, f"Could not read archived training data for {gloss}.") from exc
+    if clips.ndim != 3 or clips.shape[1:] != (N_FRAMES, N_FEATURES):
+        raise HTTPException(500, f"Archived training data for {gloss} has an invalid shape.")
+    if clip_index < 0 or clip_index >= clips.shape[0]:
+        raise HTTPException(404, "Training clip not found.")
+    frames = np.asarray(clips[clip_index], dtype=np.float32)
+    if not np.isfinite(frames).all():
+        raise HTTPException(500, "Archived training clip contains invalid feature values.")
+    if REGISTRY.temporal_session is None or not REGISTRY.temporal_classes:
+        raise HTTPException(409, "The active model cannot classify training clips.")
+    try:
+        logits = REGISTRY.temporal_session.run(
+            None,
+            {REGISTRY.temporal_input: frames[np.newaxis].astype(np.float32)},
+        )[0][0]
+    except Exception as exc:
+        logging.exception("Could not classify archived training clip %s[%d]", gloss, clip_index)
+        raise HTTPException(500, "Could not classify this training clip with the active model.") from exc
+    if (
+        logits.ndim != 1
+        or len(logits) != len(REGISTRY.temporal_classes)
+        or not np.isfinite(logits).all()
+    ):
+        raise HTTPException(500, "The active model returned an invalid training-clip prediction.")
+    probabilities = np.exp(logits - logits.max())
+    probabilities /= probabilities.sum()
+    order = np.argsort(probabilities)[::-1][:3]
+    predicted = REGISTRY.temporal_classes[int(order[0])]
+    sources = []
+    source_report = run_dir / "training_data" / "features" / "extract_report.json"
+    if source_report.is_file():
+        try:
+            sources = json.loads(source_report.read_text(encoding="utf-8")).get("videos", [])
+        except (OSError, json.JSONDecodeError) as exc:
+            logging.exception("Could not read archived extraction report %s", source_report)
+            raise HTTPException(500, "Could not read the active model's training-data metadata.") from exc
+    source_video = next(
+        (
+            source.get("path")
+            for source in sources
+            if source.get("gloss") == gloss
+            and source.get("status") == "kept"
+            and source.get("row") == clip_index
+        ),
+        None,
+    )
     return {
-        "total_signs": len(sign_catalog),
-        "languages": sorted({s["language"] for s in sign_catalog}),
-        "categories": sorted({s["category"] for s in sign_catalog}),
-        "dataset_version": "v0.1",
-        "model_version": REGISTRY.active["name"] if REGISTRY.active else "none",
+        "gloss": gloss,
+        "clip_index": clip_index,
+        "clip_count": int(clips.shape[0]),
+        "frame_count": int(frames.shape[0]),
+        "feature_width": int(frames.shape[1]),
+        "frames": frames.tolist(),
+        "source_video": source_video,
+        "prediction": predicted,
+        "correct": predicted == gloss,
+        "confidence": float(probabilities[order[0]]),
+        "top3": [
+            {
+                "label": REGISTRY.temporal_classes[int(index)],
+                "confidence": float(probabilities[index]),
+            }
+            for index in order
+        ],
     }
 
 
@@ -636,12 +754,9 @@ def _recognize_stream_clip(clip, emotion, hands_detected):
         if len(order) > 1
         else 1.0
     )
-    not_sure = top_probability < 0.5 or margin < 0.15
     return {
         "ready": True,
-        "label": (
-            REGISTRY.active_classes[int(order[0])] if not not_sure else "NOT_SURE"
-        ),
+        "label": REGISTRY.active_classes[int(order[0])],
         "confidence": top_probability,
         "margin": margin,
         "frames_used": N_FRAMES,
@@ -1262,7 +1377,7 @@ def admin_stats():
     ai = get_ai_config()
     coverage = _coverage_summary()
     return {
-        "total_signs": len(sign_catalog),
+        "total_signs": len(_available_model_classes()),
         "avatar_classes": coverage["with_avatar_data"],
         "model_active": REGISTRY.active["name"] if REGISTRY.active else None,
         "model_classes": len(REGISTRY.active_classes),

@@ -40,8 +40,8 @@ export default function ModelSimulationPage() {
 
   return (
     <div className="space-y-4 max-w-6xl">
-      <div className="text-xs font-mono uppercase text-text-muted">ACTIVE MODEL SIMULATION</div>
-      <h1 className="text-2xl font-bold text-text-primary">Landmark Sequence Inspector</h1>
+      <div className="text-xs font-mono uppercase text-text-muted">AVATAR DATA SIMULATION</div>
+      <h1 className="text-2xl font-bold text-text-primary">Avatar Landmark Inspector</h1>
       <p className="text-xs text-text-secondary">
         These sequences are read directly from {data?.active_model ?? "the active model"} and match its recognition vocabulary.
       </p>

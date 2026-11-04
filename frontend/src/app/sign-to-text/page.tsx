@@ -19,8 +19,6 @@ import { toast } from "sonner";
 import axios from "axios";
 
 const API_BASE = "http://localhost:8200";
-const MIN_CONFIDENCE = 0.5;
-const MIN_MARGIN = 0.15;
 
 interface Prediction {
   detected: boolean;
@@ -37,6 +35,17 @@ interface EmotionResultShape {
 }
 
 type EmotionResult = EmotionResultShape;
+
+function summarizeEmotionCounts(counts: Record<string, number>): EmotionResult | null {
+  const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
+  if (!total) return null;
+  const scores = Object.fromEntries(
+    Object.entries(counts).map(([name, count]) => [name, count / total]),
+  );
+  const [dominant, confidence] = Object.entries(counts)
+    .sort((left, right) => right[1] - left[1])[0];
+  return { dominant, confidence: confidence / total, scores };
+}
 
 interface DetectedSign {
   gloss: string;
@@ -117,6 +126,12 @@ export default function SignToTextPage() {
   const [pickSign, setPickSign] = useState("");
   const [emotion, setEmotion] = useState<EmotionResult | null>(null);
   const [emotionAvailable, setEmotionAvailable] = useState(true);
+  const [emotionCounts, setEmotionCounts] = useState<Record<string, number>>({});
+  const emotionCountsRef = useRef<Record<string, number>>({});
+  const emotionCollectionActiveRef = useRef(false);
+  const emotionSummary = summarizeEmotionCounts(emotionCounts);
+  const [confidenceThreshold, setConfidenceThreshold] = useState(0.15);
+  const confidenceThresholdRef = useRef(confidenceThreshold);
 
   // How deep the SERVER's buffer is. The client does not track this itself: it
   // uploads one frame per tick and the server reports what it holds.
@@ -139,6 +154,9 @@ export default function SignToTextPage() {
   useEffect(() => {
     autoDetectRef.current = autoDetect;
   }, [autoDetect]);
+  useEffect(() => {
+    confidenceThresholdRef.current = confidenceThreshold;
+  }, [confidenceThreshold]);
   useEffect(() => {
     recognitionModeRef.current = recognitionMode;
   }, [recognitionMode]);
@@ -287,6 +305,21 @@ export default function SignToTextPage() {
     return history.map((sign) => `[${sign.gloss.toLowerCase()}]`).join(" + ");
   };
 
+  const resetEmotionCollection = () => {
+    emotionCountsRef.current = {};
+    setEmotionCounts({});
+  };
+
+  const recordEmotionSample = (sample: EmotionResult | null | undefined) => {
+    if (!sample?.dominant) return;
+    const next = {
+      ...emotionCountsRef.current,
+      [sample.dominant]: (emotionCountsRef.current[sample.dominant] ?? 0) + 1,
+    };
+    emotionCountsRef.current = next;
+    setEmotionCounts(next);
+  };
+
   const handleStreamAndSpeak = async () => {
     if (
       detectedHistory.length === 0 ||
@@ -299,6 +332,9 @@ export default function SignToTextPage() {
     setBengaliOutput("");
 
     let full = "";
+    const translationEmotion = summarizeEmotionCounts(emotionCountsRef.current);
+    emotionCollectionActiveRef.current = false;
+    resetEmotionCollection();
 
     try {
       const gloss = buildGlossString(
@@ -312,7 +348,7 @@ export default function SignToTextPage() {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ gloss, emotion }),
+          body: JSON.stringify({ gloss, emotion: translationEmotion }),
         }
       );
 
@@ -456,6 +492,10 @@ export default function SignToTextPage() {
   };
 
   const appendGloss = (gloss: string) => {
+    if (!emotionCollectionActiveRef.current) {
+      resetEmotionCollection();
+      emotionCollectionActiveRef.current = true;
+    }
     setDetectedHistory((prev) => [...prev, { gloss }]);
   };
 
@@ -464,6 +504,8 @@ export default function SignToTextPage() {
       return;
     }
 
+    emotionCollectionActiveRef.current = false;
+    resetEmotionCollection();
     setDetectedHistory((prev) =>
       prev.slice(0, -1)
     );
@@ -480,6 +522,8 @@ export default function SignToTextPage() {
 
   const handleClear = () => {
     setDetectedHistory([]);
+    emotionCollectionActiveRef.current = false;
+    resetEmotionCollection();
     setPrediction(null);
     setBengaliOutput("");
     setLive(null);
@@ -505,6 +549,13 @@ export default function SignToTextPage() {
       data.detail === "incomplete_span" ? "Hands not clear, try again." : null
     );
     setEmotion(data.emotion ?? null);
+    if (data.state === "SIGN" && !emotionCollectionActiveRef.current) {
+      resetEmotionCollection();
+      emotionCollectionActiveRef.current = true;
+    }
+    if (emotionCollectionActiveRef.current) {
+      recordEmotionSample(data.emotion);
+    }
 
     if (!data.ready || !data.label) {
       setLive(null);
@@ -525,9 +576,8 @@ export default function SignToTextPage() {
       emotion: data.emotion ?? null,
     });
 
-    const confident = confidence >= MIN_CONFIDENCE && margin >= MIN_MARGIN;
     setLive(isSign ? { label, confidence, margin } : null);
-    if (isSign && confident && autoDetectRef.current) {
+    if (isSign && confidence >= confidenceThresholdRef.current && autoDetectRef.current) {
       appendGloss(label);
     }
   };
@@ -778,6 +828,28 @@ export default function SignToTextPage() {
             </div>
           )}
 
+          <div className="rounded-xl bg-background/50 px-3 py-2">
+            <div className="mb-1 flex items-center justify-between gap-2 text-[9px] font-mono">
+              <label htmlFor="confidence-threshold" className="text-text-secondary">
+                Auto-append confidence
+              </label>
+              <span className="text-accent-primary">{Math.round(confidenceThreshold * 100)}%</span>
+            </div>
+            <input
+              id="confidence-threshold"
+              type="range"
+              min={0}
+              max={0.8}
+              step={0.05}
+              value={confidenceThreshold}
+              onChange={(event) => setConfidenceThreshold(Number(event.target.value))}
+              className="w-full accent-[var(--accent-primary)]"
+            />
+            <p className="text-[8px] font-mono text-text-muted">
+              Best-match labels remain visible at every confidence; this only controls auto-append.
+            </p>
+          </div>
+
           {/* Recognition Result Card */}
           <div className="rounded-xl bg-background/50 p-3 flex flex-col gap-2.5 min-w-0">
             {recognitionNotice && (
@@ -832,20 +904,6 @@ export default function SignToTextPage() {
                   ))}
                 </div>
               </div>
-            ) : prediction?.label === "NOT_SURE" ? (
-              <div className="py-3 text-center">
-                <span className="text-sm font-mono font-bold text-status-pending">
-                  Not sure — try a clearer sign
-                </span>
-                <div className="mt-2 space-y-1">
-                  {prediction.top5.slice(0, 3).map((item) => (
-                    <div key={item.label} className="flex justify-between text-[10px] font-mono text-text-secondary">
-                      <span>{item.label}</span>
-                      <span>{Math.round(item.confidence * 100)}%</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
             ) : (
               <div className="py-4 flex flex-col items-center justify-center text-center">
                 <Sparkles size={16} className="text-text-muted mb-1.5" />
@@ -872,8 +930,12 @@ export default function SignToTextPage() {
               <span className="text-text-secondary font-medium">{contract.feature_width ?? 98}-dim shoulder-box</span>
             </div>
             <div className="flex justify-between">
-              <span>Affect Input:</span>
-              <span className="text-accent-secondary font-medium">{emotion?.dominant ?? "—"}</span>
+              <span>Collected affect:</span>
+              <span className="text-accent-secondary font-medium">
+                {emotionSummary
+                  ? `${emotionSummary.dominant} · ${Math.round(emotionSummary.confidence * 100)}%`
+                  : "—"}
+              </span>
             </div>
           </div>
         </section>
@@ -929,6 +991,8 @@ export default function SignToTextPage() {
                       key={idx}
                       onClick={() => {
                         setDetectedHistory((prev) => prev.slice(0, idx));
+                        emotionCollectionActiveRef.current = false;
+                        resetEmotionCollection();
                         setBengaliOutput("");
                       }}
                       title="Click to remove signs from here"

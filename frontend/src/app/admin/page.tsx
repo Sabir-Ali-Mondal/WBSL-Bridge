@@ -79,20 +79,20 @@ export default function AdminDashboardPage() {
         </div>
 
         <Link
-          href="/admin/dataset"
+          href="/admin/training-data"
           className="p-6 rounded-lg bg-surface border border-border hover:border-accent-secondary transition-all flex flex-col justify-between space-y-4"
         >
           <div>
             <div className="w-10 h-10 rounded bg-accent-secondary/10 text-accent-secondary flex items-center justify-center mb-3">
               <Database size={20} />
             </div>
-            <h3 className="font-semibold text-text-primary">Dataset Explorer</h3>
+            <h3 className="font-semibold text-text-primary">Training Data Verification</h3>
             <p className="text-xs text-text-secondary mt-1">
-              Browse the model vocabulary and inspect per-sign avatar availability.
+              Review archived model clips, skeleton sequences, and recognition results.
             </p>
           </div>
           <div className="flex items-center space-x-1 text-xs font-mono text-accent-secondary font-bold">
-            <span>Open Explorer</span>
+            <span>Open Training Data</span>
             <ArrowUpRight size={14} />
           </div>
         </Link>
