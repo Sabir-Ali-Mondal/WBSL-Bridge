@@ -5,15 +5,12 @@ import { PageContainer } from "@/components/layout/PageContainer";
 import { ContinuousSignSimulation } from "@/components/simulation/ContinuousSignSimulation";
 import {
   AlertTriangle,
-  ArrowRight,
-  Cpu,
   Loader2,
   Mic,
   Play,
   RotateCcw,
   ShieldAlert,
   Sliders,
-  Sparkles,
   Square,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -319,6 +316,16 @@ function getRandomGlossSample(glosses: string[]): string[] {
   );
   return shuffled.slice(0, sampleSize);
 }
+
+// Shared class strings, identical to the Sign → Bengali page.
+// No borders anywhere: depth comes from stacked fills instead.
+const cardCls =
+  "flex flex-col gap-4 rounded-2xl bg-white/[0.035] p-5 sm:p-6";
+const sectionTitleCls = "text-sm font-medium text-text-secondary select-none";
+const segCls = "flex rounded-lg bg-black/25 p-1";
+const segBtnCls = "rounded-md px-3 py-1 text-xs font-semibold transition-colors";
+const segActiveCls = "bg-white/10 text-text-primary";
+const segIdleCls = "text-text-muted hover:text-text-secondary";
 
 export default function TextToSignPage() {
   const [inputText, setInputText] = useState("");
@@ -943,129 +950,178 @@ export default function TextToSignPage() {
     }
   };
 
+  // Silero VAD sliders, described once and rendered in a loop.
+  const vadControls = [
+    {
+      label: "Silence threshold",
+      display: String(silenceThreshold),
+      min: 0.1,
+      max: 0.9,
+      step: 0.05,
+      value: silenceThreshold,
+      set: setSilenceThreshold,
+    },
+    {
+      label: "Min silence",
+      display: `${minSilenceMs} ms`,
+      min: 200,
+      max: 2000,
+      step: 50,
+      value: minSilenceMs,
+      set: setMinSilenceMs,
+    },
+    {
+      label: "Speech padding",
+      display: `${speechPadMs} ms`,
+      min: 100,
+      max: 800,
+      step: 50,
+      value: speechPadMs,
+      set: setSpeechPadMs,
+    },
+    {
+      label: "Max segment",
+      display: `${maxSegmentS} s`,
+      min: 5,
+      max: 30,
+      step: 1,
+      value: maxSegmentS,
+      set: setMaxSegmentS,
+    },
+  ];
+
+  const voiceTitle = isRecording
+    ? "Listening"
+    : voiceStatus === "finalizing"
+    ? "Finalizing"
+    : voiceStatus === "complete"
+    ? "Complete"
+    : voiceStatus === "warning"
+    ? "No speech"
+    : "Voice input";
+
+  const voiceSub =
+    inFlightCount > 0
+      ? `Transcribing ${inFlightCount} segment${inFlightCount === 1 ? "" : "s"}`
+      : isRecording
+      ? sttEngine === "elevenlabs"
+        ? `${sliceRemainingSec.toFixed(1)}s to next slice`
+        : `Sends every ${recordingDuration}s`
+      : voiceStatus === "finalizing"
+      ? "Transcribing audio"
+      : "Tap the mic to speak";
+
   return (
     <PageContainer className="w-full max-w-[1600px] px-3 sm:px-6 lg:px-8 py-4 lg:py-6">
-      <div className="grid grid-cols-1 lg:grid-cols-[30%_70%] gap-4 lg:gap-6 items-stretch">
+      <div className="grid grid-cols-1 items-stretch gap-5 lg:grid-cols-[30%_70%] lg:gap-6">
         {/* LEFT PANEL: INPUT & CONTROLS */}
-        <section className={`flex flex-col justify-between rounded-2xl border border-border/80 bg-surface/50 p-4 sm:p-5 backdrop-blur-sm gap-3.5 h-full ${showVadSettings ? "relative z-20" : ""}`}>
-          {/* Top row: STT Engine Selector + VAD Mode */}
-          <div className="flex flex-col gap-2">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                {/* STT Engine Selector */}
-                <div
-                  className="flex items-center gap-0.5 p-0.5 rounded-lg bg-surface/80 border border-border/80"
-                  role="group"
-                  aria-label="STT Engine"
+        <section
+          className={`${cardCls} h-full justify-between ${
+            showVadSettings ? "relative z-20" : ""
+          }`}
+        >
+          {/* Speech engine */}
+          <div className="flex flex-col gap-2.5">
+            <div className="flex items-center justify-between">
+              <span className={sectionTitleCls}>Bengali text</span>
+              <div className={segCls} role="group" aria-label="STT Engine">
+                <button
+                  type="button"
+                  onClick={() => setSttEngine("local")}
+                  aria-pressed={sttEngine === "local"}
+                  className={`${segBtnCls} ${
+                    sttEngine === "local" ? segActiveCls : segIdleCls
+                  }`}
+                  title="Local faster-whisper on CPU (Free, Offline, No cloud calls)"
                 >
+                  Local
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (sttEngine !== "elevenlabs") {
+                      setShowPremiumModal(true);
+                    }
+                  }}
+                  aria-pressed={sttEngine === "elevenlabs"}
+                  className={`${segBtnCls} ${
+                    sttEngine === "elevenlabs"
+                      ? "bg-amber-400/20 text-amber-300"
+                      : segIdleCls
+                  }`}
+                  title="ElevenLabs Scribe v1/v2 (Premium Cloud STT)"
+                >
+                  ElevenLabs
+                </button>
+              </div>
+            </div>
+
+            {sttEngine === "elevenlabs" && (
+              <div className="flex items-center justify-between rounded-xl bg-amber-400/10 px-3.5 py-2.5 text-xs text-amber-300">
+                <span>ElevenLabs Scribe is on</span>
+                <button
+                  type="button"
+                  onClick={() => setSttEngine("local")}
+                  className="underline underline-offset-2 hover:text-white"
+                >
+                  Switch to local
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Premium Warning Modal */}
+          {showPremiumModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+              <div className="flex w-full max-w-md flex-col gap-4 rounded-2xl bg-surface p-6 shadow-2xl">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-400/15 text-amber-300">
+                    <ShieldAlert size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-text-primary">
+                      Switch to ElevenLabs STT?
+                    </h3>
+                    <span className="text-xs text-text-muted">
+                      Cloud-based multilingual transcription
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2 rounded-xl bg-black/25 p-4 text-xs leading-relaxed text-text-secondary">
+                  <p>Audio is sent to ElevenLabs cloud servers.</p>
+                  <p>API usage charges and quotas apply.</p>
+                  <p className="font-medium text-amber-300">
+                    There is no automatic fallback. Missing credentials or quota limits will make transcription fail.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-1">
                   <button
                     type="button"
-                    onClick={() => setSttEngine("local")}
-                    aria-pressed={sttEngine === "local"}
-                    className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider transition-colors flex items-center gap-1 ${
-                      sttEngine === "local"
-                        ? "bg-accent-primary/20 text-accent-primary border border-accent-primary/40 shadow-sm"
-                        : "text-text-muted hover:text-text-secondary"
-                    }`}
-                    title="Local faster-whisper on CPU (Free, Offline, No cloud calls)"
+                    onClick={() => setShowPremiumModal(false)}
+                    className="rounded-lg px-3.5 py-2 text-xs text-text-secondary transition-colors hover:bg-white/[0.07] hover:text-text-primary"
                   >
-                    <Cpu size={10} />
-                    Local
+                    Cancel
                   </button>
                   <button
                     type="button"
                     onClick={() => {
-                      if (sttEngine !== "elevenlabs") {
-                        setShowPremiumModal(true);
-                      }
+                      setSttEngine("elevenlabs");
+                      setShowPremiumModal(false);
+                      toast.success("Switched to ElevenLabs Scribe STT mode.");
                     }}
-                    aria-pressed={sttEngine === "elevenlabs"}
-                    className={`px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider transition-colors flex items-center gap-1 ${
-                      sttEngine === "elevenlabs"
-                        ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm"
-                        : "text-text-muted hover:text-text-secondary"
-                    }`}
-                    title="ElevenLabs Scribe v1/v2 (Premium Cloud STT)"
+                    className="rounded-lg bg-amber-400 px-4 py-2 text-xs font-semibold text-black transition-colors hover:bg-amber-300"
                   >
-                    <Sparkles size={10} />
-                    ElevenLabs
+                    Use ElevenLabs
                   </button>
                 </div>
-
               </div>
             </div>
-
-            {/* Premium ElevenLabs Mode Notice */}
-            {sttEngine === "elevenlabs" && (
-              <div className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-[10px] font-mono text-amber-300">
-                <span className="flex items-center gap-1.5">
-                  <Sparkles size={12} className="text-amber-400" />
-                  ElevenLabs Scribe active
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setSttEngine("local")}
-                  className="text-[9px] underline hover:text-white"
-                >
-                  Exit
-                </button>
-              </div>
-            )}
-
-          </div>
-
-{/* Premium Warning Modal */}
-{showPremiumModal && (
-  <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-    <div className="bg-surface border border-amber-500/40 rounded-2xl max-w-md w-full p-5 shadow-2xl flex flex-col gap-4">
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
-          <ShieldAlert size={20} />
-        </div>
-        <div>
-          <h3 className="font-mono font-bold text-sm text-text-primary">
-            Switch to ElevenLabs STT?
-          </h3>
-          <span className="text-[10px] font-mono text-amber-400">
-            Cloud-based multilingual transcription
-          </span>
-        </div>
-      </div>
-
-      <div className="text-xs text-text-secondary leading-relaxed bg-surface-elevated p-3 rounded-xl border border-border/60 flex flex-col gap-2">
-        <p>• Audio will be sent to ElevenLabs cloud servers.</p>
-        <p>• API usage charges and quotas apply.</p>
-        <p className="font-semibold text-amber-300">
-          • No automatic fallback: missing credentials or quota limits will cause transcription to fail.
-        </p>
-      </div>
-
-      <div className="flex items-center justify-end gap-2.5 pt-1">
-        <button
-          type="button"
-          onClick={() => setShowPremiumModal(false)}
-          className="px-3 py-1.5 rounded-lg border border-border text-xs font-mono text-text-secondary hover:text-text-primary hover:bg-surface-elevated transition-colors"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setSttEngine("elevenlabs");
-            setShowPremiumModal(false);
-            toast.success("Switched to ElevenLabs Scribe STT mode.");
-          }}
-          className="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black font-mono font-bold text-xs transition-colors shadow-md"
-        >
-          Enable ElevenLabs
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+          )}
 
           {/* Multiline Textarea with inline unmapped word highlighting and locked height */}
-          <div className="relative w-full flex-1 min-h-[340px] lg:min-h-[420px] rounded-xl bg-background/50 border border-blue-500 focus-within:ring-1 focus-within:ring-accent-secondary/50 focus-within:border-accent-secondary/60 transition-all flex flex-col overflow-hidden">
+          <div className="relative flex min-h-[340px] w-full flex-1 flex-col overflow-hidden rounded-xl bg-black/20 transition-colors focus-within:bg-black/30 lg:min-h-[420px]">
             {inputText && (
               <button
                 type="button"
@@ -1073,16 +1129,16 @@ export default function TextToSignPage() {
                   setInputText("");
                   setResult(null);
                 }}
-                className="absolute top-3 right-2 z-20 rounded-md border border-red-500 px-2 py-1 text-[10px] font-mono leading-none text-text-muted hover:text-text-primary transition-colors"
+                className="absolute right-3 top-1 z-20 rounded-md px-2 py-1 text-xs transition-colors hover:bg-white/[0.07] hover:text-text-primary"
               >
                 Clear
               </button>
             )}
-            <div className="relative flex-1 w-full h-full min-h-[280px]">
+            <div className="relative h-full min-h-[280px] w-full flex-1">
               {/* Highlight backdrop overlay (mirrors textarea font, padding, word wrap) */}
               <div
                 aria-hidden="true"
-                className="pointer-events-none absolute inset-0 p-4 pt-6 font-bengali text-base whitespace-pre-wrap break-words overflow-hidden select-none leading-relaxed text-transparent"
+                className="pointer-events-none absolute inset-0 select-none overflow-hidden whitespace-pre-wrap break-words p-4 pt-6 font-bengali text-base leading-relaxed text-transparent"
               >
                 {renderHighlightedText(inputText, effectiveUnmappedWords)}
               </div>
@@ -1098,255 +1154,201 @@ export default function TextToSignPage() {
                   }
                 }}
                 placeholder="বাংলা বাক্য লিখুন"
-                className="relative z-10 w-full h-full p-4 pt-6 bg-transparent text-text-primary font-bengali text-base placeholder:text-text-muted/50 focus:outline-none resize-none leading-relaxed"
+                className="relative z-10 h-full w-full resize-none bg-transparent p-4 pt-6 font-bengali text-base leading-relaxed text-text-primary placeholder:text-text-muted/50 focus:outline-none"
               />
             </div>
           </div>
 
-          {/* Guide text placed at bottom of text-input area, above voice controls */}
-          <div className="flex items-center justify-between px-1 text-[11px] font-mono text-text-muted select-none">
-            <span className={effectiveUnmappedWords.length > 0 ? "text-status-error/90 flex items-center gap-1" : ""}>
-              {effectiveUnmappedWords.length > 0 && <AlertTriangle size={12} className="text-status-error" />}
-              Red text = no matching sign
+          {/* Guide text above the voice controls */}
+          <div className="flex select-none items-center justify-between px-1 text-xs text-text-muted">
+            <span
+              className={
+                effectiveUnmappedWords.length > 0
+                  ? "flex items-center gap-1.5 text-status-error/90"
+                  : ""
+              }
+            >
+              {effectiveUnmappedWords.length > 0 && (
+                <AlertTriangle size={12} className="text-status-error" />
+              )}
+              Red text has no matching sign
             </span>
+            <span>Ctrl + Enter to play</span>
           </div>
 
           {/* Continuous Voice Splitter Control */}
           <div
-            className={`w-full rounded-xl border p-4 flex flex-col gap-2 transition-all ${
+            className={`flex w-full flex-col gap-3 rounded-xl p-4 transition-colors ${
               isRecording
-                ? "bg-status-error/15 border-status-error/40 text-status-error shadow-sm"
+                ? "bg-status-error/15"
                 : voiceStatus === "finalizing"
-                ? "bg-accent-secondary/10 border-accent-secondary/30"
+                ? "bg-accent-secondary/10"
                 : voiceStatus === "complete"
-                ? "bg-status-success/10 border-status-success/30"
+                ? "bg-status-success/10"
                 : voiceStatus === "warning"
-                ? "bg-status-warning/10 border-status-warning/30"
-                : "bg-surface/50 border-border/70"
+                ? "bg-status-warning/10"
+                : "bg-black/20"
             }`}
           >
             <div className="flex items-center justify-between gap-3">
-              <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-              <button
-                type="button"
-                disabled={voiceStatus === "finalizing"}
-                onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
-                title={
-                  voiceStatus === "finalizing"
-                    ? "Finalizing transcription..."
-                    : isRecording
-                    ? "Stop recording"
-                    : "Record voice"
-                }
-                aria-label={
-                  isRecording ? "Stop voice recording" : "Start voice recording"
-                }
-                className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
-                  isRecording
-                    ? "bg-status-error text-white shadow-md animate-pulse"
-                    : voiceStatus === "finalizing"
-                    ? "bg-accent-secondary text-white shadow-sm"
-                    : "bg-accent-secondary/20 text-accent-secondary hover:bg-accent-secondary/30"
-                }`}
-              >
-                {voiceStatus === "finalizing" ? (
-                  <Loader2 size={17} className="animate-spin" />
-                ) : isRecording ? (
-                  <Square size={14} fill="currentColor" />
-                ) : (
-                  <Mic size={18} />
-                )}
-              </button>
-
-              <div className="flex w-[58px] min-w-0 shrink flex-col">
-                <span
-                  className={`whitespace-nowrap text-[9px] font-sans font-semibold tracking-wide leading-3 ${
+              <div className="flex min-w-0 flex-1 items-center gap-3">
+                <button
+                  type="button"
+                  disabled={voiceStatus === "finalizing"}
+                  onClick={isRecording ? stopVoiceRecording : startVoiceRecording}
+                  title={
+                    voiceStatus === "finalizing"
+                      ? "Finalizing transcription..."
+                      : isRecording
+                      ? "Stop recording"
+                      : "Record voice"
+                  }
+                  aria-label={
+                    isRecording ? "Stop voice recording" : "Start voice recording"
+                  }
+                  className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${
                     isRecording
-                      ? "text-status-error"
+                      ? "animate-pulse bg-status-error text-white"
                       : voiceStatus === "finalizing"
-                      ? "text-accent-secondary"
-                      : voiceStatus === "complete"
-                      ? "text-status-success"
-                      : voiceStatus === "warning"
-                      ? "text-status-warning"
-                      : "text-text-primary"
+                      ? "bg-accent-secondary text-white"
+                      : "bg-accent-secondary/20 text-accent-secondary hover:bg-accent-secondary/30"
                   }`}
                 >
-                  {isRecording
-                    ? "LISTENING"
-                    : voiceStatus === "finalizing"
-                    ? "FINALIZING"
-                    : voiceStatus === "complete"
-                    ? "COMPLETE"
-                    : voiceStatus === "warning"
-                    ? "NO SPEECH"
-                    : "VOICE"}
-                </span>
-                {(isRecording || voiceStatus === "finalizing" || inFlightCount > 0) && (
-                  <span className="mt-0.5 max-w-[72px] break-words text-[8px] font-sans leading-tight text-text-secondary">
-                    {inFlightCount > 0
-                      ? `Transcribing ${inFlightCount} segment${inFlightCount === 1 ? "" : "s"}`
-                      : isRecording
-                      ? sttEngine === "elevenlabs"
-                        ? `${sliceRemainingSec.toFixed(1)}s to next slice`
-                        : `Every ${recordingDuration}s`
-                      : "Transcribing audio"}
-                  </span>
-                )}
-              </div>
+                  {voiceStatus === "finalizing" ? (
+                    <Loader2 size={17} className="animate-spin" />
+                  ) : isRecording ? (
+                    <Square size={14} fill="currentColor" />
+                  ) : (
+                    <Mic size={18} />
+                  )}
+                </button>
 
               </div>
 
               <div className="flex shrink-0 items-center gap-2">
-              {/* Language Selector */}
-              <div
-                className="flex shrink-0 items-center gap-0.5 rounded-xl bg-surface/80 p-1"
-                role="group"
-                aria-label="Input Language"
-              >
-                {([
-                  { key: "auto", label: "AUTO" },
-                  { key: "bn", label: "বাংলা" },
-                  { key: "en", label: "ENGLISH" },
-                ] as const).map((opt) => (
-                  <button
-                    key={opt.key}
-                    type="button"
-                    onClick={() => setSttLanguage(opt.key)}
-                    aria-pressed={sttLanguage === opt.key}
-                    className={`rounded-lg px-2 py-1.5 text-[10px] font-sans font-semibold tracking-wide transition-colors ${
-                      sttLanguage === opt.key
-                        ? "bg-accent-secondary text-white shadow-sm"
-                        : "text-text-secondary hover:bg-surface-elevated hover:text-text-primary"
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
+                {/* Language Selector */}
+                <div className={segCls} role="group" aria-label="Input Language">
+                  {(
+                    [
+                      { key: "auto", label: "Auto" },
+                      { key: "bn", label: "বাংলা" },
+                      { key: "en", label: "English" },
+                    ] as const
+                  ).map((opt) => (
+                    <button
+                      key={opt.key}
+                      type="button"
+                      onClick={() => setSttLanguage(opt.key)}
+                      aria-pressed={sttLanguage === opt.key}
+                      className={`${segBtnCls} px-2.5 ${
+                        sttLanguage === opt.key ? segActiveCls : segIdleCls
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
 
-              <div className="relative">
-                {sttEngine === "local" && (
-                  <button
-                    type="button"
-                    onClick={() => setShowVadSettings((v) => !v)}
-                    aria-label="VAD Configuration"
-                    aria-expanded={showVadSettings}
-                    className={`flex h-10 w-10 items-center justify-center rounded-xl bg-surface/80 text-text-secondary hover:text-text-primary transition-colors ${
-                      showVadSettings ? "bg-surface-elevated text-accent-secondary" : ""
-                    }`}
-                    title="Configure Silero VAD thresholds & padding"
-                  >
-                    <Sliders size={12} />
-                  </button>
-                )}
-                {showVadSettings && sttEngine === "local" && (
-                  <div className="absolute bottom-full left-1/2 z-30 mb-3 w-[min(26rem,calc(100vw-2rem))] -translate-x-1/2 rounded-xl border border-border/80 bg-surface p-4 shadow-xl flex flex-col gap-3 text-xs font-mono">
-                    <div className="flex items-center justify-between pb-1 border-b border-border/50">
-                      <span className="font-bold text-[11px] text-text-primary flex items-center gap-1.5">
-                        <Sliders size={12} className="text-accent-secondary" />
-                        Silero VAD Parameters
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSilenceThreshold(0.5);
-                          setMinSilenceMs(500);
-                          setSpeechPadMs(400);
-                          setMaxSegmentS(15.0);
-                          toast.info("VAD parameters reset to defaults.");
-                        }}
-                        className="text-[9px] text-text-muted hover:text-text-primary underline"
-                      >
-                        Reset Defaults
-                      </button>
-                    </div>
+                <div className="relative">
+                  {sttEngine === "local" && (
+                    <button
+                      type="button"
+                      onClick={() => setShowVadSettings((v) => !v)}
+                      aria-label="VAD Configuration"
+                      aria-expanded={showVadSettings}
+                      className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${
+                        showVadSettings
+                          ? "bg-white/10 text-accent-secondary"
+                          : "bg-white/[0.06] text-text-secondary hover:bg-white/10 hover:text-text-primary"
+                      }`}
+                      title="Configure Silero VAD thresholds & padding"
+                    >
+                      <Sliders size={14} />
+                    </button>
+                  )}
 
-                    <div className="grid grid-cols-1 gap-3 text-[10px]">
-                      <div className="flex flex-col gap-1">
-                        <div className="flex justify-between text-text-secondary">
-                          <span className="whitespace-nowrap">Silence Threshold:</span>
-                          <span className="text-accent-secondary font-bold">{silenceThreshold}</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="0.1"
-                          max="0.9"
-                          step="0.05"
-                          value={silenceThreshold}
-                          onChange={(e) => setSilenceThreshold(parseFloat(e.target.value))}
-                          className="w-full h-1 bg-surface-elevated rounded accent-accent-secondary cursor-pointer"
-                        />
+                  {showVadSettings && sttEngine === "local" && (
+                    <div className="absolute bottom-full right-0 z-30 mb-3 flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-4 rounded-xl bg-surface p-4 text-xs shadow-2xl">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-text-primary">
+                          Voice detection
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSilenceThreshold(0.5);
+                            setMinSilenceMs(500);
+                            setSpeechPadMs(400);
+                            setMaxSegmentS(15.0);
+                            toast.info("VAD parameters reset to defaults.");
+                          }}
+                          className="text-text-muted underline underline-offset-2 hover:text-text-primary"
+                        >
+                          Reset defaults
+                        </button>
                       </div>
 
-                      <div className="flex flex-col gap-1">
-                        <div className="flex justify-between text-text-secondary">
-                          <span className="whitespace-nowrap">Min Silence (ms):</span>
-                          <span className="text-accent-secondary font-bold">{minSilenceMs}ms</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="200"
-                          max="2000"
-                          step="50"
-                          value={minSilenceMs}
-                          onChange={(e) => setMinSilenceMs(parseInt(e.target.value, 10))}
-                          className="w-full h-1 bg-surface-elevated rounded accent-accent-secondary cursor-pointer"
-                        />
-                      </div>
-
-                      <div className="flex flex-col gap-1">
-                        <div className="flex justify-between text-text-secondary">
-                          <span className="whitespace-nowrap">Speech Padding (ms):</span>
-                          <span className="text-accent-secondary font-bold">{speechPadMs}ms</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="100"
-                          max="800"
-                          step="50"
-                          value={speechPadMs}
-                          onChange={(e) => setSpeechPadMs(parseInt(e.target.value, 10))}
-                          className="w-full h-1 bg-surface-elevated rounded accent-accent-secondary cursor-pointer"
-                        />
-                      </div>
-
-                      <div className="flex flex-col gap-1">
-                        <div className="flex justify-between text-text-secondary">
-                          <span className="whitespace-nowrap">Max Segment (s):</span>
-                          <span className="text-accent-secondary font-bold">{maxSegmentS}s</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="5"
-                          max="30"
-                          step="1"
-                          value={maxSegmentS}
-                          onChange={(e) => setMaxSegmentS(parseFloat(e.target.value))}
-                          className="w-full h-1 bg-surface-elevated rounded accent-accent-secondary cursor-pointer"
-                        />
+                      <div className="flex flex-col gap-3.5">
+                        {vadControls.map((c) => (
+                          <div key={c.label} className="flex flex-col gap-1.5">
+                            <div className="flex justify-between text-text-secondary">
+                              <span>{c.label}</span>
+                              <span className="font-mono font-semibold text-accent-secondary">
+                                {c.display}
+                              </span>
+                            </div>
+                            <input
+                              type="range"
+                              min={c.min}
+                              max={c.max}
+                              step={c.step}
+                              value={c.value}
+                              onChange={(e) => c.set(Number(e.target.value))}
+                              className="h-1 w-full cursor-pointer rounded accent-accent-secondary"
+                            />
+                          </div>
+                        ))}
                       </div>
                     </div>
-                    </div>
-                    )}
+                  )}
                 </div>
               </div>
             </div>
 
-            {/* Timing Animation Progress Bar (Shows speaker when slice ends to finish long words) */}
+            {/* Slice timer */}
             {isRecording && (
-              <div className="w-full bg-border/40 h-1.5 rounded-full overflow-hidden">
+              <div className="h-1 w-full overflow-hidden rounded-full bg-white/10">
                 <div
-                  className="h-full bg-status-error transition-all duration-100 ease-linear rounded-full"
+                  className="h-full rounded-full bg-status-error transition-all duration-100 ease-linear"
                   style={{ width: `${sliceProgress}%` }}
                 />
               </div>
             )}
 
+            {/* Status text: full width at the bottom of the box */}
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+              <span
+                className={`text-sm font-medium ${
+                  isRecording
+                    ? "text-status-error"
+                    : voiceStatus === "finalizing"
+                    ? "text-accent-secondary"
+                    : voiceStatus === "complete"
+                    ? "text-status-success"
+                    : voiceStatus === "warning"
+                    ? "text-status-warning"
+                    : "text-text-primary"
+                }`}
+              >
+                {voiceTitle}
+              </span>
+              <span className="text-xs text-text-muted">{voiceSub}</span>
+            </div>
+
             {/* Recoverable Failed Slices Notice */}
             {failedSlices.length > 0 && voiceStatus !== "recording" && (
-              <div className="flex items-center justify-between mt-1 pt-1.5 border-t border-border/60 text-xs">
-                <span className="flex items-center gap-1.5 text-status-warning font-mono text-[11px]">
+              <div className="flex items-center justify-between text-xs">
+                <span className="flex items-center gap-1.5 text-status-warning">
                   <AlertTriangle size={12} />
                   {failedSlices.length} segment{failedSlices.length > 1 ? "s" : ""} unconfirmed
                 </span>
@@ -1354,10 +1356,10 @@ export default function TextToSignPage() {
                   type="button"
                   onClick={retryAllFailedSlices}
                   disabled={voiceStatus === "finalizing"}
-                  className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-medium bg-accent-secondary/15 hover:bg-accent-secondary/25 text-accent-secondary transition-colors"
+                  className="flex items-center gap-1 rounded-md bg-accent-secondary/15 px-2.5 py-1 font-medium text-accent-secondary transition-colors hover:bg-accent-secondary/25"
                 >
-                  <RotateCcw size={10} />
-                  Retry Failed
+                  <RotateCcw size={11} />
+                  Retry failed
                 </button>
               </div>
             )}
@@ -1370,20 +1372,19 @@ export default function TextToSignPage() {
                 type="button"
                 role="switch"
                 aria-checked={useLlm}
+                aria-label="Use LLM"
                 onClick={() => setUseLlm((v) => !v)}
-                className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border border-border transition-colors duration-200 ease-in-out focus:outline-none ${
-                  useLlm ? "bg-accent-secondary" : "bg-surface-elevated"
+                className={`relative h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors focus:outline-none ${
+                  useLlm ? "bg-accent-secondary" : "bg-white/15"
                 }`}
               >
                 <span
-                  className={`pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out my-auto ${
-                    useLlm ? "translate-x-4 ml-0.5" : "translate-x-0.5 bg-text-muted"
+                  className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${
+                    useLlm ? "translate-x-4" : ""
                   }`}
                 />
               </button>
-              <span className="text-[11px] font-mono font-medium text-text-secondary select-none tracking-wider">
-                LLM
-              </span>
+              <span className="select-none text-xs text-text-secondary">Use LLM</span>
             </div>
 
             <button
@@ -1397,21 +1398,30 @@ export default function TextToSignPage() {
                   ? "Stop recording"
                   : "Record speech"
               }
-              className="w-11 h-11 rounded-xl bg-accent-secondary hover:brightness-110 active:scale-95 text-white flex items-center justify-center transition-all shadow-md disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+              className="flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-accent-secondary px-5 text-sm font-semibold text-white transition hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
             >
               {isLoading ? (
-                <Loader2 size={18} className="animate-spin" />
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  Generating...
+                </>
               ) : isRecording ? (
-                <Square size={16} fill="currentColor" />
+                <>
+                  <Square size={14} fill="currentColor" />
+                  Stop
+                </>
               ) : (
-                <Play size={18} fill="currentColor" className="ml-0.5" />
+                <>
+                  <Play size={16} fill="currentColor" />
+                  Play signs
+                </>
               )}
             </button>
           </div>
         </section>
 
         {/* RIGHT PANEL: SIGN PLAYBACK */}
-        <section className="flex flex-col rounded-2xl border border-border/80 bg-surface/50 p-4 sm:p-5 backdrop-blur-sm min-h-[500px] h-full justify-center">
+        <section className={`${cardCls} h-full min-h-[500px] justify-center`}>
           {result && result.gloss_sequence.length > 0 ? (
             <ContinuousSignSimulation
               glosses={result.gloss_sequence}
@@ -1423,21 +1433,16 @@ export default function TextToSignPage() {
               onComplete={handleSequenceComplete}
             />
           ) : (
-            <div className="flex flex-col h-full space-y-2 justify-between">
-              <div className="flex items-center justify-between gap-3 px-1 mb-1">
-                <div className="inline-flex items-center px-2 py-0.5 rounded border border-border/80 bg-surface text-[10px] font-mono font-bold text-text-muted uppercase tracking-wider">
-                  0 SIGNS
-                </div>
+            <div className="flex h-full flex-col justify-between gap-3">
+              <div className="flex items-center justify-between">
+                <span className={sectionTitleCls}>Sign playback</span>
+                <span className="text-xs text-text-muted">0 signs</span>
               </div>
 
-              <div className="aspect-[16/10] w-full rounded-xl border border-dashed border-border/70 bg-background/30 flex flex-col items-center justify-center text-center p-6 shadow-inner">
-                <div className="w-12 h-12 rounded-xl bg-surface-elevated border border-border flex items-center justify-center text-text-muted mb-4 shadow-sm">
-                  <ArrowRight size={20} />
-                </div>
-
-                <div className="text-xs font-mono text-text-secondary tracking-wide mb-4">
-                  Enter a Bengali sentence to generate the sign sequence
-                </div>
+              <div className="flex aspect-[16/10] w-full flex-col items-center justify-center rounded-xl bg-black/20 p-6 text-center">
+                <p className="mb-4 text-sm text-text-secondary">
+                  Enter a Bengali sentence to generate the sign sequence.
+                </p>
 
                 {exampleSample.length > 0 && (
                   <button
@@ -1445,14 +1450,14 @@ export default function TextToSignPage() {
                     onClick={() => {
                       setInputText(exampleSample.join(" "));
                     }}
-                    className="px-4 py-2 rounded-lg border border-accent-secondary/50 bg-surface-elevated text-accent-secondary font-mono text-xs hover:border-accent-secondary hover:bg-accent-secondary/10 transition-all shadow-sm max-w-full truncate"
+                    className="max-w-full truncate rounded-lg bg-white/10 px-4 py-2 text-sm text-text-primary transition-colors hover:bg-white/[0.16]"
                   >
                     Try: {exampleSample.join(" ")}
                   </button>
                 )}
               </div>
 
-              <div className="h-6" aria-hidden="true" />
+              <div className="h-4" aria-hidden="true" />
             </div>
           )}
         </section>

@@ -509,9 +509,9 @@ export function HandRig({
   const materials = useMemo(
     () => ({
       fingers: new THREE.MeshStandardMaterial({
-        color: CERAMIC_WHITE,
-        metalness: 0.28,
-        roughness: 0.22,
+        color: color || CERAMIC_WHITE,
+        metalness: 0.2,
+        roughness: 0.3,
       }),
       joints: new THREE.MeshStandardMaterial({
         color: TITANIUM_DARK,
@@ -530,9 +530,9 @@ export function HandRig({
         emissive: new THREE.Color(color || ACCENT_GOLD).multiplyScalar(0.2),
       }),
       palm: new THREE.MeshStandardMaterial({
-        color: CERAMIC_SLEEVE,
-        roughness: 0.32,
-        metalness: 0.35,
+        color: color || CERAMIC_SLEEVE,
+        roughness: 0.36,
+        metalness: 0.22,
         side: THREE.DoubleSide,
       }),
     }),
@@ -590,7 +590,7 @@ export function HandRig({
 
     group.position.set(0, 0, 0);
 
-    const smoothing = 1 - Math.exp(-28 * Math.min(delta, 0.05));
+    const smoothing = 1 - Math.exp(-14 * Math.min(delta, 0.05));
 
     for (let j = 0; j < 21; j++) {
       const o = j * 3;
@@ -599,7 +599,7 @@ export function HandRig({
         continue;
       }
 
-      if (j === 0 || !initialized.current[j]) {
+      if (!initialized.current[j]) {
         smoothPoints.current[o] = points[o];
         smoothPoints.current[o + 1] = points[o + 1];
         smoothPoints.current[o + 2] = points[o + 2];
@@ -624,17 +624,19 @@ export function HandRig({
       );
     }
 
-    // Dynamic scale centered on the wrist
-    const wX = smoothPoints.current[0];
-    const wY = smoothPoints.current[1];
-    const wZ = smoothPoints.current[2];
+    // Keep the hand attached to the matching pose wrist while smoothing its shape.
+    const poseWristOffset = (slot + 4) * 4;
+    const poseWristValid = state.pose[poseWristOffset + 3] >= THRESH;
+    const wX = poseWristValid ? state.pose[poseWristOffset] : smoothPoints.current[0];
+    const wY = poseWristValid ? state.pose[poseWristOffset + 1] : smoothPoints.current[1];
+    const wZ = poseWristValid ? state.pose[poseWristOffset + 2] : smoothPoints.current[2];
 
     const p = scaledPoints.current;
     for (let j = 0; j < 21; j++) {
       const o = j * 3;
-      p[o] = wX + (smoothPoints.current[o] - wX) * scale;
-      p[o + 1] = wY + (smoothPoints.current[o + 1] - wY) * scale;
-      p[o + 2] = wZ + (smoothPoints.current[o + 2] - wZ) * scale;
+      p[o] = wX + (smoothPoints.current[o] - smoothPoints.current[0]) * scale;
+      p[o + 1] = wY + (smoothPoints.current[o + 1] - smoothPoints.current[1]) * scale;
+      p[o + 2] = wZ + (smoothPoints.current[o + 2] - smoothPoints.current[2]) * scale;
     }
 
     const fading = alpha < 0.985;
@@ -663,8 +665,8 @@ export function HandRig({
       readPoint(start, p, a * 3);
       readPoint(end, p, b * 3);
 
-      const rA = HAND_JOINT_RADII[a] * 0.88 * scale;
-      const rB = HAND_JOINT_RADII[b] * 0.82 * scale;
+      const rA = HAND_JOINT_RADII[a] * 1.02 * scale;
+      const rB = HAND_JOINT_RADII[b] * 0.96 * scale;
 
       updateSegment(bones, i, start, end, rA, rB, dummy, direction);
     }

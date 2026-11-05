@@ -70,24 +70,25 @@ export function FramingWarningArea({
     return null;
   }
 
+  // Borderless, same fills and corner radius as the rest of the workspace.
   return (
     <div
-      className={`px-3 py-1.5 rounded-lg border text-[11px] font-mono flex items-center gap-2 transition-all duration-300 ${
+      className={`flex items-center gap-2.5 rounded-xl px-3.5 py-2.5 text-xs font-medium transition-colors duration-300 ${
         messageType === "good"
-          ? "bg-accent-primary/10 border-accent-primary/30 text-accent-primary"
+          ? "bg-accent-primary/10 text-accent-primary"
           : messageType === "warning"
-          ? "bg-status-error/10 border-status-error/30 text-status-error"
-          : "bg-surface-elevated/70 border-border text-text-secondary"
+          ? "bg-status-error/10 text-status-error"
+          : "bg-black/20 text-text-secondary"
       }`}
       role="status"
       aria-live="polite"
     >
       {messageType === "good" ? (
-        <CheckCircle2 size={13} className="shrink-0 text-accent-primary" />
+        <CheckCircle2 size={14} className="shrink-0" />
       ) : messageType === "warning" ? (
-        <AlertCircle size={13} className="shrink-0 text-status-error" />
+        <AlertCircle size={14} className="shrink-0" />
       ) : (
-        <Info size={13} className="shrink-0 text-text-muted" />
+        <Info size={14} className="shrink-0 text-text-muted" />
       )}
       <span className="truncate">{currentMessage}</span>
     </div>
