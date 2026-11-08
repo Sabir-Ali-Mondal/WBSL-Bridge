@@ -130,7 +130,14 @@ export default function AboutPage() {
       icon: Brain,
       label: "BENGALI NLG",
       accent: "emerald" as const,
-      desc: "NVIDIA Nemotron 3.5-B (offline) / OpenRouter (online). 50-criteria constrained prompt. AI_MODE selects engine.",
+      desc: "NVIDIA Nemotron-3.5-Bolt-E4B-4GB (Gemma 4 E4B-it base + GRPO RL via NeMo Gym, offline) & Nemotron-3 Ultra 550B (online). 50-criteria anti-hallucination prompt.",
+    },
+    {
+      id: "stt",
+      icon: MessageSquareText,
+      label: "STT & VAD",
+      accent: "blue" as const,
+      desc: "HIMA-ASR ONNX INT8 with native Bengali script + Silero Neural VAD segmentation. Optional ElevenLabs Scribe.",
     },
     {
       id: "tts",
@@ -173,7 +180,11 @@ export default function AboutPage() {
     },
     {
       category: "LLM",
-      items: "Nemotron-3.5-B (KoboldCpp) · OpenRouter · OpenAI-compatible API",
+      items: "Nemotron-3-Ultra-550B (OpenRouter online) · NVIDIA Nemotron-3.5-Bolt-E4B-4GB (Gemma 4 E4B-it base + GRPO RL via NeMo / KoboldCpp offline)",
+    },
+    {
+      category: "STT",
+      items: "HIMA-ASR ONNX INT8 (native Bengali/English) · Silero VAD v6 · ElevenLabs Scribe",
     },
     {
       category: "TTS",
@@ -1149,7 +1160,7 @@ export default function AboutPage() {
                 >
                   <Globe size={14} className="text-emerald-400" />
                   <span className="font-mono text-[11.5px] text-slate-200">
-                    Online · edge-tts + OpenRouter
+                    Online · edge-tts + Nemotron 3 Ultra 550B (OpenRouter)
                   </span>
                 </div>
                 <div
@@ -1161,7 +1172,7 @@ export default function AboutPage() {
                 >
                   <WifiOff size={14} className="text-amber-400" />
                   <span className="font-mono text-[11.5px] text-slate-200">
-                    Offline · BanglaTTS + Nemotron 3.5-B
+                    Offline · BanglaTTS + Nemotron-3.5-Bolt-E4B-4GB (Gemma 4 Base + GRPO RL)
                   </span>
                 </div>
                 <div

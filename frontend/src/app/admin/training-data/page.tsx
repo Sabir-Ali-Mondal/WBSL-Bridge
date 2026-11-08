@@ -355,10 +355,7 @@ export default function AdminTrainingDataPage() {
         <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-surface">
           <div className="flex items-center justify-between border-b border-border px-3 py-2 text-[10px] font-mono uppercase text-text-muted">
             <span>Glosses</span>
-            <span className="flex items-center gap-2">
-              <span>{data?.total ?? 0}</span>
-              <span className="normal-case tracking-normal text-text-muted/70" title="Use Up and Down arrows to change gloss">↑ ↓</span>
-            </span>
+            <span>{data?.total ?? 0}</span>
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
             {isLoading ? (

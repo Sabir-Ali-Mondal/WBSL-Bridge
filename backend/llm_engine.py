@@ -150,6 +150,8 @@ def build_request(
             payload["reasoning"] = {"enabled": True}
         else:
             payload["reasoning_effort"] = cfg["reasoning_effort"]
+    elif "openrouter.ai" in cfg["base_url"]:
+        payload["reasoning"] = {"enabled": False}
 
     payload.update({k: v for k, v in overrides.items() if v is not None})
     return payload
@@ -574,9 +576,12 @@ def break_into_glosses(text: str, vocab: list[str]) -> dict:
         ],
         "temperature": 0.1,
         "top_p": 0.85,
-        "max_tokens": 128,
+        "max_tokens": 512,
         "stream": False,
     }
+
+    if "openrouter.ai" in cfg["base_url"]:
+        payload["reasoning"] = {"enabled": False}
 
     try:
         resp = httpx.post(
