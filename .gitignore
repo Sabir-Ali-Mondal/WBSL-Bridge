@@ -26,9 +26,8 @@ ENV/
 pyvenv.cfg
 
 # Local model assets that are required at runtime but too large for Git.
-/models/emotion/
-models*/
-models/silero_vad
+models/
+model_training_zone/
 # Packaging / builds
 build/
 dist/
