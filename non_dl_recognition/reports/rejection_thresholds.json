@@ -1,0 +1,31 @@
+{
+  "knn": {
+    "max_dist": 0.0953824104899067,
+    "min_margin": 0.02404957464185812
+  },
+  "dtw": {
+    "max_dist": 116.49808542728404,
+    "min_margin": 25.653108402974482
+  },
+  "diagnostics": {
+    "knn": {
+      "score": 0.738500971617812,
+      "max_dist": 0.0953824104899067,
+      "min_margin": 0.02404957464185812,
+      "accept_correct": 0.8049921996879875,
+      "accept_wrong": 0.02631578947368421,
+      "accept_oov": 0.05333333333333334
+    },
+    "dtw": {
+      "score": 0.7618518518518519,
+      "max_dist": 116.49808542728404,
+      "min_margin": 25.653108402974482,
+      "accept_correct": 0.8385185185185186,
+      "accept_wrong": 0.0,
+      "accept_oov": 0.07666666666666666
+    },
+    "split": "grouped",
+    "prefilter": "knn",
+    "oov_clips": 300
+  }
+}

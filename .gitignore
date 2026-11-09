@@ -97,6 +97,7 @@ backend/tts_output/*
 
 # Common binary artifacts produced by training and capture pipelines.
 
+*.mp3
 *.wav
 *.m4a
 *.flac
@@ -107,6 +108,10 @@ backend/tts_output/*
 *.parquet
 *.arrow
 models/onnx_models
+
+# Generated evaluation & benchmark outputs (regenerable)
+non_dl_recognition/reports/evaluation_report.json
+
 
 # -----------------------------------------------------------------------------
 # Node / Next.js  (frontend has its own .gitignore too — this is a backstop
