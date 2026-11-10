@@ -30,8 +30,7 @@ import {
 } from "lucide-react";
 
 /* ─────────────────────────────────────────────────────────────
-   SECTION WRAPPER — keeps every section visually consistent
-   with the Home page's card language
+   SECTION WRAPPER — floating 3D card with mouse tilt + glare
    ───────────────────────────────────────────────────────────── */
 function Section({
   id,
@@ -42,17 +41,56 @@ function Section({
   children: React.ReactNode;
   className?: string;
 }) {
+  const tiltRef = React.useRef<HTMLDivElement>(null);
+  const uid = React.useId();
+
+  // deterministic stagger so each section floats out of phase (SSR-safe)
+  const delay = React.useMemo(() => {
+    let h = 0;
+    for (const ch of uid) h = (h + ch.charCodeAt(0)) % 7;
+    return `${-h * 0.9}s`;
+  }, [uid]);
+
+  const handleMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "touch") return;
+    const el = tiltRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const px = (e.clientX - r.left) / r.width - 0.5;
+    const py = (e.clientY - r.top) / r.height - 0.5;
+    el.style.transform = `rotateX(${(-py * 6).toFixed(2)}deg) rotateY(${(px * 6).toFixed(2)}deg) translateZ(18px)`;
+    el.style.setProperty("--gx", `${(px + 0.5) * 100}%`);
+    el.style.setProperty("--gy", `${(py + 0.5) * 100}%`);
+    el.style.setProperty("--glare", "1");
+  };
+
+  const handleLeave = () => {
+    const el = tiltRef.current;
+    if (!el) return;
+    el.style.transform = "";
+    el.style.setProperty("--glare", "0");
+  };
+
   return (
     <section
       id={id}
-      className={`
-        rounded-xl border border-white/[0.08]
-        bg-white/[0.025] p-6 sm:p-8
-        backdrop-blur-sm
-        ${className}
-      `}
+      className="float-scene"
+      style={{ animationDelay: delay }}
     >
-      {children}
+      <div
+        ref={tiltRef}
+        onPointerMove={handleMove}
+        onPointerLeave={handleLeave}
+        className={`
+          float-card relative rounded-xl border border-white/[0.08]
+          bg-white/[0.025] p-6 sm:p-8 backdrop-blur-sm
+          ${className}
+        `}
+      >
+        {/* glare that follows the cursor */}
+        <div className="float-glare pointer-events-none absolute inset-0 rounded-xl" />
+        {children}
+      </div>
     </section>
   );
 }
@@ -304,6 +342,60 @@ export default function AboutPage() {
 
   return (
     <main className="relative min-h-screen w-full overflow-hidden bg-background">
+      {/* ─── 3D FLOATING EFFECT STYLES ─── */}
+      <style>{`
+        .float-scene {
+          perspective: 1200px;
+          animation: fs-float 7s ease-in-out infinite;
+          will-change: transform;
+        }
+        .float-card {
+          transform-style: preserve-3d;
+          transition: transform 0.25s ease-out, box-shadow 0.35s ease, border-color 0.35s ease;
+          box-shadow:
+            0 1px 0 rgba(255,255,255,0.06) inset,
+            0 10px 25px -8px rgba(0,0,0,0.55),
+            0 30px 60px -20px rgba(0,0,0,0.6),
+            0 0 40px -18px rgba(52,211,153,0.25);
+        }
+        .float-card:hover {
+          border-color: rgba(255,255,255,0.16);
+          box-shadow:
+            0 1px 0 rgba(255,255,255,0.1) inset,
+            0 18px 35px -10px rgba(0,0,0,0.6),
+            0 50px 90px -25px rgba(0,0,0,0.7),
+            0 0 60px -15px rgba(52,211,153,0.35);
+        }
+        .float-glare {
+          opacity: var(--glare, 0);
+          transition: opacity 0.3s ease;
+          background: radial-gradient(
+            420px circle at var(--gx, 50%) var(--gy, 50%),
+            rgba(255,255,255,0.08),
+            transparent 60%
+          );
+        }
+
+        /* inner cards pop out of the surface on hover */
+        .float-card [class*="rounded-lg"] {
+          transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        .float-card [class*="rounded-lg"]:hover {
+          transform: translateY(-3px) translateZ(28px);
+          box-shadow: 0 14px 28px -10px rgba(0,0,0,0.6);
+        }
+
+        @keyframes fs-float {
+          0%, 100% { transform: translateY(0); }
+          50%      { transform: translateY(-8px); }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .float-scene { animation: none; }
+          .float-card, .float-card * { transition: none !important; }
+        }
+      `}</style>
+
       {/* ─── BACKGROUND (matches Home) ─── */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <video

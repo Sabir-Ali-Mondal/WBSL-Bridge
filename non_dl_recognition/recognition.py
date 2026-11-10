@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """
 non_dl_recognition/recognition.py — Production Live Non-DL Sign Recognition System.
-Includes AUTO, MANUAL, and TIMED (5-second) recording modes.
+Modes: AUTO (hand raise, max 7 s) | TIMED (continuous 7-sec auto-capture)
+Robust capture: lighting enhancement, ROI hand rescue, 4-frame hand/face hold,
+bounded gap filling, and a 64x98 matrix produced from as few as 4 usable frames.
 """
 from __future__ import annotations
 import json
@@ -28,33 +30,45 @@ FEATURES_DIR = ROOT / "model_training_zone" / "dataset_train" / "features" / "3"
 CLASSES_JSON = ROOT / "models" / "onnx_models" / "5" / "sign_daily_classes.json"
 REPORTS_DIR = Path(__file__).resolve().parent / "reports"
 THRESHOLDS_JSON = REPORTS_DIR / "rejection_thresholds.json"
+RECORDINGS_DIR = ROOT / "non_dl_recognition" / "recordings"
 
-# Feature configuration
 N_FRAMES = 64
 N_FEATURES = 98
 DTW_N_CONTENT = 95
 
-# Production Algorithm Hyperparameters
 KNN_K = 3
 KNN_EPS = 1e-3
 DTW_WINDOW = 10
 DTW_TOP_M_CANDIDATES = 5
 DTW_TOP_K_AVG = 3
 
-# UI & Display
 LIVE_WIDTH = 640
 TOP_K = 3
 RESULT_HOLD_S = 4.0
 MSG_HOLD_S = 3.0
 MAX_READ_FAILS = 30
-TIMED_DURATION = 5.0  # Duration for TIMED mode in seconds
 
-# Load calibrated rejection thresholds
+# Timing
+TIMED_DURATION = 7.0   # continuous chunk length (seconds)
+AUTO_MAX_S     = 7.0   # auto span hard cap (seconds)
+
+# Auto trigger / end stability
+TRIGGER_NEED   = 4     # consecutive raised+detected frames to start
+END_WIN        = 10    # window for end decision
+END_MAX_RAISED = 2     # end when <= this many raised in last END_WIN frames
+
+# Recovery limits
+HAND_HOLD = 4          # reuse last-seen hand for this many frames
+FACE_HOLD = 4
+MAX_FILL  = 6          # longest interior gap interpolated
+MAX_EDGE  = 2          # longest start/end gap held
+MIN_GOOD  = 4          # fewest usable frames we still build 64x98 from
+
 REJECT = (json.loads(THRESHOLDS_JSON.read_text(encoding="utf-8"))
           if THRESHOLDS_JSON.exists() else None)
 
 # --------------------------------------------------------------------------- #
-# NUMBA SAKOE-CHIBA DTW KERNELS
+# NUMBA DTW KERNELS
 # --------------------------------------------------------------------------- #
 @nb.njit(cache=True)
 def _dtw_pair(a: np.ndarray, b: np.ndarray, w: int) -> float:
@@ -103,10 +117,7 @@ class KNNRecognizer:
     def __init__(self, k: int = KNN_K, eps: float = KNN_EPS):
         self.k = k
         self.eps = eps
-        self._Tn = None
-        self._y = None
-        self._cls = None
-        self._starts = None
+        self._Tn = self._y = self._cls = self._starts = None
 
     def _prep(self, X: np.ndarray) -> np.ndarray:
         X = np.asarray(X, dtype=np.float32)[:, :, :DTW_N_CONTENT]
@@ -133,15 +144,11 @@ class KNNRecognizer:
         order = np.argsort(M, axis=1)[:, :n]
         return self._cls[order], np.take_along_axis(M, order, axis=1)
 
-
 class TwoStageDTWRecognizer:
     def __init__(self, top_m: int = DTW_TOP_M_CANDIDATES, top_k_avg: int = DTW_TOP_K_AVG, window: int = DTW_WINDOW):
-        self.top_m = top_m
-        self.top_k_avg = top_k_avg
-        self.window = window
+        self.top_m, self.top_k_avg, self.window = top_m, top_k_avg, window
         self.n_classes = 0
-        self.X_train = None
-        self.y_train = None
+        self.X_train = self.y_train = None
         self.class_indices: dict[int, np.ndarray] = {}
 
     def fit(self, X_train: np.ndarray, y_train: np.ndarray, n_classes: int):
@@ -165,12 +172,9 @@ class TwoStageDTWRecognizer:
         ranked.sort(key=lambda kv: kv[1])
         return ranked
 
-
 class HybridRecognizer:
     def __init__(self, knn: KNNRecognizer, dtw: TwoStageDTWRecognizer, top_m: int = DTW_TOP_M_CANDIDATES):
-        self.knn = knn
-        self.dtw = dtw
-        self.top_m = top_m
+        self.knn, self.dtw, self.top_m = knn, dtw, top_m
 
     def preview(self, clip: np.ndarray):
         cls, dist = self.knn.rank_classes(clip, self.top_m)
@@ -179,13 +183,11 @@ class HybridRecognizer:
     def confirm(self, clip: np.ndarray, candidates: list[int]):
         return self.dtw.predict_detailed(clip[0], candidates=candidates)
 
-
 # --------------------------------------------------------------------------- #
-# DATASET LOADING & FEATURE EXTRACTION
+# DATASET & EXTRACTION
 # --------------------------------------------------------------------------- #
 def load_dataset() -> tuple[np.ndarray, np.ndarray, list[str]]:
-    if not CLASSES_JSON.exists():
-        sys.exit(f"ERROR: Classes JSON not found at {CLASSES_JSON}")
+    if not CLASSES_JSON.exists(): sys.exit(f"ERROR: Classes JSON not found")
     classes = json.loads(CLASSES_JSON.read_text(encoding="utf-8"))
     X_list, y_list = [], []
     for idx, gloss in enumerate(classes):
@@ -194,25 +196,21 @@ def load_dataset() -> tuple[np.ndarray, np.ndarray, list[str]]:
         arr = np.load(path)
         X_list.append(arr)
         y_list.extend([idx] * len(arr))
-    if not X_list:
-        sys.exit(f"ERROR: No feature files found in {FEATURES_DIR}")
+    if not X_list: sys.exit(f"ERROR: No feature files found")
     return np.concatenate(X_list, axis=0).astype(np.float32), np.array(y_list, dtype=np.int32), classes
 
-
 class Fr:
-    __slots__ = ("pose", "hands", "face", "face_ok", "in_use", "t")
-    def __init__(self, pose, hands, face, face_ok, in_use, t):
+    __slots__ = ("pose", "hands", "face", "face_ok", "in_use", "t", "held")
+    def __init__(self, pose, hands, face, face_ok, in_use, t, held=0):
         self.pose, self.hands, self.face = pose, hands, face
-        self.face_ok, self.in_use, self.t = face_ok, in_use, t
-
+        self.face_ok, self.in_use, self.t, self.held = face_ok, in_use, t, held
 
 def read_landmarks(res, W: int, H: int):
     pose = np.full((8, 4), np.nan, np.float32)
     pose[:, 3] = 0.0
     if res.pose_landmarks:
         lm = res.pose_landmarks.landmark
-        for k, i in enumerate(EX.POSE_IDX):
-            pose[k] = (lm[i].x, lm[i].y, lm[i].z, lm[i].visibility)
+        for k, i in enumerate(EX.POSE_IDX): pose[k] = (lm[i].x, lm[i].y, lm[i].z, lm[i].visibility)
     hands = np.full((2, 21, 3), np.nan, np.float32)
     for h, hl in enumerate((res.left_hand_landmarks, res.right_hand_landmarks)):
         if hl: hands[h] = EX._lm(hl.landmark, range(21))
@@ -221,37 +219,68 @@ def read_landmarks(res, W: int, H: int):
     if f_ok: face = EX._lm(res.face_landmarks.landmark, EX.FACE_CACHE_IDX)
     return pose, hands, face, f_ok
 
-
 def rescue_hands(rgb, pose, hands, in_use, hands_det):
+    """Re-detect missed hands: enlarged wrist ROI first, then full frame."""
     missing = [h for h in (0, 1) if in_use[h] and np.isnan(hands[h, 0, 0])]
     if not missing: return hands, hands_det
     if hands_det is None:
-        hands_det = mp.solutions.hands.Hands(static_image_mode=True, max_num_hands=2, min_detection_confidence=0.5)
-    r2 = hands_det.process(rgb)
-    if r2.multi_hand_landmarks:
-        best = {}
-        for hl in r2.multi_hand_landmarks:
-            pts = EX._lm(hl.landmark, range(21))
-            dists = []
-            for wi in (EX.P_LWR, EX.P_RWR):
-                w = pose[wi, :2]
-                dists.append(float(np.hypot(*(pts[0, :2] - w))) if np.isfinite(w).all() else 9e9)
-            h = int(np.argmin(dists))
-            if h in missing and dists[h] < EX.RESCUE_MAX_DIST and (h not in best or dists[h] < best[h][0]):
-                best[h] = (dists[h], pts)
-        for h, (_, pts) in best.items(): hands[h] = pts
+        hands_det = mp.solutions.hands.Hands(static_image_mode=True, max_num_hands=2, min_detection_confidence=0.3)
+    H, W = rgb.shape[:2]
+    maxd = EX.RESCUE_MAX_DIST
+
+    def roi(c, frac):
+        s = int(np.clip(frac * max(W, H), 64, min(W, H)))
+        x0 = int(np.clip(c[0] * W - s / 2, 0, W - s)); y0 = int(np.clip(c[1] * H - s / 2, 0, H - s))
+        crop = cv2.resize(np.ascontiguousarray(rgb[y0:y0 + s, x0:x0 + s]), (256, 256), interpolation=cv2.INTER_CUBIC)
+        r, out = hands_det.process(crop), []
+        for hl in (r.multi_hand_landmarks or []):
+            p = np.array(EX._lm(hl.landmark, range(21)), np.float32)
+            p[:, 0] = (x0 + p[:, 0] * s) / W; p[:, 1] = (y0 + p[:, 1] * s) / H; p[:, 2] *= s / W
+            out.append(p)
+        return out
+
+    def taken(p):
+        return any(np.isfinite(hands[o, 0, 0]) and np.hypot(*(hands[o, 0, :2] - p[0, :2])) < 0.03 for o in (0, 1))
+
+    for h, wi in ((0, EX.P_LWR), (1, EX.P_RWR)):
+        c = pose[wi, :2]
+        if h not in missing or not np.isfinite(c).all(): continue
+        for frac in (0.25, 0.35, 0.50):
+            best = None
+            for p in roi(c, frac):
+                d = float(np.hypot(*(p[0, :2] - c)))
+                if d < maxd and not taken(p) and (best is None or d < best[0]): best = (d, p)
+            if best:
+                hands[h] = best[1]; break
+    still = [h for h in missing if np.isnan(hands[h, 0, 0])]
+    if still:
+        r2 = hands_det.process(rgb)
+        if r2.multi_hand_landmarks:
+            best = {}
+            for hl in r2.multi_hand_landmarks:
+                pts = EX._lm(hl.landmark, range(21))
+                dists = [float(np.hypot(*(pts[0, :2] - pose[wi, :2]))) if np.isfinite(pose[wi, :2]).all() else 9e9
+                         for wi in (EX.P_LWR, EX.P_RWR)]
+                h = int(np.argmin(dists))
+                if h in still and dists[h] < maxd and (h not in best or dists[h] < best[h][0]): best[h] = (dists[h], pts)
+            for h, (_, pts) in best.items(): hands[h] = pts
     return hands, hands_det
 
+def _why(pose, hands, face_ok, in_use, complete):
+    bad = ~complete
+    parts = [f"{int(bad.sum())}/{len(bad)} frames incomplete"]
+    n = int((np.isnan(pose[:, :, 0]).any(1) & bad).sum())
+    if n: parts.append(f"pose missing {n}")
+    for h, name in enumerate("LR"):
+        n = int((in_use[:, h].astype(bool) & np.isnan(hands[:, h, 0, 0]) & bad).sum())
+        if n: parts.append(f"{name}-hand missing {n}")
+    n = int((~face_ok & bad).sum())
+    if n: parts.append(f"face missing {n}")
+    if len(parts) == 1: parts.append("EX.complete_mask failed for another reason (e.g. low visibility)")
+    return ", ".join(parts)
 
-def build_clip(buf, W: int, H: int, fps_est: float) -> np.ndarray | None:
-    pose = np.stack([f.pose for f in buf])
-    hands = np.stack([f.hands for f in buf])
-    face = np.stack([f.face for f in buf])
-    face_ok = np.array([f.face_ok for f in buf], bool)
-    in_use = np.stack([f.in_use for f in buf])
-    raw = dict(pose=pose, hands=hands, face=face, face_ok=face_ok, W=W, H=H)
-    complete = EX.complete_mask(raw, in_use)
-    F = len(buf)
+def _select(complete):
+    F = len(complete)
     nxt = np.empty(F, int)
     cur = -1
     for i in range(F - 1, -1, -1):
@@ -262,11 +291,112 @@ def build_clip(buf, W: int, H: int, fps_est: float) -> np.ndarray | None:
     for p in pos:
         n = nxt[p]
         if n < 0 or n - p > EX.MAX_GAP: return None
-        chosen.append(n)
+        chosen.append(int(n))
+    return chosen
+
+def _stretch(complete):
+    good = np.flatnonzero(complete)
+    if good.size < MIN_GOOD: return None
+    k = np.floor(np.arange(EX.N_FRAMES) * (good.size - 1) / (EX.N_FRAMES - 1) + 0.5).astype(int)
+    return [int(i) for i in good[k]]
+
+def build_clip(buf, W: int, H: int, fps_est: float):
+    """Always try to return a (1,64,98) matrix. note explains any fallback used."""
+    pose = np.stack([f.pose for f in buf])
+    hands = np.stack([f.hands for f in buf])
+    face = np.stack([f.face for f in buf])
+    face_ok = np.array([f.face_ok for f in buf], bool)
+    in_use = np.stack([f.in_use for f in buf])
+    raw = dict(pose=pose, hands=hands, face=face, face_ok=face_ok, W=W, H=H)
+    complete = np.asarray(EX.complete_mask(raw, in_use), bool)
+    F = len(buf)
+    note = "ok"
+    chosen = _select(complete)
+    if chosen is None:
+        why = _why(pose, hands, face_ok, in_use, complete)
+        miss = in_use[:, :2].astype(bool) & np.isnan(hands[:, :, 0, 0])
+
+        def masked():
+            if int(np.isfinite(hands[:, :, 0, 0]).any(1).sum()) < MIN_GOOD:
+                return None, in_use, ""
+            iu2 = in_use.copy()
+            iu2[:, :2][miss] = False
+            c2 = np.asarray(EX.complete_mask(raw, iu2), bool)
+            ch = _select(c2) or _stretch(c2)
+            return ch, iu2, f"hand undetected in {int(miss.any(1).sum())}/{F} frames, treated as absent"
+
+        def stretched():
+            return _stretch(complete), in_use, f"stretched from {int(complete.sum())}/{F} good frames"
+
+        def pose_only():
+            okp = np.isfinite(pose[:, :, :2]).all(1) & face_ok
+            if okp.sum() < MIN_GOOD: return None, in_use, ""
+            good = np.flatnonzero(okp)
+            k = np.floor(np.arange(EX.N_FRAMES) * (good.size - 1) / (EX.N_FRAMES - 1) + 0.5).astype(int)
+            iu2 = in_use.copy(); iu2[:, :2] = False
+            return [int(i) for i in good[k]], iu2, f"pose-only {int(okp.sum())}/{F} frames, hands treated absent"
+
+        order = (stretched, masked, pose_only) if complete.mean() >= 0.5 else (masked, stretched, pose_only)
+        for attempt in order:
+            ch, iu, nt = attempt()
+            if ch is not None:
+                chosen, in_use, note = ch, iu, nt
+                break
+        if chosen is None:
+            print("[reject] no usable pose/face landmarks:", why)
+            return None, why
+        print(f"[low-quality] {why}  ->  {note}")
     duration = F / max(fps_est, 1.0)
     feats = np.stack([EX.frame_features(pose[i], hands[i], face[i], in_use[i], W, H, duration) for i in chosen])
-    return feats.astype(np.float32)[None]
+    return feats.astype(np.float32)[None], note
 
+# --------------------------------------------------------------------------- #
+# ENHANCEMENT & RECOVERY
+# --------------------------------------------------------------------------- #
+def enhance_image(frame):
+    g = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    m, s = float(g.mean()), float(g.std())
+    if 90 < m < 170 and s > 50: return frame
+    out = frame
+    if m < 90 or m > 170:
+        gamma = float(np.clip(math.log(115 / 255) / math.log(max(m, 1) / 255), 0.55, 1.8))
+        out = cv2.LUT(out, (255 * (np.arange(256) / 255) ** gamma).astype(np.uint8))
+    lab = cv2.cvtColor(out, cv2.COLOR_BGR2LAB)
+    lab[..., 0] = cv2.createCLAHE(clipLimit=3.0 if s < 35 else 2.0, tileGridSize=(8, 8)).apply(lab[..., 0])
+    return cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
+
+def _fill_gaps(arr):
+    sh = arr.shape
+    flat = arr.reshape(sh[0], -1).copy()
+    x = np.arange(sh[0])
+    for c in np.flatnonzero(np.isnan(flat).any(axis=0)):
+        col = flat[:, c]
+        good = np.flatnonzero(~np.isnan(col))
+        if good.size == 0: continue
+        for a, b in zip(good[:-1], good[1:]):
+            if 1 < b - a <= MAX_FILL + 1:
+                col[a + 1:b] = np.interp(x[a + 1:b], [a, b], [col[a], col[b]])
+        if 0 < good[0] <= MAX_EDGE: col[:good[0]] = col[good[0]]
+        t = sh[0] - 1 - good[-1]
+        if 0 < t <= MAX_EDGE: col[good[-1] + 1:] = col[good[-1]]
+    return flat.reshape(sh)
+
+def interpolate_buffer(buf, W, H):
+    if len(buf) < 2: return buf
+    pose = np.stack([f.pose for f in buf]).copy()
+    pose[np.isnan(pose[:, :, 0]), 3] = np.nan
+    pose = _fill_gaps(pose)
+    pose[:, :, 3] = np.nan_to_num(pose[:, :, 3], nan=0.0)
+    hands = _fill_gaps(np.stack([f.hands for f in buf]))
+    face = _fill_gaps(np.stack([f.face for f in buf]))
+    out = []
+    for i, f in enumerate(buf):
+        in_use = f.in_use
+        if np.isnan(f.pose[:, 0]).any():
+            try: in_use = np.logical_or(in_use, np.asarray(EX.frame_in_use(pose[i], W, H)))
+            except Exception: pass
+        out.append(Fr(pose[i], hands[i], face[i], bool(np.isfinite(face[i]).all()), in_use, f.t, f.held))
+    return out
 
 # --------------------------------------------------------------------------- #
 # OVERLAY
@@ -274,44 +404,57 @@ def build_clip(buf, W: int, H: int, fps_est: float) -> np.ndarray | None:
 def put(img, text, xy, scale=0.6, color=(255, 255, 255), thick=2):
     cv2.putText(img, text, xy, cv2.FONT_HERSHEY_SIMPLEX, scale, color, thick, cv2.LINE_AA)
 
-def draw(img, mode, state, fps, lat_ms, rec_s, rec_n, result, result_until, msg, msg_until, now, engine_tag="HYBRID"):
+def draw_skeleton(img, fr: Fr, W: int, H: int):
+    def to_px(pt): return (int(pt[0] * W), int(pt[1] * H))
+    for i in range(8):
+        if np.isfinite(fr.pose[i, 0]):
+            color = (0, 255, 0) if fr.pose[i, 3] >= 0.5 else (0, 165, 255)
+            cv2.circle(img, to_px(fr.pose[i]), 4, color, -1)
+    for h in (0, 1):
+        if fr.held & (1 << h): color = (0, 165, 255)          # held/recovered hand
+        elif not np.isnan(fr.hands[h, 0, 0]): color = (0, 255, 0)
+        else: color = (0, 165, 255)
+        for pt in fr.hands[h]:
+            if np.isfinite(pt[0]): cv2.circle(img, to_px(pt), 3, color, -1)
+    if fr.face_ok:
+        for pt in fr.face:
+            if np.isfinite(pt[0]): cv2.circle(img, to_px(pt), 2, (255, 0, 0), -1)
+
+def draw(img, mode, state, fps, lat_ms, rec_s, rec_n, result, result_until, msg, msg_until, now, engine_tag="HYBRID", note=""):
     put(img, f"mode {mode.upper()}  state {state}  [{engine_tag}]", (12, 28), 0.65, (200, 220, 255))
     put(img, f"fps {fps:4.1f}   infer {lat_ms:5.1f} ms", (12, 54), 0.6, (180, 180, 170))
-    put(img, "SPACE rec  M mode  Q quit", (12, img.shape[0] - 14), 0.5, (140, 140, 130))
+    put(img, "M toggle mode  Q quit", (12, img.shape[0] - 14), 0.5, (140, 140, 130))
     if state == "SIGN":
         put(img, f"REC {rec_s:4.1f}s  frames {rec_n:3d}", (12, 80), 0.7, (90, 90, 255))
     if result and now < result_until:
         headline, tops, _ = result
-        col = (110, 230, 140) if headline != "Not sure" else (90, 190, 255)
+        col = (110, 230, 140) if "Not sure" not in headline else (90, 190, 255)
         put(img, headline, (12, 116), 1.0, col, 2)
         for k, (name, score_str) in enumerate(tops):
             put(img, f"{k + 1}. {name}  {score_str}", (12, 146 + 26 * k), 0.6, (230, 230, 225))
+        if note:
+            put(img, f"LOW QUALITY: {note}", (12, 146 + 26 * len(tops) + 6), 0.5, (0, 165, 255), 1)
     return img
 
 def draw_centred(img, text, y, scale, color, thick=2):
     w = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, scale, thick)[0][0]
     cv2.putText(img, text, ((img.shape[1] - w) // 2, y), cv2.FONT_HERSHEY_SIMPLEX, scale, color, thick, cv2.LINE_AA)
 
-
 # --------------------------------------------------------------------------- #
-# MAIN EXECUTION (Straight Run)
+# MAIN EXECUTION
 # --------------------------------------------------------------------------- #
 def main():
-    # --- Hardcoded Configuration ---
     CAMERA_IDX = 0
     DETECTION_WIDTH = 640
     MODEL_COMPLEXITY = 1
     USE_DTW = True
-    # -------------------------------
 
     print("=" * 70)
     print(" WBSL Sign Recognition — Production Non-DL Engine")
     print("=" * 70)
     print("Loading training dataset and compiling Numba DTW kernel...")
     X_train, y_train, classes = load_dataset()
-    
-    if USE_DTW:
-        warmup()
+    if USE_DTW: warmup()
 
     knn = KNNRecognizer().fit(X_train, y_train)
     if USE_DTW:
@@ -326,31 +469,40 @@ def main():
     print(f"Pipeline : {engine_tag} (Threshold Rejection: {'Active' if REJECT else 'Disabled'})")
 
     cap = cv2.VideoCapture(CAMERA_IDX)
-    if not cap.isOpened():
-        sys.exit(f"ERROR: cannot open webcam {CAMERA_IDX}. Check connection and retry.")
+    if not cap.isOpened(): sys.exit(f"ERROR: cannot open webcam {CAMERA_IDX}")
 
     holistic = mp.solutions.holistic.Holistic(
         static_image_mode=False, model_complexity=MODEL_COMPLEXITY,
         smooth_landmarks=True, refine_face_landmarks=False,
-        min_detection_confidence=0.5, min_tracking_confidence=0.5)
+        min_detection_confidence=0.4, min_tracking_confidence=0.4)
     hands_det = None
 
-    modes = ["auto", "manual", "timed"]
+    modes = ["auto", "timed"]
     mode, state = "auto", "IDLE"
-    up = down = 0
     buf = []
-    pre = deque(maxlen=EX.PRE_ROLL + EX.TRIGGER_FRAMES)
+    pre = deque(maxlen=EX.PRE_ROLL + TRIGGER_NEED)
+    win = deque(maxlen=END_WIN)
     result, result_until = None, 0.0
     msg, msg_until = None, 0.0
     lat_ms = 0.0
     ema_dt = 1.0 / 30.0
     prev_t = time.perf_counter()
     read_fails = 0
-    timed_start = 0.0
+    timed_start = time.perf_counter()
+    span_start = 0.0
+    last_up_rel = 0
+    rec_count = 0
+    result_note = ""
+    frame_no = 0
+    last_hands = [None, None]
+    last_seen = [-99, -99]
+    last_face, last_face_seen = None, -99
+
+    RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
 
     def close_span(frames):
-        nonlocal result, result_until, msg, msg_until, lat_ms
-        feats = build_clip(frames, W_cur, H_cur, 1.0 / max(ema_dt, 1e-4))
+        nonlocal result, result_until, msg, msg_until, lat_ms, rec_count, result_note
+        feats, note = build_clip(frames, W_cur, H_cur, 1.0 / max(ema_dt, 1e-4))
         if feats is None:
             msg, msg_until = "Hands not clear, try again", time.perf_counter() + MSG_HOLD_S
             return
@@ -370,14 +522,31 @@ def main():
         d1 = ranked[0][1]
         margin = (ranked[1][1] - ranked[0][1]) if len(ranked) > 1 else float("inf")
         thr = (REJECT or {}).get(engine)
-        rejected = bool(thr) and (d1 > thr["max_dist"] or margin < thr["min_margin"])
 
-        headline = "Not sure" if rejected else classes[ranked[0][0]]
+        rejected = False
+        reject_reason = ""
+        if thr:
+            if d1 > thr["max_dist"]:
+                rejected = True; reject_reason = "Low Confidence"
+            elif margin < thr["min_margin"]:
+                rejected = True; reject_reason = "Ambiguous"
+
+        headline = f"Not sure ({reject_reason})" if rejected else classes[ranked[0][0]]
         tops = [(classes[c], f"d={s:.1f}" if engine == "dtw" else f"d={s:.3f}") for c, s in ranked[:TOP_K]]
         result = (headline, tops, lat_ms)
         result_until = time.perf_counter() + RESULT_HOLD_S
+        result_note = "" if note == "ok" else note
 
-    print("\nLive test running! Controls: SPACE=rec | M=cycle mode | Q/ESC=quit\n")
+        rec_count += 1
+        ts = int(time.time())
+        save_path = RECORDINGS_DIR / f"rec_{ts}_{rec_count:04d}.npz"
+        np.savez(save_path,
+                 raw_hands=np.stack([f.hands for f in frames]),
+                 raw_pose=np.stack([f.pose for f in frames]),
+                 raw_in_use=np.stack([f.in_use for f in frames]),
+                 final_features=feats[0], prediction=headline, engine=engine, quality=note)
+
+    print("\nLive test running! Controls: M=toggle mode | Q/ESC=quit\n")
 
     try:
         W_cur = H_cur = 0
@@ -385,97 +554,94 @@ def main():
             ok, frame = cap.read()
             if not ok:
                 read_fails += 1
-                if read_fails >= MAX_READ_FAILS:
-                    print("ERROR: webcam stopped delivering frames.")
-                    break
+                if read_fails >= MAX_READ_FAILS: break
                 time.sleep(0.01)
                 continue
             read_fails = 0
             now = time.perf_counter()
             dt = now - prev_t
             prev_t = now
-            if 0.0 < dt < 1.0:
-                ema_dt = 0.9 * ema_dt + 0.1 * dt
+            if 0.0 < dt < 1.0: ema_dt = 0.9 * ema_dt + 0.1 * dt
             fps = 1.0 / max(ema_dt, 1e-4)
+            frame_no += 1
 
             fh, fw = frame.shape[:2]
             if fw > DETECTION_WIDTH:
                 small = cv2.resize(frame, (DETECTION_WIDTH, int(round(fh * DETECTION_WIDTH / fw))))
             else:
                 small = frame
-            H_cur, W_cur = small.shape[:2]
-            rgb = cv2.cvtColor(small, cv2.COLOR_BGR2RGB)
+
+            small_enhanced = enhance_image(small)
+            H_cur, W_cur = small_enhanced.shape[:2]
+
+            rgb = cv2.cvtColor(small_enhanced, cv2.COLOR_BGR2RGB)
             rgb.flags.writeable = False
             res = holistic.process(rgb)
 
             pose, hands, face, f_ok = read_landmarks(res, W_cur, H_cur)
             in_use = EX.frame_in_use(pose, W_cur, H_cur)
             hands, hands_det = rescue_hands(rgb, pose, hands, in_use, hands_det)
-            fr = Fr(pose, hands, face, f_ok, in_use, now)
-            raised = bool(in_use.any())
 
-            # ── Sign-span state machine ──────────
+            # Temporal hold: reuse last-seen hand/face across short motion dropouts
+            held = 0
+            for h in (0, 1):
+                if np.isfinite(hands[h, 0, 0]):
+                    last_hands[h] = hands[h].copy(); last_seen[h] = frame_no
+                elif last_seen[h] >= 0 and (frame_no - last_seen[h]) <= HAND_HOLD and last_hands[h] is not None:
+                    hands[h] = last_hands[h].copy(); held |= (1 << h)
+            if f_ok:
+                last_face, last_face_seen = face.copy(), frame_no
+            elif last_face is not None and (frame_no - last_face_seen) <= FACE_HOLD:
+                face, f_ok = last_face.copy(), True
+
+            fr = Fr(pose, hands, face, f_ok, in_use, now, held)
+            raised = bool(in_use.any()) and bool(np.isfinite(hands[:, :, 0, 0]).any())
+            win.append(raised)
+
+            draw_skeleton(small, fr, W_cur, H_cur)
+
+            # State machine
             if mode == "auto":
                 if state == "IDLE":
                     pre.append(fr)
-                    up = up + 1 if raised else 0
-                    if up >= EX.TRIGGER_FRAMES:
-                        state = "SIGN"
-                        down = 0
-                        buf = list(pre)
-                        last_up_rel = len(buf) - 1
+                    if len(win) >= TRIGGER_NEED and all(win) and raised:
+                        state = "SIGN"; span_start = now
+                        buf = list(pre); last_up_rel = len(buf) - 1
                 else:
                     buf.append(fr)
                     rel = len(buf) - 1
-                    if raised:
-                        last_up_rel, down = rel, 0
-                    else:
-                        down += 1
-                        if down >= EX.END_FRAMES:
-                            end_rel = min(last_up_rel + EX.KEEP_TAIL, rel)
-                            close_span(buf[:end_rel + 1])
-                            state, up, down, buf = "IDLE", 0, 0, []
-                            pre.clear()
-            elif state == "SIGN":
+                    if raised: last_up_rel = rel
+                    over = (now - span_start) >= AUTO_MAX_S
+                    quiet = (rel > 12) and (sum(win) <= END_MAX_RAISED)
+                    if over or quiet:
+                        end_rel = min(last_up_rel + EX.KEEP_TAIL, rel)
+                        close_span(interpolate_buffer(buf[:end_rel + 1], W_cur, H_cur))
+                        state = "IDLE"; buf = []; win.clear(); pre.clear()
+
+            elif mode == "timed":
                 buf.append(fr)
+                if now - timed_start >= TIMED_DURATION:
+                    close_span(interpolate_buffer(buf, W_cur, H_cur))
+                    buf = []; win.clear(); timed_start = now
 
-            # ── Timed Mode Expiration Check ──────
-            if mode == "timed" and state == "SIGN":
-                elapsed = now - timed_start
-                if elapsed >= TIMED_DURATION:
-                    close_span(buf)
-                    state, buf = "IDLE", []
-
-            # ── Keys ─────────────────────────────
+            # Keys
             k = cv2.waitKey(1) & 0xFF
-            if k in (27, ord("q"), ord("Q")):
-                break
+            if k in (27, ord("q"), ord("Q")): break
             if k in (ord("m"), ord("M")):
                 mode = modes[(modes.index(mode) + 1) % len(modes)]
-                state, buf, up, down = "IDLE", [], 0, 0
-                pre.clear()
-            elif k == 32:  # SPACE
-                if mode == "manual":
-                    if state == "IDLE":
-                        state, buf = "SIGN", [fr]
-                    else:
-                        close_span(buf)
-                        state, buf = "IDLE", []
-                elif mode == "timed":
-                    if state == "IDLE":
-                        state = "SIGN"
-                        timed_start = time.perf_counter()
-                        buf = [fr]
+                state, buf = "IDLE", []
+                win.clear(); pre.clear()
+                timed_start = time.perf_counter()
 
-            # ── Overlay ──────────────────────────
             rec_s = (now - buf[0].t) if buf else 0.0
             draw(frame, mode, state, fps, lat_ms, rec_s, len(buf),
-                 result, result_until, msg, msg_until, now, engine_tag=engine_tag)
-            
-            # Timed mode countdown overlay
-            if mode == "timed" and state == "SIGN":
+                 result, result_until, msg, msg_until, now, engine_tag=engine_tag, note=result_note)
+
+            frame[:H_cur, :W_cur] = small
+
+            if mode == "timed":
                 remaining = max(0.0, TIMED_DURATION - (now - timed_start))
-                put(frame, f"TIMED: {remaining:.1f}s remaining", (12, 106), 0.7, (0, 165, 255))
+                put(frame, f"NEXT SCAN IN: {remaining:.1f}s", (12, 106), 0.7, (0, 165, 255))
 
             if msg and now < msg_until:
                 draw_centred(frame, msg, 60, 0.85, (80, 120, 255))

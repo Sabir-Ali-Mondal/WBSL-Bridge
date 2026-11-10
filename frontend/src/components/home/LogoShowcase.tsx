@@ -6,6 +6,20 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { useGLTF, Float } from "@react-three/drei";
 
 // ==========================================
+// 0. CLOCK BRIDGE
+// Bubbles/ripples are animated with the Canvas clock (starts at 0 when the
+// Canvas mounts). Spawn times MUST come from that same clock — using
+// performance.now() breaks after client-side navigation (e.g. from /about),
+// because the page has been alive for a long time while the Canvas clock is new.
+// ==========================================
+function ClockBridge({ clockRef }: { clockRef: React.MutableRefObject<THREE.Clock | null> }) {
+  useFrame((state) => {
+    clockRef.current = state.clock;
+  });
+  return null;
+}
+
+// ==========================================
 // 1. THE 3D LOGO WITH TACTILE TILT & CLICK INTERACTION
 // ==========================================
 function LogoModel({ onInteract }: { onInteract: (point: THREE.Vector3) => void }) {
@@ -97,7 +111,7 @@ function InteractiveBubblesField({ bubbles }: { bubbles: InteractiveBubble[] }) 
       const age = now - b.bornAt;
       const progress = age / b.lifetime;
 
-      if (progress >= 1) {
+      if (progress >= 1 || progress < 0) {
         mesh.visible = false;
         return;
       }
@@ -133,6 +147,7 @@ function InteractiveBubblesField({ bubbles }: { bubbles: InteractiveBubble[] }) 
             meshRefs.current[idx] = el;
           }}
           position={b.origin}
+          visible={false}
         >
           <sphereGeometry args={[1, 24, 24]} />
           <meshPhysicalMaterial
@@ -167,7 +182,7 @@ function DynamicTouchRipples({ ripples }: { ripples: Ripple[] }) {
     ripples.forEach((r, idx) => {
       const mesh = meshRefs.current[idx];
       if (!mesh) return;
-      const age = now - r.bornAt;
+      const age = Math.max(now - r.bornAt, 0);
       const progress = Math.min(age / 1.1, 1);
       const scale = 0.1 + progress * 1.3;
       mesh.scale.set(scale, scale, scale);
@@ -206,10 +221,14 @@ function DynamicTouchRipples({ ripples }: { ripples: Ripple[] }) {
 export function LogoShowcase() {
   const [bubbles, setBubbles] = useState<InteractiveBubble[]>([]);
   const [ripples, setRipples] = useState<Ripple[]>([]);
+  const clockRef = useRef<THREE.Clock | null>(null);
 
   // Function to release a cluster of bubbles & ripple
   const triggerCluster = useCallback((hitPoint: THREE.Vector3, count = 3) => {
-    const now = performance.now() / 1000;
+    // Use the Canvas clock; skip until the first frame has rendered
+    const clock = clockRef.current;
+    if (!clock) return;
+    const now = clock.elapsedTime;
 
     // Trigger ripple
     setRipples((prev) => [
@@ -280,6 +299,8 @@ export function LogoShowcase() {
         camera={{ position: [0, 0, 5.7], fov: 42 }}
         gl={{ alpha: true, antialias: true, powerPreference: "high-performance" }}
       >
+        <ClockBridge clockRef={clockRef} />
+
         <ambientLight intensity={0.7} />
         <directionalLight position={[-2.5, 4, 4]} intensity={2.2} color="#f0fdfa" />
         <directionalLight position={[3.8, 0, -2]} intensity={2.6} color="#06b6d4" />
