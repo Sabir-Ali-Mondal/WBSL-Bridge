@@ -38,6 +38,17 @@ const config: Config = {
           error: "#EF4444",
           unknown: "#A855F7",
         },
+        admin: {
+          bg: "#080F1C",
+          card: "#0D1726",
+          surface: "#111E30",
+          border: "#263449",
+          "text-primary": "#F1F5F9",
+          "text-secondary": "#94A3B8",
+          "text-muted": "#64748B",
+          accent: "#34D399",
+          "accent-secondary": "#22D3EE",
+        },
       },
       fontFamily: {
         sans: ["var(--font-inter)", "sans-serif"],

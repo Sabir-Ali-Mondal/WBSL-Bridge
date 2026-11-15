@@ -36,7 +36,7 @@ interface TrainingClip {
   top3: { label: string; confidence: number }[];
 }
 
-const HAND_COLORS = ["#5EEAD4", "#C4B5FD"];
+const HAND_COLORS = ["#34D399", "#22D3EE"];
 
 function TrainingClipView({ clip }: { clip: TrainingClip }) {
   const [frameIndex, setFrameIndex] = React.useState(0);
@@ -190,7 +190,7 @@ function TrainingClipView({ clip }: { clip: TrainingClip }) {
           {renderHand(0)}
           {renderHand(1)}
         </svg>
-        <span className="pointer-events-none absolute bottom-2 right-2 rounded bg-background/70 px-2 py-1 text-[9px] font-mono text-text-muted">
+        <span className="pointer-events-none absolute bottom-2 right-2 rounded-md bg-[#080F1C]/80 px-2 py-1 text-[9px] font-mono text-[#64748B] border border-[#263449]">
           CLICK / SPACE {playing ? "TO PAUSE" : "TO PLAY"}
         </span>
       </div>
@@ -206,9 +206,9 @@ function TrainingClipView({ clip }: { clip: TrainingClip }) {
             setFrameIndex(Number(event.target.value));
           }}
           aria-label="Training clip frame"
-          className="m-0 min-w-0 flex-1 accent-[var(--accent-primary)]"
+          className="m-0 min-w-0 flex-1 accent-[#34D399]"
         />
-        <span className="w-16 text-right text-[9px] font-mono text-text-muted">
+        <span className="w-16 text-right text-[9px] font-mono text-[#64748B]">
           {frameIndex + 1} / {clip.frame_count}
         </span>
       </div>
@@ -296,24 +296,27 @@ export default function AdminTrainingDataPage() {
       className="mx-auto flex h-full min-h-[480px] max-w-7xl flex-col gap-4"
       onKeyDown={handleNavigationKeys}
     >
-      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
-        <h1 className="text-xl font-bold text-text-primary">Training Data</h1>
-        <span className="rounded border border-border bg-surface px-2.5 py-1 text-[10px] font-mono text-text-muted">
-          MODEL {data?.model_id ?? "—"}
+      <header className="flex flex-wrap items-center justify-between gap-2 border-b border-[#263449] pb-3">
+        <div>
+          <div className="text-xs font-mono uppercase text-[#64748B]">DATASET EXPLORER</div>
+          <h1 className="text-xl font-bold text-[#F1F5F9] mt-0.5">Training Data Verification</h1>
+        </div>
+        <span className="rounded-md border border-[#263449] bg-[#0D1726] px-2.5 py-1 text-[10px] font-mono text-[#94A3B8]">
+          MODEL: <strong className="text-[#F1F5F9]">{data?.model_id ?? "—"}</strong>
         </span>
       </header>
 
       <div className="flex flex-wrap items-center gap-2">
         <label className="relative flex-1">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#64748B]" />
           <input
             value={search}
             onChange={(event) => {
               setSearch(event.target.value);
             }}
-            placeholder="Search glosses"
+            placeholder="Search glosses..."
             aria-label="Search glosses"
-            className="w-full rounded border border-border bg-surface py-2 pl-9 pr-3 text-xs text-text-primary focus:border-accent-primary focus:outline-none"
+            className="w-full rounded-lg border border-[#263449] bg-[#0D1726] py-2 pl-9 pr-3 text-xs text-[#F1F5F9] placeholder:text-[#64748B] focus:border-[#34D399] focus:outline-none transition-colors"
           />
         </label>
         <select
@@ -322,7 +325,7 @@ export default function AdminTrainingDataPage() {
             setCategory(event.target.value);
           }}
           aria-label="Filter by category"
-          className="rounded border border-border bg-surface px-3 py-2 text-[10px] font-mono text-text-secondary focus:border-accent-primary focus:outline-none"
+          className="rounded-lg border border-[#263449] bg-[#0D1726] px-3 py-2 text-[10px] font-mono text-[#94A3B8] focus:border-[#34D399] focus:outline-none transition-colors"
         >
           <option value="">All categories</option>
           <option value="Alphabet">Alphabet</option>
@@ -335,49 +338,49 @@ export default function AdminTrainingDataPage() {
           }}
           aria-label="Filter by dialect"
           title="Filter using dialect/source labels saved in the model archive"
-          className="rounded border border-border bg-surface px-3 py-2 text-[10px] font-mono text-text-secondary focus:border-accent-primary focus:outline-none"
+          className="rounded-lg border border-[#263449] bg-[#0D1726] px-3 py-2 text-[10px] font-mono text-[#94A3B8] focus:border-[#34D399] focus:outline-none transition-colors"
         >
           <option value="">All dialects</option>
           {data?.dialects.map((availableDialect) => (
             <option key={availableDialect} value={availableDialect}>{availableDialect}</option>
           ))}
         </select>
-        <span className="px-2 text-[10px] font-mono text-text-muted">{data?.total ?? 0} glosses</span>
+        <span className="px-2 text-[10px] font-mono text-[#64748B]">{data?.total ?? 0} glosses</span>
       </div>
 
       {isError && (
-        <div className="rounded border border-status-error/30 bg-status-error/10 p-3 text-xs text-status-error">
+        <div className="rounded-lg border border-[#EF4444]/30 bg-[#EF4444]/10 p-3 text-xs text-[#EF4444]">
           Could not load the active model&apos;s archived training clips.
         </div>
       )}
 
       <div className="grid min-h-0 flex-1 gap-3 md:grid-cols-[220px_minmax(0,1fr)] xl:grid-cols-[240px_minmax(0,1fr)]">
-        <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-border bg-surface">
-          <div className="flex items-center justify-between border-b border-border px-3 py-2 text-[10px] font-mono uppercase text-text-muted">
+        <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-[#263449] bg-[#0D1726]">
+          <div className="flex items-center justify-between border-b border-[#263449] bg-[#111E30] px-3 py-2 text-[10px] font-mono uppercase text-[#64748B]">
             <span>Glosses</span>
-            <span>{data?.total ?? 0}</span>
+            <span className="text-[#94A3B8] font-bold">{data?.total ?? 0}</span>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain divide-y divide-[#263449]">
             {isLoading ? (
-              <div className="p-4 text-xs font-mono text-text-muted">Loading…</div>
+              <div className="p-4 text-xs font-mono text-[#64748B]">Loading…</div>
             ) : data?.items.length ? (
               data.items.map((item) => (
                 <button
                   key={item.gloss}
                   type="button"
                   onClick={() => selectGloss(item.gloss)}
-                  className={`flex w-full items-center justify-between gap-2 border-b border-border px-3 py-2.5 text-left text-xs font-mono last:border-0 ${
+                  className={`flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-xs font-mono transition-colors ${
                     currentGloss === item.gloss
-                      ? "bg-accent-primary/10 text-accent-primary"
-                      : "text-text-secondary hover:bg-surface-elevated"
+                      ? "bg-[#34D399]/10 text-[#34D399] font-semibold"
+                      : "text-[#94A3B8] hover:bg-[#111E30] hover:text-[#F1F5F9]"
                   }`}
                 >
                   <span className="truncate">{item.gloss}</span>
-                  <span className="shrink-0 text-[9px] text-text-muted">{item.clip_count}</span>
+                  <span className="shrink-0 text-[9px] text-[#64748B]">{item.clip_count}</span>
                 </button>
               ))
             ) : (
-              <div className="p-4 text-xs font-mono leading-relaxed text-text-muted">
+              <div className="p-4 text-xs font-mono leading-relaxed text-[#64748B]">
                 {search
                   ? "No matching glosses."
                   : "No archived training data."}
@@ -386,18 +389,18 @@ export default function AdminTrainingDataPage() {
           </div>
         </section>
 
-        <section className="flex min-h-0 min-w-0 flex-col rounded-lg border border-border bg-surface p-3 sm:p-4">
+        <section className="flex min-h-0 min-w-0 flex-col rounded-lg border border-[#263449] bg-[#0D1726] p-3 sm:p-4">
           {clip ? (
             <>
-              <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border pb-2.5">
+              <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-[#263449] pb-2.5">
                 <div className="flex min-w-0 items-center gap-3">
                   <div className="min-w-0">
-                    <div className="text-sm font-bold text-text-primary">{clip.gloss}</div>
+                    <div className="text-sm font-bold text-[#F1F5F9]">{clip.gloss}</div>
                   </div>
-                  <div className={`flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-[9px] font-mono font-bold ${
+                  <div className={`flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-mono font-bold ${
                     clip.correct
-                      ? "border-status-approved/30 bg-status-approved/10 text-status-approved"
-                      : "border-status-error/30 bg-status-error/10 text-status-error"
+                      ? "border-[#34D399]/30 bg-[#34D399]/10 text-[#34D399]"
+                      : "border-[#EF4444]/30 bg-[#EF4444]/10 text-[#EF4444]"
                   }`}>
                     {clip.correct ? <CircleCheck size={11} /> : <CircleX size={11} />}
                     {clip.correct ? "MATCH" : "MISMATCH"} · {Math.round(clip.confidence * 100)}%
@@ -408,7 +411,7 @@ export default function AdminTrainingDataPage() {
                     type="button"
                     onClick={() => setClipIndex((value) => Math.max(0, value - 1))}
                     disabled={clipIndex <= 0}
-                    className="rounded border border-border p-1.5 text-text-secondary disabled:opacity-30"
+                    className="rounded-md border border-[#263449] bg-[#111E30] p-1.5 text-[#94A3B8] hover:border-[#94A3B8]/40 hover:text-[#F1F5F9] disabled:opacity-30 transition-colors"
                     aria-label="Previous training clip (left arrow)"
                     title="Previous clip (←)"
                   >
@@ -418,35 +421,35 @@ export default function AdminTrainingDataPage() {
                     type="button"
                     onClick={() => setClipIndex((value) => Math.min(clip.clip_count - 1, value + 1))}
                     disabled={clipIndex >= clip.clip_count - 1}
-                    className="rounded border border-border p-1.5 text-text-secondary disabled:opacity-30"
+                    className="rounded-md border border-[#263449] bg-[#111E30] p-1.5 text-[#94A3B8] hover:border-[#94A3B8]/40 hover:text-[#F1F5F9] disabled:opacity-30 transition-colors"
                     aria-label="Next training clip (right arrow)"
                     title="Next clip (→)"
                   >
                     <ChevronRight size={15} />
                   </button>
-                  <span className="whitespace-nowrap text-[9px] font-mono text-text-muted">
+                  <span className="whitespace-nowrap text-[9px] font-mono text-[#64748B]">
                     Clip {clip.clip_index + 1} / {clip.clip_count}
                   </span>
                 </div>
               </div>
               <TrainingClipView key={`${clip.gloss}-${clip.clip_index}`} clip={clip} />
-              <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-t border-border pt-2 text-[9px] font-mono text-text-muted">
-                <span>Expected <strong className="text-text-secondary">{clip.gloss}</strong></span>
-                <span>Predicted <strong className={clip.correct ? "text-status-approved" : "text-status-error"}>{clip.prediction}</strong></span>
+              <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-t border-[#263449] pt-2 text-[9px] font-mono text-[#64748B]">
+                <span>Expected <strong className="text-[#94A3B8]">{clip.gloss}</strong></span>
+                <span>Predicted <strong className={clip.correct ? "text-[#34D399]" : "text-[#EF4444]"}>{clip.prediction}</strong></span>
                 {clip.source_video && (
                   <span className="max-w-[220px] truncate" title={clip.source_video}>
                     Source {clip.source_video}
                   </span>
                 )}
-                <span className="ml-auto text-[8px]">Training clip · not validation accuracy</span>
+                <span className="ml-auto text-[8px] text-[#64748B]">Training clip · not validation accuracy</span>
                 <div className="flex w-full flex-wrap gap-x-4 gap-y-1.5">
                   {clip.top3.map((item, index) => {
                     const confidence = Math.max(0, Math.min(100, item.confidence * 100));
                     return (
                       <div key={item.label} className="flex min-w-[120px] flex-1 items-center gap-2">
-                        <span className="w-24 truncate text-text-secondary" title={item.label}>{item.label}</span>
+                        <span className="w-24 truncate text-[#94A3B8]" title={item.label}>{item.label}</span>
                         <div
-                          className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-border"
+                          className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-[#111E30] border border-[#263449]"
                           role="meter"
                           aria-label={`${item.label} confidence`}
                           aria-valuemin={0}
@@ -454,11 +457,11 @@ export default function AdminTrainingDataPage() {
                           aria-valuenow={Math.round(confidence)}
                         >
                           <div
-                            className={`h-full rounded-full ${index === 0 ? "bg-accent-primary" : "bg-text-muted/60"}`}
+                            className={`h-full rounded-full ${index === 0 ? "bg-[#34D399]" : "bg-[#64748B]"}`}
                             style={{ width: `${confidence}%` }}
                           />
                         </div>
-                        <span className="w-8 text-right">{Math.round(confidence)}%</span>
+                        <span className="w-8 text-right text-[#94A3B8]">{Math.round(confidence)}%</span>
                       </div>
                     );
                   })}
@@ -466,7 +469,7 @@ export default function AdminTrainingDataPage() {
               </div>
             </>
           ) : (
-            <div className="flex min-h-[220px] flex-1 items-center justify-center text-center text-xs font-mono text-text-muted">
+            <div className="flex min-h-[220px] flex-1 items-center justify-center text-center text-xs font-mono text-[#64748B]">
               {clipLoading
                 ? "Loading clip…"
                 : clipError

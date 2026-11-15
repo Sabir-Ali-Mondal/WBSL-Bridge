@@ -31,21 +31,23 @@ export default function AdminSettingsPage() {
   ];
 
   return (
-    <div className="space-y-4">
-      <div className="text-xs font-mono uppercase text-text-muted">SYSTEM SETTINGS</div>
-      <h1 className="text-2xl font-bold text-text-primary">System Settings</h1>
+    <div className="space-y-4 max-w-6xl">
+      <div className="pb-3 border-b border-[#263449]">
+        <div className="text-xs font-mono uppercase text-[#64748B]">SYSTEM SETTINGS</div>
+        <h1 className="text-2xl font-bold text-[#F1F5F9] mt-0.5">System Settings</h1>
+      </div>
 
       {health?.model_error && (
-        <div className="p-3 rounded-lg border border-status-error/40 bg-status-error/10 text-[10px] font-mono text-status-error">
+        <div className="p-3 rounded-lg border border-[#EF4444]/40 bg-[#EF4444]/10 text-[10px] font-mono text-[#EF4444]">
           {health.model_error}
         </div>
       )}
 
-      <div className="p-6 bg-surface border border-border rounded-lg space-y-3 font-mono text-xs">
+      <div className="p-6 bg-[#0D1726] border border-[#263449] rounded-lg space-y-1 font-mono text-xs">
         {rows.map(([k, v]) => (
-          <div key={k} className="flex justify-between py-2 border-b border-border last:border-0">
-            <span className="text-text-muted">{k}</span>
-            <span className="text-text-primary text-right">{v}</span>
+          <div key={k} className="flex justify-between py-2.5 border-b border-[#263449] last:border-0 hover:bg-[#111E30]/40 px-2 rounded transition-colors">
+            <span className="text-[#64748B] font-semibold">{k}</span>
+            <span className="text-[#F1F5F9] text-right font-medium">{v}</span>
           </div>
         ))}
       </div>

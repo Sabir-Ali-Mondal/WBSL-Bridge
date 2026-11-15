@@ -122,14 +122,14 @@ export default function AdminModelsPage() {
   const busy = rescan.isPending || activate.isPending;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 max-w-6xl">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <div className="text-xs font-mono uppercase text-text-muted">MODEL REGISTRY</div>
-          <h1 className="text-2xl font-bold text-text-primary">Models Registry</h1>
-          <p className="text-xs text-text-secondary mt-1 font-mono">
+          <div className="text-xs font-mono uppercase text-[#64748B]">MODEL REGISTRY</div>
+          <h1 className="text-2xl font-bold text-[#F1F5F9]">Models Registry</h1>
+          <p className="text-xs text-[#94A3B8] mt-1 font-mono">
             Auto-discovered from{" "}
-            <span className="text-text-primary">
+            <span className="text-[#F1F5F9]">
               {data?.scan_dir ?? "models/onnx_models"}
             </span>{" "}
             · newest run wins on startup
@@ -138,26 +138,26 @@ export default function AdminModelsPage() {
         <button
           onClick={() => rescan.mutate()}
           disabled={busy}
-          className="flex items-center gap-2 px-3 py-2 rounded border border-border bg-surface-elevated text-xs font-mono text-text-primary hover:border-accent-primary disabled:opacity-50"
+          className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#263449] bg-[#111E30] text-xs font-mono text-[#F1F5F9] hover:border-[#94A3B8]/40 hover:bg-[#16273e] disabled:opacity-50 transition-colors"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${rescan.isPending ? "animate-spin" : ""}`} />
+          <RefreshCw className={`w-3.5 h-3.5 ${rescan.isPending ? "animate-spin text-[#34D399]" : ""}`} />
           RESCAN
         </button>
       </div>
 
-      <div className="p-6 bg-surface border border-border rounded-lg space-y-3">
+      <div className="p-6 bg-[#0D1726] border border-[#263449] rounded-lg space-y-3">
         {isLoading && (
-          <div className="text-xs font-mono text-text-muted">Scanning model folder…</div>
+          <div className="text-xs font-mono text-[#64748B]">Scanning model folder…</div>
         )}
 
         {!isLoading && data?.error && (
-          <div className="p-4 rounded bg-status-rejected/10 border border-status-rejected/40 text-xs font-mono text-status-rejected">
+          <div className="p-4 rounded-lg bg-[#EF4444]/10 border border-[#EF4444]/40 text-xs font-mono text-[#EF4444]">
             {data.error}
           </div>
         )}
 
         {!isLoading && models.length === 0 && !data?.error && (
-          <div className="p-4 rounded bg-surface-elevated border border-border text-xs font-mono text-text-muted">
+          <div className="p-4 rounded-lg bg-[#111E30] border border-[#263449] text-xs font-mono text-[#64748B]">
             No models found — train one from the Training Console.
           </div>
         )}
@@ -167,26 +167,28 @@ export default function AdminModelsPage() {
           return (
             <div
               key={m.path}
-              className={`flex items-center justify-between gap-4 p-4 rounded bg-surface-elevated border ${
-                m.active ? "border-accent-primary/60" : "border-border"
+              className={`flex items-center justify-between gap-4 p-4 rounded-lg bg-[#111E30] border transition-all ${
+                m.active
+                  ? "border-[#34D399]/50 shadow-[0_0_12px_rgba(52,211,153,0.06)]"
+                  : "border-[#263449] hover:border-[#334460]"
               }`}
             >
               <div className="flex items-start gap-3 min-w-0">
                 <Cpu
                   className={`w-4 h-4 mt-0.5 shrink-0 ${
-                    m.active ? "text-accent-primary" : "text-text-muted"
+                    m.active ? "text-[#34D399]" : "text-[#64748B]"
                   }`}
                 />
                 <div className="min-w-0">
-                  <div className="text-sm font-mono font-bold text-text-primary truncate">
+                  <div className="text-sm font-mono font-bold text-[#F1F5F9] truncate">
                     {m.name}.onnx
                   </div>
-                  <div className="text-xs text-text-muted font-mono">
+                  <div className="text-xs text-[#94A3B8] font-mono">
                     {featureLabel(m)}
                     {" · "}
                     {m.classes} classes · {m.size_mb} MB · {m.run}
                   </div>
-                  <div className="text-[10px] text-text-muted font-mono truncate">
+                  <div className="text-[10px] text-[#64748B] font-mono truncate">
                     {m.path}
                   </div>
                 </div>
@@ -195,21 +197,21 @@ export default function AdminModelsPage() {
               <div className="flex items-center gap-2 shrink-0">
                 {!servable && (
                   <span
-                    className="px-2 py-0.5 rounded text-[10px] font-mono bg-status-pending/20 text-status-pending"
+                    className="px-2 py-0.5 rounded text-[10px] font-mono bg-[#F59E0B]/20 text-[#F59E0B] border border-[#F59E0B]/30"
                     title="The backend requires a temporal model with 64 frames of 98-dim shoulder-box features."
                   >
                     INCOMPATIBLE
                   </span>
                 )}
                 {m.active ? (
-                  <span className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono bg-status-approved/20 text-status-approved">
-                    <CheckCircle2 className="w-3 h-3" /> ACTIVE
+                  <span className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[10px] font-mono bg-[#34D399]/15 text-[#34D399] border border-[#34D399]/30 font-semibold">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> ACTIVE
                   </span>
                 ) : (
                   <button
                     onClick={() => activate.mutate(m.path)}
                     disabled={busy || !servable}
-                    className="px-3 py-1.5 rounded text-[10px] font-mono border border-border text-text-primary hover:border-accent-primary disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="px-3 py-1.5 rounded-lg text-[10px] font-mono border border-[#263449] bg-[#0D1726] text-[#F1F5F9] hover:border-[#94A3B8]/40 hover:bg-[#16273e] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                   >
                     {activate.isPending && activate.variables === m.path
                       ? "LOADING…"
@@ -223,22 +225,22 @@ export default function AdminModelsPage() {
       </div>
 
       {data?.active && (
-        <div className="text-xs font-mono text-text-muted">
-          Serving now: <span className="text-text-primary">{data.active.name}</span> (
+        <div className="text-xs font-mono text-[#64748B]">
+          Serving now: <span className="text-[#F1F5F9] font-medium">{data.active.name}</span> (
           {data.active.classes} classes, {data.active.temporal ? "temporal" : "static"})
         </div>
       )}
 
-      <section className="space-y-3 rounded-lg border border-border bg-surface p-5">
+      <section className="space-y-3 rounded-lg border border-[#263449] bg-[#0D1726] p-5">
         <div>
-          <div className="text-xs font-mono uppercase text-text-muted">ACTIVE MODEL REPORT</div>
-          <h2 className="mt-1 text-lg font-bold text-text-primary">
+          <div className="text-xs font-mono uppercase text-[#64748B]">ACTIVE MODEL REPORT</div>
+          <h2 className="mt-1 text-lg font-bold text-[#F1F5F9]">
             Validation &amp; Confusion Matrix
           </h2>
         </div>
 
         {report?.best_val_acc === undefined ? (
-          <p className="text-xs font-mono text-text-muted">
+          <p className="text-xs font-mono text-[#64748B]">
             No training report is available for the active model bundle.
           </p>
         ) : (
@@ -250,28 +252,28 @@ export default function AdminModelsPage() {
                 ["Macro F1", report.macro_avg?.f1],
                 ["Validation loss", report.best_val_loss],
               ].map(([label, value]) => (
-                <div key={label} className="rounded border border-border bg-surface-elevated p-3">
-                  <div className="text-[9px] font-mono uppercase text-text-muted">{label}</div>
-                  <div className="mt-1 text-lg font-bold text-text-primary">
+                <div key={label} className="rounded-lg border border-[#263449] bg-[#111E30] p-3">
+                  <div className="text-[9px] font-mono uppercase text-[#64748B]">{label}</div>
+                  <div className="mt-1 text-lg font-bold text-[#F1F5F9]">
                     {typeof value === "number" ? `${(value * (label === "Validation loss" ? 1 : 100)).toFixed(1)}${label === "Validation loss" ? "" : "%"}` : "—"}
                   </div>
                 </div>
               ))}
             </div>
 
-            <div className="text-[10px] font-mono text-text-muted">
+            <div className="text-[10px] font-mono text-[#64748B]">
               Epoch {report.best_epoch ?? "—"} · {report.data?.train_videos ?? "—"} training clips ·{" "}
               {report.data?.val_videos ?? "—"} validation clips · {report.training_seconds ?? "—"} s
             </div>
 
             {report.per_class && (
-              <details className="rounded border border-border">
-                <summary className="cursor-pointer px-3 py-2 text-[10px] font-mono text-text-secondary">
+              <details className="rounded-lg border border-[#263449] bg-[#111E30]/40">
+                <summary className="cursor-pointer px-3 py-2 text-[10px] font-mono text-[#94A3B8] hover:text-[#F1F5F9] transition-colors">
                   Per-class precision, recall &amp; F1 ({Object.keys(report.per_class).length} classes)
                 </summary>
-                <div className="max-h-80 overflow-auto">
+                <div className="max-h-80 overflow-auto border-t border-[#263449]">
                   <table className="w-full text-left text-[10px] font-mono">
-                    <thead className="sticky top-0 bg-surface-elevated text-text-muted">
+                    <thead className="sticky top-0 bg-[#111E30] text-[#64748B] border-b border-[#263449]">
                       <tr>
                         <th className="px-3 py-2">Gloss</th>
                         <th className="px-3 py-2">Precision</th>
@@ -280,14 +282,14 @@ export default function AdminModelsPage() {
                         <th className="px-3 py-2">Support</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-border">
+                    <tbody className="divide-y divide-[#263449]">
                       {Object.entries(report.per_class).map(([gloss, metrics]) => (
-                        <tr key={gloss}>
-                          <td className="px-3 py-1.5 font-bold text-text-primary">{gloss}</td>
-                          <td className="px-3 py-1.5 text-text-secondary">{metrics.precision?.toFixed(3) ?? "—"}</td>
-                          <td className="px-3 py-1.5 text-text-secondary">{metrics.recall?.toFixed(3) ?? "—"}</td>
-                          <td className="px-3 py-1.5 text-text-secondary">{metrics.f1?.toFixed(3) ?? "—"}</td>
-                          <td className="px-3 py-1.5 text-text-secondary">{metrics.support ?? "—"}</td>
+                        <tr key={gloss} className="hover:bg-[#111E30]/60 transition-colors">
+                          <td className="px-3 py-1.5 font-bold text-[#F1F5F9]">{gloss}</td>
+                          <td className="px-3 py-1.5 text-[#94A3B8]">{metrics.precision?.toFixed(3) ?? "—"}</td>
+                          <td className="px-3 py-1.5 text-[#94A3B8]">{metrics.recall?.toFixed(3) ?? "—"}</td>
+                          <td className="px-3 py-1.5 text-[#94A3B8]">{metrics.f1?.toFixed(3) ?? "—"}</td>
+                          <td className="px-3 py-1.5 text-[#94A3B8]">{metrics.support ?? "—"}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -297,17 +299,17 @@ export default function AdminModelsPage() {
             )}
 
             {confusion?.classes?.length && confusion.matrix?.length ? (
-              <details className="rounded border border-border">
-                <summary className="cursor-pointer px-3 py-2 text-[10px] font-mono text-text-secondary">
+              <details className="rounded-lg border border-[#263449] bg-[#111E30]/40">
+                <summary className="cursor-pointer px-3 py-2 text-[10px] font-mono text-[#94A3B8] hover:text-[#F1F5F9] transition-colors">
                   Confusion matrix · actual rows × predicted columns
                 </summary>
-                <div className="max-h-[440px] overflow-auto">
+                <div className="max-h-[440px] overflow-auto border-t border-[#263449]">
                   <table className="min-w-max border-collapse text-[9px] font-mono">
-                    <thead className="sticky top-0 z-10 bg-surface-elevated text-text-muted">
+                    <thead className="sticky top-0 z-10 bg-[#111E30] text-[#64748B]">
                       <tr>
-                        <th className="sticky left-0 z-20 border border-border bg-surface-elevated px-2 py-1">Actual</th>
+                        <th className="sticky left-0 z-20 border border-[#263449] bg-[#111E30] px-2 py-1">Actual</th>
                         {confusion.classes.map((gloss) => (
-                          <th key={gloss} className="border border-border px-2 py-1" title={gloss}>
+                          <th key={gloss} className="border border-[#263449] px-2 py-1 text-[#94A3B8]" title={gloss}>
                             {gloss}
                           </th>
                         ))}
@@ -316,17 +318,18 @@ export default function AdminModelsPage() {
                     <tbody>
                       {confusion.matrix.map((row, rowIndex) => (
                         <tr key={confusion.classes?.[rowIndex] ?? rowIndex}>
-                          <th className="sticky left-0 border border-border bg-surface-elevated px-2 py-1 text-left text-text-primary">
+                          <th className="sticky left-0 border border-[#263449] bg-[#111E30] px-2 py-1 text-left text-[#F1F5F9]">
                             {confusion.classes?.[rowIndex] ?? rowIndex}
                           </th>
                           {row.map((count, columnIndex) => (
                             <td
                               key={columnIndex}
-                              className="border border-border px-2 py-1 text-center text-text-secondary"
+                              className="border border-[#263449] px-2 py-1 text-center text-[#94A3B8]"
                               style={{
                                 backgroundColor: count
-                                  ? `rgba(94, 234, 212, ${Math.min(0.7, 0.12 + count / Math.max(1, ...row) * 0.55)})`
+                                  ? `rgba(34, 211, 238, ${Math.min(0.65, 0.12 + (count / Math.max(1, ...row)) * 0.5)})`
                                   : undefined,
+                                color: count ? "#F1F5F9" : undefined,
                               }}
                               title={`${confusion.classes?.[rowIndex]} → ${confusion.classes?.[columnIndex]}: ${count}`}
                             >
@@ -340,7 +343,7 @@ export default function AdminModelsPage() {
                 </div>
               </details>
             ) : (
-              <p className="text-[10px] font-mono text-text-muted">
+              <p className="text-[10px] font-mono text-[#64748B]">
                 No confusion matrix is available for the active model bundle.
               </p>
             )}

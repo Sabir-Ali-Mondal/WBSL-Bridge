@@ -189,3 +189,49 @@ body::after {
 
   background-size: 20px 20px;
 }
+
+/* =========================================
+   ADMIN THEME SCROLLBARS & UTILITIES
+   Palette:
+   - bg: #080F1C
+   - card: #0D1726
+   - surface: #111E30
+   - border: #263449
+   - text-primary: #F1F5F9
+   - text-secondary: #94A3B8
+   - text-muted: #64748B
+   - accent: #34D399
+   - accent-secondary: #22D3EE
+========================================= */
+
+.admin-theme {
+  --admin-bg: #080F1C;
+  --admin-card: #0D1726;
+  --admin-surface: #111E30;
+  --admin-border: #263449;
+  --admin-text-primary: #F1F5F9;
+  --admin-text-secondary: #94A3B8;
+  --admin-text-muted: #64748B;
+  --admin-accent: #34D399;
+  --admin-accent-secondary: #22D3EE;
+  background-color: #080F1C;
+  color: #F1F5F9;
+}
+
+.admin-theme ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.admin-theme ::-webkit-scrollbar-track {
+  background: #080F1C;
+}
+
+.admin-theme ::-webkit-scrollbar-thumb {
+  background: #263449;
+  border-radius: 9999px;
+}
+
+.admin-theme ::-webkit-scrollbar-thumb:hover {
+  background: #334460;
+}
