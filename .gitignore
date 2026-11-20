@@ -27,7 +27,6 @@ pyvenv.cfg
 
 # Local model assets that are required at runtime but too large for Git.
 models/
-model_training_zone/
 # Packaging / builds
 build/
 dist/
