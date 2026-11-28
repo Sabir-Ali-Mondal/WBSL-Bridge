@@ -4,7 +4,7 @@ dl_nondl_recognize_v2.py - STANDALONE Part-Robust Multi-View DTW + DL hybrid rec
 
 Keep beside:
     extract.py          (only local dependency)
-
+hhh
 Run:
     py model_training_zone\dl_nondl_recognize_v2.py
     py model_training_zone\dl_nondl_recognize_v2.py --selftest
