@@ -325,6 +325,7 @@ models/onnx_models/
     ├── sign_daily_classes.json
     ├── daily_report.json
     ├── confusion_matrix.json
+    |-- training_data/features
     └── avatar/
         └── <GLOSS>/
             ├── pose.npy
