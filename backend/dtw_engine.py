@@ -43,9 +43,9 @@ except ImportError:
 # ── constants mirrored from extract.py / dl_nondl_recognize.py ───────────────
 N_FRAMES = 64
 N_FEATURES = 98
-# How many feature columns the DTW side uses (can be < N_FEATURES)
-DTW_N_CONTENT = 97          # last col is duration — excluded from DTW
-MIN_REAL_FRAMES = 10
+# How many feature columns the DTW side uses (excludes hand flags [95,96] and duration [97])
+DTW_N_CONTENT = 95
+MIN_REAL_FRAMES = 8
 BIG = 1e18
 
 PART_ORDER = ["LH", "RH", "BOTH", "BODY", "FACE", "REST", "META"]
@@ -625,11 +625,14 @@ def _decide(ev: dict, pr: dict, deep_r: Optional[dict] = None,
     conf = float(np.clip(
         0.45 * dl_rel[win] + 0.35 * dtw_rel[win] + 0.20 * gnorm, 0, 1))
 
+    qual = str(ev.get("note", ""))
     low = (
         flag in ("DL kept", "DTW led", "rescued")
         or gap < pr["low_gap"]
         or rb > 1.60
         or (p1 < 0.25 and dmargin < 0.08)
+        or qual.startswith("single frame")
+        or qual.startswith("hands absent")
     )
 
     return dict(
@@ -641,16 +644,43 @@ def _decide(ev: dict, pr: dict, deep_r: Optional[dict] = None,
     )
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# SINGLETON ENGINE STATE
-# ═══════════════════════════════════════════════════════════════════════════════
-
+# Singleton engine state
 _lock  = threading.Lock()
 _bank: Optional[PartBank] = None
 _pmap: Optional[dict]     = None
 _base_w: Optional[np.ndarray] = None
 _classes: list[str] = []
+_active_pr: dict = dict(PR)
 _ready = False
+
+RECOGNITION_SETTINGS = {
+    "rule": "v2",
+    "part_on": True,
+    "use_mask": True,
+    "n_frames": N_FRAMES,
+    "n_features": N_FEATURES,
+    "dtw_n_content": DTW_N_CONTENT,
+    "min_real_frames": MIN_REAL_FRAMES,
+    "pr": dict(PR),
+    "part_w": dict(PART_W_DEFAULTS),
+}
+
+
+def get_recognition_config() -> dict:
+    """Return the active centralized recognition configuration."""
+    with _lock:
+        return {
+            "rule": "v2",
+            "part_on": True,
+            "use_mask": True,
+            "n_frames": N_FRAMES,
+            "n_features": N_FEATURES,
+            "dtw_n_content": DTW_N_CONTENT,
+            "min_real_frames": MIN_REAL_FRAMES,
+            "dtw_ready": _ready,
+            "pr": dict(_active_pr),
+            "part_w": dict(PART_W_DEFAULTS),
+        }
 
 
 def _load_part_map(run_dir: Path, n_content: int) -> dict:
@@ -682,7 +712,7 @@ def init_engine(run_dir: Path, classes: list[str]) -> bool:
 
     Returns True if the DTW bank loaded successfully.
     """
-    global _bank, _pmap, _base_w, _classes, _ready
+    global _bank, _pmap, _base_w, _classes, _active_pr, _ready
 
     if not _NUMBA_OK:
         logger.warning("[DTW] engine not initialised (numba missing).")
@@ -700,24 +730,44 @@ def init_engine(run_dir: Path, classes: list[str]) -> bool:
         logger.warning("[DTW] no matching .npy reference files — engine disabled.")
         return False
 
+    pr = dict(PR)
+    part_mult: dict[str, float] = {}
+    for cand_tune in (
+        run_dir / "hybrid_v2_tuned.json",
+        Path(__file__).resolve().parent.parent / "model_training_zone" / "hybrid_v2_tuned.json",
+    ):
+        if cand_tune.exists():
+            try:
+                blob = json.loads(cand_tune.read_text(encoding="utf-8"))
+                pr.update(blob.get("params", {}))
+                part_mult = blob.get("part_mult", {})
+                logger.info(f"[DTW] loaded tuned params from {cand_tune.name}")
+                break
+            except Exception as exc:
+                logger.warning(f"[DTW] could not load {cand_tune.name}: {exc}")
+
     pmap   = _load_part_map(run_dir, DTW_N_CONTENT)
     names  = pmap["names"]
-    base_w = np.array([PART_W_DEFAULTS.get(n, 0.6) for n in names], np.float32)
+    base_w = np.array(
+        [PART_W_DEFAULTS.get(n, 0.6) * float(part_mult.get(n, 1.0)) for n in names],
+        np.float32,
+    )
 
     logger.info(f"[DTW] initialising PartBank for {len(sign_classes)} classes …")
     try:
         _kernel_warmup()   # JIT compile before we block on preload
-        bank = PartBank(feature_dir, sign_classes, pmap, base_w, PR, preload=True)
+        bank = PartBank(feature_dir, sign_classes, pmap, base_w, pr, preload=True)
     except Exception as exc:
         logger.error(f"[DTW] PartBank init failed: {exc}")
         return False
 
     with _lock:
-        _bank    = bank
-        _pmap    = pmap
-        _base_w  = base_w
-        _classes = sign_classes
-        _ready   = True
+        _bank      = bank
+        _pmap      = pmap
+        _base_w    = base_w
+        _classes   = sign_classes
+        _active_pr = pr
+        _ready     = True
 
     logger.info("[DTW] engine ready.")
     return True
@@ -779,13 +829,25 @@ def _stretch_indices(complete: np.ndarray) -> list[int] | None:
     return [int(idx[p]) for p in pos]
 
 
-def build_clip_from_frames(frames: list[dict | None], duration: float) -> np.ndarray | None:
+def _variant_idx(chosen: list[int], kind: int) -> list[int]:
+    n = len(chosen)
+    t = np.linspace(0.0, 1.0, n)
+    if kind == 0:
+        m = t
+    elif kind == 1:
+        m = t ** 0.88
+    elif kind == 2:
+        m = t ** 1.14
+    else:
+        m = 0.07 + 0.86 * t
+    pos = np.clip(np.round(m * (n - 1)).astype(int), 0, n - 1)
+    return [int(chosen[i]) for i in pos]
+
+
+def build_clip2(frames: list[dict | None], duration: float, n_tta: int = 4) -> dict | None:
     """
-    Exact port of build_clip2() from dl_nondl_recognize.py.
-    Never rejects with incomplete_span as long as at least 1 frame has pose data:
-    forward/backward fills missing landmarks, falls back to stretching,
-    pose-only geometry, or holding the best frame.
-    Returns (N_FRAMES, N_FEATURES) float32 array.
+    Exact port of build_clip2() from dl_nondl_recognize_v2.py.
+    Returns dict(feats, variants, note, real, parts) or None if no valid frames.
     """
     from backend.extract import (
         complete_mask_single,
@@ -807,6 +869,7 @@ def build_clip_from_frames(frames: list[dict | None], duration: float) -> np.nda
     face = np.full((F, len(valid_frames[0]["face"]), 3), np.nan, np.float32)
     face_ok = np.zeros(F, bool)
     in_use = np.zeros((F, 2), bool)
+    held = np.zeros((F, 2), bool)
 
     for i, fr in enumerate(frames):
         if fr is None:
@@ -815,7 +878,18 @@ def build_clip_from_frames(frames: list[dict | None], duration: float) -> np.nda
         hands[i] = fr["hands"]
         face[i] = fr["face"]
         face_ok[i] = bool(fr["face_ok"])
-        in_use[i] = frame_in_use(fr["pose"], W, H)
+        in_use[i] = fr["in_use"] if "in_use" in fr else frame_in_use(fr["pose"], W, H)
+        if "held" in fr:
+            held[i] = fr["held"]
+
+    miss_l = in_use[:, 0].astype(bool) & np.isnan(hands[:, 0, 0, 0])
+    miss_r = in_use[:, 1].astype(bool) & np.isnan(hands[:, 1, 0, 0])
+    bad_l = miss_l | held[:, 0]
+    bad_r = miss_r | held[:, 1]
+    bad_body = ~np.isfinite(pose[:, :, 0]).all(1)
+    bad_face = ~face_ok
+    n_miss_raw = int((miss_l | miss_r).sum())
+    n_held = int(held.any(1).sum())
 
     pose_f = _hold_valid(pose)
     hands_f = _hold_valid(hands)
@@ -837,9 +911,12 @@ def build_clip_from_frames(frames: list[dict | None], duration: float) -> np.nda
         dtype=bool,
     )
 
+    note = "ok"
     chosen = _select_indices(complete)
     if chosen is None:
         chosen = _stretch_indices(complete)
+        if chosen is not None:
+            note = f"stretched from {int(complete.sum())}/{F} frames"
     if chosen is None:
         iu3 = iu.copy()
         iu3[:, :2] = False
@@ -850,7 +927,7 @@ def build_clip_from_frames(frames: list[dict | None], duration: float) -> np.nda
         )
         chosen = _select_indices(c3) or _stretch_indices(c3)
         if chosen is not None:
-            iu = iu3
+            iu, note = iu3, "hands absent; pose-only geometry"
     if chosen is None:
         def _frac_finite(a):
             flat = np.isfinite(a).reshape(F, -1)
@@ -863,13 +940,72 @@ def build_clip_from_frames(frames: list[dict | None], duration: float) -> np.nda
         )
         b = int(np.argmax(score))
         chosen = [b] * N_FRAMES
+        note = f"single frame {b} held (very low quality)"
 
-    with np.errstate(all="ignore"):
-        feats = np.stack(
-            [frame_features(pose_f[i], hands_f[i], face_f[i], iu[i], W, H, duration)
-             for i in chosen]
-        )
-    return np.nan_to_num(feats.astype(np.float32), nan=0.0, posinf=0.0, neginf=0.0)
+    if note == "ok" and (n_miss_raw or n_held):
+        note = f"filled {n_miss_raw}/{F} missing-hand frames ({n_held} motion-held)"
+
+    ch = np.asarray(chosen, int)
+    parts = {
+        "LH": ~bad_l[ch],
+        "RH": ~bad_r[ch],
+        "BOTH": (~bad_l & ~bad_r)[ch],
+        "BODY": ~bad_body[ch],
+        "FACE": ~bad_face[ch],
+        "REST": (~bad_l & ~bad_r & ~bad_body)[ch],
+        "META": ~(bad_l | bad_r)[ch],
+        "ALL": ~(bad_l | bad_r)[ch],
+    }
+    real = parts["ALL"]
+    if int(real.sum()) < MIN_REAL_FRAMES:
+        parts = {k: np.ones(N_FRAMES, bool) for k in parts}
+        real = parts["ALL"]
+
+    def make(idxs):
+        with np.errstate(all="ignore"):
+            f = np.stack(
+                [frame_features(pose_f[i], hands_f[i], face_f[i], iu[i], W, H, duration)
+                 for i in idxs]
+            )
+        return np.nan_to_num(
+            f.astype(np.float32), nan=0.0, posinf=0.0, neginf=0.0
+        )[None]
+
+    feats = make(chosen)
+    variants = [feats]
+    for kind in range(1, max(int(n_tta), 1)):
+        variants.append(make(_variant_idx(chosen, kind)))
+
+    return dict(
+        feats=feats,
+        variants=variants,
+        note=note,
+        real=real,
+        parts=parts,
+    )
+
+
+def build_clip_from_frames(frames: list[dict | None], duration: float) -> np.ndarray | None:
+    """Backwards-compatible wrapper returning (N_FRAMES, N_FEATURES) float32 array."""
+    clip = build_clip2(frames, duration, n_tta=1)
+    return clip["feats"][0] if clip is not None else None
+
+
+def channel_masks(parts: dict, names: list[str], use_mask: bool = True):
+    P = len(names)
+    if not use_mask or not parts:
+        return np.ones((P, N_FRAMES), np.float32), np.ones(P), False
+    qm = np.stack([parts.get(n, parts["ALL"]).astype(np.float32) for n in names])
+    n = qm.sum(1)
+    ok = n >= MIN_REAL_FRAMES
+    fallback = False
+    if not ok.any():
+        qm = np.ones((P, N_FRAMES), np.float32)
+        ok = np.ones(P, bool)
+        n = qm.sum(1)
+        fallback = True
+    rel = np.where(ok, 0.35 + 0.65 * (n / N_FRAMES), 0.0)
+    return np.ascontiguousarray(qm, np.float32), rel, fallback
 
 
 def _tta_variants(clip: np.ndarray, n_tta: int = 4) -> list[np.ndarray]:
@@ -891,7 +1027,7 @@ def _tta_variants(clip: np.ndarray, n_tta: int = 4) -> list[np.ndarray]:
     return variants
 
 
-def _dl_probs(onnx_session, input_name: str, variants: list[np.ndarray]) -> np.ndarray:
+def _dl_probs(onnx_session, input_name: str, variants: list[np.ndarray]) -> tuple[np.ndarray, float]:
     """Average softmax probabilities over TTA variants with [0.40, 0.20, 0.20, 0.20]."""
     w = np.asarray([0.40, 0.20, 0.20, 0.20][:len(variants)], np.float64)
     w /= w.sum()
@@ -899,7 +1035,11 @@ def _dl_probs(onnx_session, input_name: str, variants: list[np.ndarray]) -> np.n
     for v in variants:
         logits = onnx_session.run(None, {input_name: v})[0][0]
         ps.append(_softmax(logits.astype(np.float64)))
-    return (w[:, None] * np.asarray(ps)).sum(0)
+    ps_arr = np.asarray(ps)
+    p = (w[:, None] * ps_arr).sum(0)
+    tops = ps_arr.argmax(1)
+    stability = float(np.mean(tops == tops[0]))
+    return p, stability
 
 
 def _deep_pair(
@@ -949,48 +1089,57 @@ def _deep_pair(
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def hybrid_recognize(
-    clip: np.ndarray,
+    clip,
     onnx_session,
     input_name: str,
     all_classes: list[str],
 ) -> dict:
     """
-    Run the Part-Robust DTW + DL hybrid recogniser on a (1, 64, 98) clip.
+    Run the Part-Robust DTW + DL hybrid v2 recogniser on either a build_clip2()
+    dict or a (1, 64, 98) clip array.
 
     Falls back to pure ONNX if the DTW bank is not ready.
-
-    Returns a dict with keys:
-        label, confidence, margin, top3, flag, dtw_active
     """
+    if isinstance(clip, dict):
+        clip_arr = clip["feats"]
+        variants = clip["variants"]
+        parts = clip.get("parts")
+        note = clip.get("note", "ok")
+    else:
+        clip_arr = clip[None] if clip.ndim == 2 else clip
+        variants = _tta_variants(clip_arr, PR["tta"])
+        parts = None
+        note = "ok"
+
     if not _ready:
-        return _pure_onnx(clip, onnx_session, input_name, all_classes)
+        return _pure_onnx(clip_arr, onnx_session, input_name, all_classes)
 
     with _lock:
         bank     = _bank
         base_w   = _base_w.copy()
-        pr       = dict(PR)
+        pr       = dict(_active_pr)
         sign_cls = list(_classes)
 
     # ── DL probabilities over ALL classes (with 4x TTA) ──────────────────
-    variants = _tta_variants(clip, pr["tta"])
-    p_all    = _dl_probs(onnx_session, input_name, variants)
+    variants = variants[:max(int(pr["tta"]), 1)]
+    p_all, stab = _dl_probs(onnx_session, input_name, variants)
 
     # Restrict to sign classes the bank knows about
     cls_index    = {c: i for i, c in enumerate(all_classes)}
     bank_indices = [cls_index[c] for c in sign_cls if c in cls_index]
     if not bank_indices:
-        return _pure_onnx(clip, onnx_session, input_name, all_classes)
+        return _pure_onnx(clip_arr, onnx_session, input_name, all_classes)
 
     p_bank = p_all[bank_indices]   # probabilities for the DTW classes
 
-    # ── query tensor ─────────────────────────────────────────────────────
-    q_full = clip[0]                           # (64, 98)
+    # ── query tensor & channel masks ─────────────────────────────────────
+    q_full = clip_arr[0]                       # (64, 98)
     q = np.ascontiguousarray(
         q_full[:, :DTW_N_CONTENT][:, bank.perm], np.float32)
 
-    # All frames are "real" (the stream already selects complete frames)
-    qm  = np.ones((bank.P, N_FRAMES), np.float32)
-    rel = np.ones(bank.P)
+    qm, rel, fb = channel_masks(parts, bank.names, use_mask=bool(parts))
+    if fb:
+        note = f"{note} | masks fell back to all frames" if note != "ok" else "masks fell back to all frames"
     cw  = np.ascontiguousarray(base_w * rel, np.float32)
     alpha = pr["alpha"]
     beta  = pr["beta"]
@@ -1013,7 +1162,7 @@ def hybrid_recognize(
     r       = _make_r(rch, rj, W, alpha, beta)
 
     # ── pass 1 decision → optional deep DTW + Chamfer tie-breaker ────────
-    ev   = dict(p=p_bank[U], r=r, n_dl=len(dl_top_idx), note="ok")
+    ev   = dict(p=p_bank[U], r=r, n_dl=len(dl_top_idx), note=note)
     dec0 = _decide(ev, pr, None, rule="v2")
     deep_r = None
     if dec0["want_deep"] and len(dec0["finalists"]) > 1:
@@ -1026,8 +1175,13 @@ def hybrid_recognize(
     win_conf = float(dec["conf"])
 
     ranking = dec["ranking"]
+    top_fused = max(float(dec["fused"][ranking[0]]), 1e-9) if ranking else 1.0
     top3 = [
-        {"label": cands[i], "confidence": float(p_bank[U[i]])}
+        {
+            "label": cands[i],
+            "confidence": float(np.clip(dec["fused"][i] / top_fused * win_conf if i != dec["win"] else win_conf, 0.0, 1.0)),
+            "dl_prob": float(p_bank[U[i]]),
+        }
         for i in ranking[:3]
     ]
 
@@ -1037,12 +1191,16 @@ def hybrid_recognize(
     )
 
     return {
-        "label":      win_cand,
-        "confidence": win_conf,
-        "margin":     margin,
-        "top3":       top3,
-        "flag":       dec["flag"],
-        "dtw_active": True,
+        "label":         win_cand,
+        "confidence":    win_conf,
+        "margin":        margin,
+        "top3":          top3,
+        "flag":          dec["flag"],
+        "low":           bool(dec["low"]),
+        "note":          note,
+        "tta_stability": stab,
+        "r_best":        float(dec["r_best"]) if np.isfinite(dec["r_best"]) else None,
+        "dtw_active":    True,
     }
 
 

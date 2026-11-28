@@ -56,6 +56,15 @@ END_FRAMES = 10
 KEEP_TAIL = 2
 MAX_GAP = 5
 
+RAISE_START_MARGIN = 0.10
+RAISE_STOP_MARGIN = 0.05
+RAISE_CONFIRM_FRAMES = 3
+LOWER_CONFIRM_FRAMES = 6
+MAX_SPAN_S = 7.0
+MIN_SPAN_FRAMES = 12
+HOLD_MAX_AGE = 4
+LIVE_WIDTH = 480
+
 
 @contextlib.contextmanager
 def _suppress_c_stderr():
@@ -142,12 +151,185 @@ def frame_in_use(pose: np.ndarray, W: int, H: int) -> np.ndarray:
     return out
 
 
-def process_holistic_frame(frame_bgr: np.ndarray) -> dict | None:
-    """Run Holistic once and return the frame's raw pose, hand, and face landmarks."""
+def enhance_image(frame: np.ndarray) -> np.ndarray:
+    """Adaptive gamma + CLAHE lighting normalization matching dl_nondl_recognize_v2.py."""
     import cv2
 
-    H_img, W_img = frame_bgr.shape[:2]
-    rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+    g = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    m, s = float(g.mean()), float(g.std())
+    if 90 < m < 170 and s > 50:
+        return frame
+    out = frame
+    if m < 90 or m > 170:
+        gamma = float(
+            np.clip(math.log(115 / 255) / math.log(max(m, 1) / 255), 0.55, 1.8)
+        )
+        lut = (255 * (np.arange(256) / 255) ** gamma).astype(np.uint8)
+        out = cv2.LUT(out, lut)
+    lab = cv2.cvtColor(out, cv2.COLOR_BGR2LAB)
+    lab[..., 0] = cv2.createCLAHE(
+        clipLimit=3.0 if s < 35 else 2.0,
+        tileGridSize=(8, 8),
+    ).apply(lab[..., 0])
+    return cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
+
+
+def _rescue_hands_roi(
+    rgb: np.ndarray,
+    pose: np.ndarray,
+    hands: np.ndarray,
+    in_use: np.ndarray,
+) -> np.ndarray:
+    """Multi-scale ROI hand rescue + full-frame fallback (dl_nondl_recognize_v2.py)."""
+    import cv2
+
+    missing = [h for h in (0, 1) if in_use[h] and np.isnan(hands[h, 0, 0])]
+    if not missing:
+        return hands
+
+    H, W = rgb.shape[:2]
+
+    def roi(c, frac):
+        s = int(min(max(frac * max(W, H), 64), min(W, H)))
+        x0 = int(np.clip(c[0] * W - s / 2, 0, W - s))
+        y0 = int(np.clip(c[1] * H - s / 2, 0, H - s))
+        crop = cv2.resize(
+            np.ascontiguousarray(rgb[y0 : y0 + s, x0 : x0 + s]),
+            (256, 256),
+            interpolation=cv2.INTER_CUBIC,
+        )
+        r = _hands_det.process(crop)
+        out = []
+        for hl in r.multi_hand_landmarks or []:
+            p = np.array(_lm(hl.landmark, range(21)), np.float32)
+            p[:, 0] = (x0 + p[:, 0] * s) / W
+            p[:, 1] = (y0 + p[:, 1] * s) / H
+            p[:, 2] *= s / W
+            out.append(p)
+        return out
+
+    def taken(p):
+        return any(
+            np.isfinite(hands[o, 0, 0])
+            and np.hypot(*(hands[o, 0, :2] - p[0, :2])) < 0.03
+            for o in (0, 1)
+        )
+
+    for h, wi in ((0, P_LWR), (1, P_RWR)):
+        c = pose[wi, :2]
+        if h not in missing or not np.isfinite(c).all():
+            continue
+        for frac in (0.30, 0.45, 0.60):
+            best = None
+            for p in roi(c, frac):
+                d = float(np.hypot(*(p[0, :2] - c)))
+                if d < RESCUE_MAX_DIST and not taken(p) and (best is None or d < best[0]):
+                    best = (d, p)
+            if best:
+                hands[h] = best[1]
+                break
+
+    still = [h for h in missing if np.isnan(hands[h, 0, 0])]
+    if still:
+        r2 = _hands_det.process(rgb)
+        if r2.multi_hand_landmarks:
+            best = {}
+            for hl in r2.multi_hand_landmarks:
+                pts = _lm(hl.landmark, range(21))
+                dists = [
+                    float(np.hypot(*(pts[0, :2] - pose[wi, :2])))
+                    if np.isfinite(pose[wi, :2]).all()
+                    else 9e9
+                    for wi in (P_LWR, P_RWR)
+                ]
+                h = int(np.argmin(dists))
+                if (
+                    h in still
+                    and dists[h] < RESCUE_MAX_DIST
+                    and (h not in best or dists[h] < best[h][0])
+                ):
+                    best[h] = (dists[h], pts)
+            for h, (_, pts) in best.items():
+                hands[h] = pts
+    return hands
+
+
+def make_hand_holder(max_age: int = HOLD_MAX_AGE):
+    """A hand missing for <= max_age frames is carried by wrist translation."""
+    state = {0: None, 1: None}
+
+    def apply(pose: np.ndarray, hands: np.ndarray):
+        held = np.zeros(2, bool)
+        for h, wi in ((0, P_LWR), (1, P_RWR)):
+            if np.isfinite(hands[h, 0, 0]):
+                state[h] = (0, pose[wi, :2].copy(), hands[h].copy())
+                continue
+            st = state[h]
+            if st is None:
+                continue
+            age, pw, ph = st
+            age += 1
+            if (
+                age <= max_age
+                and np.isfinite(pose[wi, :2]).all()
+                and np.isfinite(pw).all()
+            ):
+                d = pose[wi, :2] - pw
+                nh = ph.copy()
+                nh[:, 0] += d[0]
+                nh[:, 1] += d[1]
+                hands[h] = nh
+                held[h] = True
+                state[h] = (age, pose[wi, :2].copy(), nh)
+            else:
+                state[h] = (age, pw, ph)
+        return hands, held
+
+    return apply
+
+
+def raise_levels(pose: np.ndarray, W: int, H: int):
+    levels = np.zeros(2, np.float64)
+    fin = np.array([np.isfinite(pose[P_LWR, 1]), np.isfinite(pose[P_RWR, 1])])
+    sl = pose[P_LSH, :2].astype(np.float64) * [W, H]
+    sr = pose[P_RSH, :2].astype(np.float64) * [W, H]
+    if not (np.isfinite(sl).all() and np.isfinite(sr).all()):
+        return levels, fin, False
+    sw = float(np.linalg.norm(sl - sr))
+    if sw < 1e-6:
+        return levels, fin, False
+    if pose[P_LHIP, 3] >= VIS_MIN and pose[P_RHIP, 3] >= VIS_MIN:
+        rest_y = (pose[P_LHIP, 1] + pose[P_RHIP, 1]) / 2.0 * H
+    else:
+        rest_y = (sl[1] + sr[1]) / 2.0 + REST_SHOULDER_FACTOR * sw
+    for h, wi in enumerate((P_LWR, P_RWR)):
+        if fin[h]:
+            levels[h] = (rest_y - pose[wi, 1] * H) / sw
+    return levels, fin, True
+
+
+def raise_state(pose: np.ndarray, W: int, H: int) -> tuple[bool, bool]:
+    """Return (raised_now, lowered_now) using v2 hysteresis thresholds."""
+    levels, fin, ok = raise_levels(pose, W, H)
+    if not ok or not fin.any():
+        return False, False
+    vals = levels[fin]
+    return bool((vals > RAISE_START_MARGIN).any()), bool((vals < RAISE_STOP_MARGIN).all())
+
+
+def process_holistic_frame(frame_bgr: np.ndarray) -> dict | None:
+    """Enhance frame, run Holistic, and apply multi-scale ROI hand rescue."""
+    import cv2
+
+    fh, fw = frame_bgr.shape[:2]
+    small = (
+        cv2.resize(frame_bgr, (LIVE_WIDTH, int(round(fh * LIVE_WIDTH / fw))))
+        if fw > LIVE_WIDTH
+        else frame_bgr
+    )
+    small_enh = enhance_image(small)
+    H_img, W_img = small_enh.shape[:2]
+    rgb = cv2.cvtColor(small_enh, cv2.COLOR_BGR2RGB)
     rgb.flags.writeable = False
     res = _holistic.process(rgb)
     if not res.pose_landmarks:
@@ -172,28 +354,7 @@ def process_holistic_frame(frame_bgr: np.ndarray) -> dict | None:
             hands[h] = _lm(hand_landmarks.landmark, range(21))
 
     in_use = frame_in_use(pose, W_img, H_img)
-    missing = [h for h in (0, 1) if in_use[h] and np.isnan(hands[h, 0, 0])]
-    if missing:
-        rescued = _hands_det.process(rgb)
-        if rescued.multi_hand_landmarks:
-            best = {}
-            for hand_landmarks in rescued.multi_hand_landmarks:
-                points = _lm(hand_landmarks.landmark, range(21))
-                for wrist_index in (P_LWR, P_RWR):
-                    wrist = pose[wrist_index, :2]
-                    if np.isfinite(wrist).all():
-                        distance = float(
-                            np.hypot(
-                                points[0, 0] - wrist[0],
-                                points[0, 1] - wrist[1],
-                            )
-                        )
-                        hand_index = 0 if wrist_index == P_LWR else 1
-                        if hand_index in missing and distance < RESCUE_MAX_DIST:
-                            if hand_index not in best or distance < best[hand_index][0]:
-                                best[hand_index] = (distance, points)
-            for hand_index, (_, points) in best.items():
-                hands[hand_index] = points
+    hands = _rescue_hands_roi(rgb, pose, hands, in_use)
 
     face = np.full((len(FACE_CACHE_IDX), 3), np.nan, np.float32)
     face_ok = bool(res.face_landmarks)
@@ -205,6 +366,8 @@ def process_holistic_frame(frame_bgr: np.ndarray) -> dict | None:
         "hands": hands,
         "face": face,
         "face_ok": face_ok,
+        "in_use": in_use,
+        "held": np.zeros(2, bool),
         "W": W_img,
         "H": H_img,
     }

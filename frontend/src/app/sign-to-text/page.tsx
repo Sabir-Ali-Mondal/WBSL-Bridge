@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { PageContainer } from "@/components/layout/PageContainer";
 import { CameraFramingGuide } from "@/components/camera/CameraFramingGuide";
 import { FramingWarningArea } from "@/components/camera/FramingWarningArea";
+import { HolisticSkeletonOverlay } from "@/components/camera/HolisticSkeletonOverlay";
 import {
+  Camera,
   CameraOff,
   Volume2,
   Trash2,
@@ -12,11 +13,21 @@ import {
   Delete,
   Plus,
   ShieldAlert,
+  Sparkles,
+  Activity,
+  SlidersHorizontal,
+  ScanFace,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { toast } from "sonner";
 import axios from "axios";
 
 const API_BASE = "http://localhost:8200";
+const WS_BASE = "ws://localhost:8200";
+const CAPTURE_INTERVAL_MS = 33; // 30 FPS target
+const JPEG_QUALITY = 0.92;
+const MAX_PENDING_FRAMES = 2;
 
 interface Prediction {
   detected: boolean;
@@ -24,6 +35,11 @@ interface Prediction {
   confidence: number;
   top5: { label: string; confidence: number }[];
   emotion?: EmotionResult | null;
+  flag?: string;
+  low?: boolean;
+  note?: string;
+  dtw_active?: boolean;
+  tta_stability?: number;
 }
 
 interface EmotionResultShape {
@@ -34,14 +50,17 @@ interface EmotionResultShape {
 
 type EmotionResult = EmotionResultShape;
 
-function summarizeEmotionCounts(counts: Record<string, number>): EmotionResult | null {
+function summarizeEmotionCounts(
+  counts: Record<string, number>
+): EmotionResult | null {
   const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
   if (!total) return null;
   const scores = Object.fromEntries(
-    Object.entries(counts).map(([name, count]) => [name, count / total]),
+    Object.entries(counts).map(([name, count]) => [name, count / total])
   );
-  const [dominant, confidence] = Object.entries(counts)
-    .sort((left, right) => right[1] - left[1])[0];
+  const [dominant, confidence] = Object.entries(counts).sort(
+    (left, right) => right[1] - left[1]
+  )[0];
   return { dominant, confidence: confidence / total, scores };
 }
 
@@ -60,6 +79,14 @@ interface StreamResult {
   state?: string;
   hands_detected?: number;
   top3?: { label: string; confidence: number }[];
+  flag?: string;
+  low?: boolean;
+  note?: string;
+  dtw_active?: boolean;
+  tta_stability?: number;
+  seq?: number;
+  process_fps?: number;
+  dropped_frames?: number;
 }
 
 interface CatalogSign {
@@ -67,13 +94,17 @@ interface CatalogSign {
   bengali_meaning?: string;
 }
 
-// Added min-w-0 so CSS Grid children never expand horizontally past their track width
-const cardCls =
-  "flex min-w-0 flex-col gap-4 rounded-2xl bg-white/[0.035] p-5 sm:p-6";
-const sectionTitleCls = "text-sm font-medium text-text-secondary select-none";
-const insetCls = "rounded-xl bg-black/20";
-const segCls = "flex rounded-lg bg-black/25 p-1";
-const segBtnCls = "rounded-md px-3 py-1 text-xs font-semibold transition-colors";
+const floatPanelCls =
+  "rounded-2xl bg-[#0C0D10]/85 backdrop-blur-xl shadow-2xl";
+const insetCls = "rounded-xl bg-black/35";
+const softPillBtn =
+  "inline-flex items-center gap-1.5 rounded-lg bg-white/[0.06] px-3 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:bg-white/10 hover:text-text-primary active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40";
+const softPrimaryBtn =
+  "inline-flex items-center justify-center gap-2 rounded-lg bg-accent-primary/15 px-4 py-1.5 text-xs font-semibold text-accent-primary transition-colors hover:bg-accent-primary/25 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40";
+const softDangerBtn =
+  "inline-flex items-center gap-1.5 rounded-lg bg-status-error/10 px-3 py-1.5 text-xs font-semibold text-status-error transition-colors hover:bg-status-error/20 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40";
+const segCls = "flex rounded-lg bg-black/40 p-1";
+const segBtnCls = "rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors";
 const segActiveCls = "bg-white/10 text-text-primary";
 const segIdleCls = "text-text-muted hover:text-text-secondary";
 
@@ -87,7 +118,10 @@ const EMOTION_ORDER = [
   "neutral",
 ];
 
-function emotionScore(scores: Record<string, number> | undefined, name: string) {
+function emotionScore(
+  scores: Record<string, number> | undefined,
+  name: string
+) {
   if (!scores) return 0;
   const key = Object.keys(scores).find((k) => k.toLowerCase() === name);
   return key ? scores[key] : 0;
@@ -98,8 +132,18 @@ export default function SignToTextPage() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const wsReconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const wsReconnectAttemptRef = useRef(0);
+  const cameraActiveRef = useRef(false);
+  const pendingFramesRef = useRef(0);
+  const frameSeqRef = useRef(0);
+  const lastVideoTimeRef = useRef(-1);
+  const lastCaptureAtRef = useRef(0);
+  const captureEmaDtRef = useRef(1 / 30);
   const isProcessingRef = useRef(false);
   const historyScrollRef = useRef<HTMLDivElement | null>(null);
+  const bengaliScrollRef = useRef<HTMLDivElement | null>(null);
 
   const sessionIdRef = useRef<string>(
     typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -118,6 +162,8 @@ export default function SignToTextPage() {
 
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [showSkeleton, setShowSkeleton] = useState(true);
+  const [showThreshold, setShowThreshold] = useState(false);
   const [prediction, setPrediction] = useState<Prediction | null>(null);
   const [detectedHistory, setDetectedHistory] = useState<DetectedSign[]>([]);
   const [, setIsProcessing] = useState(false);
@@ -132,17 +178,23 @@ export default function SignToTextPage() {
 
   const [autoDetect, setAutoDetect] = useState(true);
   const autoDetectRef = useRef(autoDetect);
-  const [recognitionMode, setRecognitionMode] = useState<"auto" | "manual">("auto");
+  const [recognitionMode, setRecognitionMode] = useState<"auto" | "manual">(
+    "auto"
+  );
   const recognitionModeRef = useRef(recognitionMode);
   const [manualRecording, setManualRecording] = useState(false);
   const manualRecordingRef = useRef(false);
   const [streamState, setStreamState] = useState("IDLE");
-  const [recognitionNotice, setRecognitionNotice] = useState<string | null>(null);
+  const [recognitionNotice, setRecognitionNotice] = useState<string | null>(
+    null
+  );
   const [catalog, setCatalog] = useState<CatalogSign[]>([]);
   const [pickSign, setPickSign] = useState("");
   const [emotion, setEmotion] = useState<EmotionResult | null>(null);
   const [emotionAvailable, setEmotionAvailable] = useState(true);
-  const [emotionCounts, setEmotionCounts] = useState<Record<string, number>>({});
+  const [emotionCounts, setEmotionCounts] = useState<Record<string, number>>(
+    {}
+  );
   const emotionCountsRef = useRef<Record<string, number>>({});
   const emotionCollectionActiveRef = useRef(false);
   const emotionSummary = summarizeEmotionCounts(emotionCounts);
@@ -150,6 +202,9 @@ export default function SignToTextPage() {
   const confidenceThresholdRef = useRef(confidenceThreshold);
 
   const [buffered, setBuffered] = useState(0);
+  const [captureFps, setCaptureFps] = useState(0);
+  const [processFps, setProcessFps] = useState(0);
+  const [wsConnected, setWsConnected] = useState(false);
 
   const [bengaliOutput, setBengaliOutput] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -175,7 +230,6 @@ export default function SignToTextPage() {
     recognitionModeRef.current = recognitionMode;
   }, [recognitionMode]);
 
-  // Keep recognized signs scrolled to the latest entry smoothly
   useEffect(() => {
     if (historyScrollRef.current) {
       historyScrollRef.current.scrollTo({
@@ -186,16 +240,23 @@ export default function SignToTextPage() {
   }, [detectedHistory.length]);
 
   useEffect(() => {
+    if (bengaliScrollRef.current && bengaliOutput) {
+      bengaliScrollRef.current.scrollTo({
+        left: bengaliScrollRef.current.scrollWidth,
+        behavior: "smooth",
+      });
+    }
+  }, [bengaliOutput]);
+
+  useEffect(() => {
     let cancelled = false;
 
     axios
       .get(`${API_BASE}/api/system/health`)
       .then((res) => {
         if (cancelled) return;
-
         setBackendOnline(true);
         setEmotionAvailable(!!res.data.emotion_available);
-
         if (res.data.contract) {
           setContract(res.data.contract);
         }
@@ -208,11 +269,8 @@ export default function SignToTextPage() {
       .get(`${API_BASE}/api/coverage`)
       .then((res) => {
         if (cancelled) return;
-
         const items: CatalogSign[] = res.data.items ?? [];
-
         setCatalog(items);
-
         if (items.length) {
           setPickSign(items[0].label);
         }
@@ -224,6 +282,80 @@ export default function SignToTextPage() {
     };
   }, []);
 
+  const closeStreamSocket = () => {
+    if (wsReconnectTimerRef.current) {
+      clearTimeout(wsReconnectTimerRef.current);
+      wsReconnectTimerRef.current = null;
+    }
+    if (wsRef.current) {
+      try {
+        wsRef.current.onopen = null;
+        wsRef.current.onmessage = null;
+        wsRef.current.onerror = null;
+        wsRef.current.onclose = null;
+        wsRef.current.close();
+      } catch {
+        // ignore
+      }
+      wsRef.current = null;
+    }
+    pendingFramesRef.current = 0;
+    setWsConnected(false);
+  };
+
+  const connectStreamSocket = () => {
+    if (!cameraActiveRef.current) return;
+    closeStreamSocket();
+    try {
+      const ws = new WebSocket(
+        `${WS_BASE}/api/stream/ws?session_id=${encodeURIComponent(
+          sessionIdRef.current
+        )}`
+      );
+      ws.binaryType = "arraybuffer";
+      ws.onopen = () => {
+        wsReconnectAttemptRef.current = 0;
+        pendingFramesRef.current = 0;
+        setWsConnected(true);
+      };
+      ws.onmessage = (event) => {
+        if (pendingFramesRef.current > 0) {
+          pendingFramesRef.current -= 1;
+        }
+        try {
+          const data: StreamResult = JSON.parse(String(event.data));
+          setBuffered(data.buffered ?? 0);
+          setHandsDetected(data.hands_detected ?? 0);
+          if (typeof data.process_fps === "number") {
+            setProcessFps(data.process_fps);
+          }
+          commitFromStream(data);
+        } catch {
+          // Ignore malformed message
+        }
+      };
+      ws.onerror = () => {
+        // onclose handles reconnect
+      };
+      ws.onclose = () => {
+        wsRef.current = null;
+        pendingFramesRef.current = 0;
+        setWsConnected(false);
+        if (cameraActiveRef.current) {
+          const attempt = wsReconnectAttemptRef.current;
+          wsReconnectAttemptRef.current = Math.min(attempt + 1, 5);
+          const delay = Math.min(3000, 400 * Math.pow(1.6, attempt));
+          wsReconnectTimerRef.current = setTimeout(() => {
+            connectStreamSocket();
+          }, delay);
+        }
+      };
+      wsRef.current = ws;
+    } catch {
+      setWsConnected(false);
+    }
+  };
+
   const changeRecognitionMode = (mode: "auto" | "manual") => {
     if (manualRecordingRef.current) return;
     recognitionModeRef.current = mode;
@@ -233,6 +365,9 @@ export default function SignToTextPage() {
     setStreamState("IDLE");
     setLive(null);
     setRecognitionNotice(null);
+    if (cameraActiveRef.current) {
+      connectStreamSocket();
+    }
   };
 
   const toggleManualRecording = () => {
@@ -256,8 +391,10 @@ export default function SignToTextPage() {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
           facingMode: "user",
-          width: { ideal: 640 },
-          height: { ideal: 480 },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          aspectRatio: { ideal: 16 / 9 },
+          frameRate: { ideal: 30, max: 30 },
         },
         audio: false,
       });
@@ -268,28 +405,37 @@ export default function SignToTextPage() {
         videoRef.current.srcObject = stream;
       }
 
+      cameraActiveRef.current = true;
+      lastVideoTimeRef.current = -1;
+      lastCaptureAtRef.current = 0;
+      frameSeqRef.current = 0;
       setCameraActive(true);
+      connectStreamSocket();
 
       if (!intervalRef.current) {
         intervalRef.current = setInterval(
           () => void doStreamTick(performance.now() / 1000),
-          100
+          CAPTURE_INTERVAL_MS
         );
       }
     } catch {
+      cameraActiveRef.current = false;
       setCameraError(
         "Camera unavailable. Check browser permissions and try again."
       );
-
       setCameraActive(false);
     }
   };
 
   const stopCamera = () => {
     if (manualRecordingRef.current) {
-      setRecognitionNotice("Stop the manual recording before turning off the camera.");
+      setRecognitionNotice(
+        "Stop the manual recording before turning off the camera."
+      );
       return;
     }
+    cameraActiveRef.current = false;
+    closeStreamSocket();
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
@@ -305,6 +451,8 @@ export default function SignToTextPage() {
     }
 
     setCameraActive(false);
+    setCaptureFps(0);
+    setProcessFps(0);
     sessionIdRef.current = newSessionId();
     setBuffered(0);
     setStreamState("IDLE");
@@ -312,11 +460,12 @@ export default function SignToTextPage() {
 
   useEffect(() => {
     return () => {
+      cameraActiveRef.current = false;
+      closeStreamSocket();
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
-
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
@@ -345,10 +494,7 @@ export default function SignToTextPage() {
   };
 
   const handleStreamAndSpeak = async () => {
-    if (
-      detectedHistory.length === 0 ||
-      isGenerating
-    ) {
+    if (detectedHistory.length === 0 || isGenerating) {
       return;
     }
 
@@ -361,20 +507,13 @@ export default function SignToTextPage() {
     resetEmotionCollection();
 
     try {
-      const gloss = buildGlossString(
-        detectedHistory
-      );
+      const gloss = buildGlossString(detectedHistory);
 
-      const response = await fetch(
-        `${API_BASE}/api/nlg/stream`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ gloss, emotion: translationEmotion }),
-        }
-      );
+      const response = await fetch(`${API_BASE}/api/nlg/stream`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ gloss, emotion: translationEmotion }),
+      });
 
       if (!response.ok || !response.body) {
         throw new Error("stream unavailable");
@@ -382,56 +521,29 @@ export default function SignToTextPage() {
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
-
       let buffer = "";
 
       while (true) {
-        const { done, value } =
-          await reader.read();
-
+        const { done, value } = await reader.read();
         if (done) break;
-
-        buffer += decoder.decode(value, {
-          stream: true,
-        });
-
+        buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
         buffer = lines.pop() || "";
 
         for (const line of lines) {
-          if (!line.startsWith("data: ")) {
-            continue;
-          }
-
-          const data = line
-            .slice(6)
-            .trim();
-
-          if (data === "[DONE]") {
-            continue;
-          }
-
+          if (!line.startsWith("data: ")) continue;
+          const data = line.slice(6).trim();
+          if (data === "[DONE]") continue;
           try {
             const parsed = JSON.parse(data);
-
-            if (
-              parsed.type === "delta" &&
-              parsed.text
-            ) {
+            if (parsed.type === "delta" && parsed.text) {
               full += parsed.text;
               setBengaliOutput(full);
-            } else if (
-              parsed.type === "done" &&
-              parsed.bengali_text
-            ) {
+            } else if (parsed.type === "done" && parsed.bengali_text) {
               full = parsed.bengali_text;
               setBengaliOutput(full);
-            } else if (
-              parsed.type === "error"
-            ) {
-              toast.error(
-                parsed.error || "LLM error"
-              );
+            } else if (parsed.type === "error") {
+              toast.error(parsed.error || "LLM error");
             }
           } catch {
             // Ignore malformed SSE chunk.
@@ -439,15 +551,12 @@ export default function SignToTextPage() {
         }
       }
     } catch {
-      toast.error(
-        "Streaming failed — check LLM configuration in .env"
-      );
+      toast.error("Streaming failed — check LLM configuration in .env");
     } finally {
       setIsGenerating(false);
     }
 
     const text = full.trim();
-
     if (!text) return;
 
     setIsPlayingAudio(true);
@@ -458,30 +567,22 @@ export default function SignToTextPage() {
         engine: string;
         status: string;
         error?: string;
-      }>(
-        `${API_BASE}/api/tts/generate`,
-        {
-          text,
-          voice: voiceId,
-          engine: ttsEngine,
-        }
-      );
+      }>(`${API_BASE}/api/tts/generate`, {
+        text,
+        voice: voiceId,
+        engine: ttsEngine,
+      });
 
       if (res.data.status === "success" && res.data.audio_url) {
-        const audio = new Audio(
-          `${API_BASE}${res.data.audio_url}`
-        );
-
-        audio.onended = () =>
-          setIsPlayingAudio(false);
-
-        audio.onerror = () =>
-          setIsPlayingAudio(false);
-
+        const audio = new Audio(`${API_BASE}${res.data.audio_url}`);
+        audio.onended = () => setIsPlayingAudio(false);
+        audio.onerror = () => setIsPlayingAudio(false);
         await audio.play();
         return;
       } else if (ttsEngine === "elevenlabs") {
-        toast.error(res.data.error || "ElevenLabs TTS failed to generate audio.");
+        toast.error(
+          res.data.error || "ElevenLabs TTS failed to generate audio."
+        );
         setIsPlayingAudio(false);
         return;
       }
@@ -497,17 +598,10 @@ export default function SignToTextPage() {
     }
 
     if (ttsEngine === "free" && "speechSynthesis" in window) {
-      const u =
-        new SpeechSynthesisUtterance(text);
-
+      const u = new SpeechSynthesisUtterance(text);
       u.lang = "bn-IN";
-
-      u.onend = () =>
-        setIsPlayingAudio(false);
-
-      u.onerror = () =>
-        setIsPlayingAudio(false);
-
+      u.onend = () => setIsPlayingAudio(false);
+      u.onerror = () => setIsPlayingAudio(false);
       window.speechSynthesis.speak(u);
     } else {
       setIsPlayingAudio(false);
@@ -523,22 +617,15 @@ export default function SignToTextPage() {
   };
 
   const handleBackspace = () => {
-    if (detectedHistory.length === 0) {
-      return;
-    }
-
+    if (detectedHistory.length === 0) return;
     emotionCollectionActiveRef.current = false;
     resetEmotionCollection();
-    setDetectedHistory((prev) =>
-      prev.slice(0, -1)
-    );
-
+    setDetectedHistory((prev) => prev.slice(0, -1));
     setBengaliOutput("");
   };
 
   const handleAddPick = () => {
     if (!pickSign) return;
-
     appendGloss(pickSign);
     setBengaliOutput("");
   };
@@ -560,9 +647,14 @@ export default function SignToTextPage() {
 
   const commitFromStream = (data: StreamResult) => {
     setStreamState(data.state ?? "IDLE");
-    setRecognitionNotice(
-      data.detail === "incomplete_span" ? "Hands not clear, try again." : null
-    );
+    if (data.detail === "incomplete_span") {
+      setRecognitionNotice("Hands not clear, try again.");
+    } else if (data.detail === "span_too_short") {
+      setRecognitionNotice("Sign too brief — hold slightly longer.");
+    } else {
+      setRecognitionNotice(null);
+    }
+
     setEmotion(data.emotion ?? null);
     if (data.state === "SIGN" && !emotionCollectionActiveRef.current) {
       resetEmotionCollection();
@@ -589,40 +681,98 @@ export default function SignToTextPage() {
       confidence,
       top5: top3.map((t) => ({ label: t.label, confidence: t.confidence })),
       emotion: data.emotion ?? null,
+      flag: data.flag,
+      low: data.low,
+      note: data.note,
+      dtw_active: data.dtw_active,
+      tta_stability: data.tta_stability,
     });
 
     setLive(isSign ? { label, confidence, margin } : null);
-    if (isSign && confidence >= confidenceThresholdRef.current && autoDetectRef.current) {
+    if (
+      isSign &&
+      confidence >= confidenceThresholdRef.current &&
+      autoDetectRef.current
+    ) {
       appendGloss(label);
     }
   };
 
   const doStreamTick = async (captureTime: number) => {
-    if (isProcessingRef.current) return;
-
     const video = videoRef.current;
     const canvas = canvasRef.current;
 
-    if (!video || !canvas || !video.videoWidth) return;
+    if (!video || !canvas || !video.videoWidth || video.readyState < 2) return;
+    if (video.currentTime === lastVideoTimeRef.current) return;
 
+    const ws = wsRef.current;
+    const useWs = ws !== null && ws.readyState === WebSocket.OPEN;
+
+    if (useWs) {
+      if (
+        pendingFramesRef.current >= MAX_PENDING_FRAMES ||
+        ws.bufferedAmount > 256 * 1024
+      ) {
+        return; // Drop stale frame instead of building backlog
+      }
+    } else if (isProcessingRef.current) {
+      return;
+    }
+
+    lastVideoTimeRef.current = video.currentTime;
+    const nowPerf = performance.now();
+    if (lastCaptureAtRef.current > 0) {
+      const dtSec = (nowPerf - lastCaptureAtRef.current) / 1000;
+      if (dtSec > 0 && dtSec < 1) {
+        captureEmaDtRef.current = 0.85 * captureEmaDtRef.current + 0.15 * dtSec;
+        setCaptureFps(Math.round(1 / Math.max(captureEmaDtRef.current, 1e-4)));
+      }
+    }
+    lastCaptureAtRef.current = nowPerf;
+
+    const scale = Math.min(1, 480 / video.videoWidth);
+    const targetW = Math.round(video.videoWidth * scale);
+    const targetH = Math.round(video.videoHeight * scale);
+    if (canvas.width !== targetW || canvas.height !== targetH) {
+      canvas.width = targetW;
+      canvas.height = targetH;
+    }
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(video, 0, 0, targetW, targetH);
+
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", JPEG_QUALITY)
+    );
+    if (!blob) return;
+
+    if (useWs && ws.readyState === WebSocket.OPEN) {
+      const seq = (frameSeqRef.current = (frameSeqRef.current + 1) >>> 0);
+      const flags =
+        (recognitionModeRef.current === "manual" ? 1 : 0) |
+        (manualRecordingRef.current ? 2 : 0);
+      const jpegBuf = await blob.arrayBuffer();
+      const packet = new ArrayBuffer(16 + jpegBuf.byteLength);
+      const view = new DataView(packet);
+      view.setUint32(0, seq, true);
+      view.setUint8(4, flags);
+      view.setFloat64(8, captureTime, true);
+      new Uint8Array(packet, 16).set(new Uint8Array(jpegBuf));
+
+      pendingFramesRef.current += 1;
+      try {
+        ws.send(packet);
+      } catch {
+        if (pendingFramesRef.current > 0) pendingFramesRef.current -= 1;
+      }
+      return;
+    }
+
+    // Fallback to HTTP POST if WebSocket is unavailable
     isProcessingRef.current = true;
     setIsProcessing(true);
-
     try {
-      const scale = Math.min(1, 640 / video.videoWidth);
-      canvas.width = Math.round(video.videoWidth * scale);
-      canvas.height = Math.round(video.videoHeight * scale);
-      const ctx = canvas.getContext("2d");
-      if (!ctx) throw new Error("Could not create the camera frame.");
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      const blob = await new Promise<Blob | null>((resolve) =>
-        canvas.toBlob(resolve, "image/jpeg", 0.7)
-      );
-      if (!blob) throw new Error("Could not encode the camera frame.");
-
       const fd = new FormData();
-
       fd.append("file", blob, "f.jpg");
       fd.append("mode", recognitionModeRef.current);
       fd.append("recording", String(manualRecordingRef.current));
@@ -645,8 +795,8 @@ export default function SignToTextPage() {
       const detail = axios.isAxiosError(err)
         ? err.response?.data?.detail || err.message
         : err instanceof Error
-          ? err.message
-          : "Recognition request failed.";
+        ? err.message
+        : "Recognition request failed.";
       setRecognitionNotice(`Recognition unavailable: ${detail}`);
     } finally {
       isProcessingRef.current = false;
@@ -659,7 +809,7 @@ export default function SignToTextPage() {
     : "—";
 
   return (
-    <PageContainer className="w-full max-w-[1600px] px-3 sm:px-6 lg:px-8 py-4 lg:py-6">
+    <div className="relative h-[100dvh] w-full p-2 sm:p-3">
       {!backendOnline && (
         <button
           type="button"
@@ -670,89 +820,92 @@ export default function SignToTextPage() {
               .catch(() => {});
           }}
           title="Backend is not running. Click to copy: uvicorn backend.main:app --reload --port 8200"
-          className="fixed bottom-4 right-4 z-40 flex items-center gap-2 rounded-lg bg-surface px-3 py-2 text-xs font-medium text-status-error shadow-lg transition-colors hover:bg-surface-elevated"
+          className="fixed bottom-4 left-4 z-50 flex items-center gap-2 rounded-full border border-status-error/30 bg-surface/90 px-4 py-2 text-xs font-medium text-status-error shadow-lg backdrop-blur-xl transition-colors hover:bg-status-error/20"
         >
-          <span className="h-1.5 w-1.5 rounded-full bg-status-error" />
+          <span className="h-2 w-2 rounded-full bg-status-error" />
           Backend offline
         </button>
       )}
 
-      {/* Grid columns locked with minmax(0, ...fr) so no content can expand or squeeze them */}
-      <div className="grid grid-cols-1 items-stretch gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-6">
+      {/* IMMERSIVE WIDE-ANGLE CAMERA STAGE (FULL HEIGHT, EQUAL PADDING) */}
+      <div className="relative flex h-full w-full flex-col overflow-hidden rounded-2xl bg-white/[0.035]">
+        {/* Hidden capture canvas for backend streaming */}
+        <canvas ref={canvasRef} className="hidden" />
 
-        {/* COLUMN 1: CAMERA */}
-        <section className={cardCls}>
-          <div className="flex items-center justify-between">
-            <span className={sectionTitleCls}>Camera</span>
-            <span className="text-xs text-text-muted">
-              {cameraActive ? "On" : "Standby"}
-            </span>
+        {/* Live wide-angle video */}
+        <video
+          ref={videoRef}
+          autoPlay
+          playsInline
+          muted
+          className={`absolute inset-0 h-full w-full scale-x-[-1] object-cover ${
+            cameraActive ? "" : "hidden"
+          }`}
+        />
+
+        {/* MediaPipe Holistic Skeleton Overlay */}
+        <HolisticSkeletonOverlay
+          videoRef={videoRef}
+          cameraActive={cameraActive}
+          visible={showSkeleton}
+        />
+
+        {/* Initial framing guide (fades out after 5s) */}
+        <CameraFramingGuide cameraActive={cameraActive} />
+
+        {/* Subtle edge vignette only when camera is active */}
+        {cameraActive && (
+          <div
+            className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,transparent_50%,rgba(8,11,18,0.5)_100%)]"
+            aria-hidden="true"
+          />
+        )}
+
+        {/* CAMERA STANDBY / ERROR OVERLAY */}
+        {!cameraActive && cameraError && (
+          <div className="relative z-20 flex flex-1 items-center justify-center p-6">
+            <div className="max-w-sm space-y-3 rounded-2xl bg-black/25 p-6 text-center backdrop-blur-xl">
+              <CameraOff size={26} className="mx-auto text-status-error" />
+              <p className="text-sm font-semibold text-text-primary">
+                Camera unavailable
+              </p>
+              <p className="text-xs leading-relaxed text-text-secondary">
+                {cameraError}
+              </p>
+              <button onClick={startCamera} className={softPrimaryBtn}>
+                <Camera size={14} />
+                Allow camera access
+              </button>
+            </div>
           </div>
+        )}
 
-          <div className="relative flex aspect-[16/10] w-full items-center justify-center overflow-hidden rounded-xl bg-black">
-            <canvas ref={canvasRef} className="hidden" />
+        {!cameraActive && !cameraError && (
+          <div className="relative z-20 flex flex-1 flex-col items-center justify-center p-6 text-center">
+            <button
+              onClick={startCamera}
+              disabled={!backendOnline}
+              className="inline-flex items-center justify-center gap-2 rounded-xl bg-accent-secondary px-5 py-2.5 text-xs font-semibold text-white transition hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Camera size={14} />
+              Start camera
+            </button>
+          </div>
+        )}
 
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className={`h-full w-full scale-x-[-1] object-cover ${
-                cameraActive ? "" : "hidden"
+        {/* TOP-LEFT FLOATING CONTROLS & FRAMING BAR */}
+        <div className="pointer-events-none relative z-30 flex flex-col items-start gap-2.5 p-3 lg:absolute lg:left-3 lg:top-3 lg:max-w-[calc(100%-21rem)] lg:p-0">
+          <div className="pointer-events-auto flex flex-wrap items-center gap-2 rounded-2xl bg-[#0C0D10]/85 px-3 py-1.5 backdrop-blur-xl shadow-2xl">
+            <span
+              className={`ml-1 h-2 w-2 rounded-full ${
+                cameraActive
+                  ? "bg-accent-primary shadow-[0_0_8px_rgba(34,197,94,0.8)]"
+                  : "bg-white/25"
               }`}
+              title={cameraActive ? "Camera live" : "Camera standby"}
             />
 
-            <CameraFramingGuide cameraActive={cameraActive} />
-
-            {!cameraActive && cameraError && (
-              <div className="absolute inset-0 flex items-center justify-center bg-surface p-4">
-                <div className="max-w-xs space-y-2 text-center">
-                  <CameraOff size={22} className="mx-auto text-status-error" />
-                  <p className="text-sm font-medium text-text-primary">
-                    Camera unavailable
-                  </p>
-                  <p className="text-xs text-text-secondary">{cameraError}</p>
-                  <button
-                    onClick={startCamera}
-                    className="rounded-lg bg-accent-primary px-3.5 py-1.5 text-xs font-semibold text-black hover:brightness-110"
-                  >
-                    Allow camera access
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {!cameraActive && !cameraError && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-surface/90 p-6 text-center">
-                <button
-                  onClick={startCamera}
-                  disabled={!backendOnline}
-                  className="rounded-lg bg-accent-primary px-5 py-2 text-sm font-semibold text-black transition hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  Start camera
-                </button>
-                <p className="mt-3 text-xs text-text-muted">
-                  Your hands and upper body are tracked while you sign.
-                </p>
-              </div>
-            )}
-          </div>
-
-          <FramingWarningArea
-            cameraActive={cameraActive}
-            handsDetected={handsDetected}
-            hasFace={Boolean(emotion)}
-            detected={Boolean(prediction?.detected)}
-            confidence={prediction?.confidence ?? 0}
-          />
-
-          {cameraActive && (
-            <div className="flex items-center justify-between rounded-xl bg-black/20 px-3.5 py-2.5">
-              <span className="flex items-center gap-2 text-xs text-text-secondary">
-                <span className="h-2 w-2 rounded-full bg-accent-primary" />
-                Camera on
-              </span>
-
+            {cameraActive ? (
               <button
                 onClick={stopCamera}
                 disabled={manualRecording}
@@ -761,63 +914,95 @@ export default function SignToTextPage() {
                     ? "Stop the recording before stopping the camera"
                     : undefined
                 }
-                className="rounded-md bg-status-error/10 px-2.5 py-1 text-xs font-semibold text-status-error transition-colors hover:bg-status-error/20 disabled:cursor-not-allowed disabled:opacity-40"
+                className={softDangerBtn}
               >
-                Stop camera
+                <CameraOff size={13} />
+                Stop
               </button>
-            </div>
-          )}
-
-          <div className="flex items-center justify-between gap-3 rounded-xl bg-black/20 px-3.5 py-2.5">
-            <span className="text-xs text-text-muted">Expression</span>
-
-            {!emotionAvailable ? (
-              <span className="text-xs text-text-muted">Unavailable</span>
-            ) : cameraActive && emotion ? (
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-medium capitalize text-text-primary">
-                  {emotion.dominant}
-                  <span className="ml-1.5 font-mono font-normal text-text-muted">
-                    {Math.round(emotion.confidence * 100)}%
-                  </span>
-                </span>
-                <div className="flex h-4 items-end gap-[3px]" aria-hidden="true">
-                  {EMOTION_ORDER.map((name) => {
-                    const score = emotionScore(emotion.scores, name);
-                    const isTop = name === emotion.dominant.toLowerCase();
-                    return (
-                      <span
-                        key={name}
-                        title={`${name} ${Math.round(score * 100)}%`}
-                        className={`w-[3px] rounded-sm ${
-                          isTop ? "bg-accent-primary" : "bg-white/25"
-                        }`}
-                        style={{ height: `${Math.max(12, Math.round(score * 100))}%` }}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
             ) : (
-              <span className="text-xs text-text-muted">
-                {cameraActive ? "No face detected" : "Camera off"}
-              </span>
+              <button
+                onClick={startCamera}
+                disabled={!backendOnline}
+                className={softPrimaryBtn}
+              >
+                <Camera size={13} />
+                Start
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setShowSkeleton((v) => !v)}
+              className={`${softPillBtn} ${
+                showSkeleton
+                  ? "border-accent-primary/30 bg-accent-primary/15 text-accent-primary"
+                  : ""
+              }`}
+              title="Toggle MediaPipe Holistic skeleton overlay"
+            >
+              <Activity size={13} />
+              Skeleton {showSkeleton ? "On" : "Off"}
+            </button>
+
+            {emotionAvailable && (
+              <div className="flex items-center gap-2 rounded-lg bg-black/35 px-2.5 py-1">
+                <ScanFace size={13} className="text-text-muted" />
+                {cameraActive && emotion ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium capitalize text-text-primary">
+                      {emotion.dominant}
+                      <span className="ml-1 font-mono text-[11px] text-text-muted">
+                        {Math.round(emotion.confidence * 100)}%
+                      </span>
+                    </span>
+                    <div
+                      className="flex h-3 items-end gap-[2px]"
+                      aria-hidden="true"
+                    >
+                      {EMOTION_ORDER.map((name) => {
+                        const score = emotionScore(emotion.scores, name);
+                        const isTop = name === emotion.dominant.toLowerCase();
+                        return (
+                          <span
+                            key={name}
+                            title={`${name} ${Math.round(score * 100)}%`}
+                            className={`w-[2.5px] rounded-sm ${
+                              isTop ? "bg-emerald-400" : "bg-white/25"
+                            }`}
+                            style={{
+                              height: `${Math.max(15, Math.round(score * 100))}%`,
+                            }}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <span className="text-xs text-text-muted">—</span>
+                )}
+              </div>
             )}
           </div>
-        </section>
 
-        {/* COLUMN 2: RECOGNITION */}
-        <section className={cardCls}>
-          <div className="flex items-center justify-between">
-            <span className={sectionTitleCls}>Recognition</span>
-            <span className="text-xs capitalize text-text-muted">
-              {cameraActive
-                ? `${live ? "Sign detected" : streamState.toLowerCase()} · ${buffered} frames`
-                : "Standby"}
-            </span>
-          </div>
+          {cameraActive && (
+            <div className="pointer-events-auto">
+              <FramingWarningArea
+                cameraActive={cameraActive}
+                handsDetected={handsDetected}
+                hasFace={Boolean(emotion)}
+                detected={Boolean(prediction?.detected)}
+                confidence={prediction?.confidence ?? 0}
+              />
+            </div>
+          )}
+        </div>
 
-          <div className="flex items-center justify-between gap-3">
+        {/* BOTTOM-LEFT FLOATING RECOGNITION HUD */}
+        <div
+          className={`relative z-30 mx-3 mb-3 flex flex-col gap-3 p-3.5 lg:absolute lg:bottom-4 lg:left-4 lg:mx-0 lg:mb-0 lg:w-[350px] ${floatPanelCls}`}
+        >
+          {/* Mode + Auto-append + Threshold toggle */}
+          <div className="flex items-center justify-between gap-2">
             <div className={segCls}>
               {(["auto", "manual"] as const).map((mode) => (
                 <button
@@ -834,97 +1019,129 @@ export default function SignToTextPage() {
               ))}
             </div>
 
-            {recognitionMode === "auto" && (
-              <div className="flex items-center gap-2.5 text-xs text-text-secondary">
-                <span>Auto-append</span>
-                <button
-                  type="button"
-                  role="switch"
-                  aria-checked={autoDetect}
-                  aria-label="Auto-append"
-                  onClick={() => setAutoDetect((v) => !v)}
-                  className={`relative h-5 w-9 rounded-full transition-colors ${
-                    autoDetect ? "bg-accent-primary" : "bg-white/15"
-                  }`}
-                >
-                  <span
-                    className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${
-                      autoDetect ? "translate-x-4" : ""
+            <div className="flex items-center gap-2">
+              {recognitionMode === "auto" && (
+                <div className="flex items-center gap-1.5 text-xs text-text-secondary">
+                  <span className="text-[11px]">Auto</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={autoDetect}
+                    aria-label="Auto-append"
+                    onClick={() => setAutoDetect((v) => !v)}
+                    className={`relative h-5 w-9 rounded-full transition-colors ${
+                      autoDetect ? "bg-emerald-500/80" : "bg-white/15"
                     }`}
-                  />
-                </button>
-              </div>
-            )}
+                  >
+                    <span
+                      className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white transition-transform ${
+                        autoDetect ? "translate-x-4" : ""
+                      }`}
+                    />
+                  </button>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setShowThreshold((v) => !v)}
+                className="flex items-center gap-1 rounded-full border border-white/[0.07] bg-white/[0.06] px-2.5 py-1 text-[11px] text-text-secondary transition hover:bg-white/[0.12]"
+                title="Confidence threshold"
+              >
+                <SlidersHorizontal size={11} />
+                {Math.round(confidenceThreshold * 100)}%
+                {showThreshold ? (
+                  <ChevronDown size={11} />
+                ) : (
+                  <ChevronUp size={11} />
+                )}
+              </button>
+            </div>
           </div>
 
+          {showThreshold && (
+            <div className={`px-3 py-2.5 ${insetCls}`}>
+              <div className="mb-1.5 flex items-center justify-between text-[11px]">
+                <label
+                  htmlFor="confidence-threshold"
+                  className="text-text-secondary"
+                >
+                  Auto-append threshold ({contract.frames}f window)
+                </label>
+                <span className="font-mono font-semibold text-emerald-300">
+                  {Math.round(confidenceThreshold * 100)}%
+                </span>
+              </div>
+              <input
+                id="confidence-threshold"
+                type="range"
+                min={0}
+                max={0.8}
+                step={0.05}
+                value={confidenceThreshold}
+                onChange={(event) =>
+                  setConfidenceThreshold(Number(event.target.value))
+                }
+                className="w-full accent-emerald-400"
+              />
+            </div>
+          )}
+
           {recognitionMode === "manual" && (
-            <div className={`flex items-center justify-between gap-3 p-3 ${insetCls}`}>
-              <span className="text-xs text-text-muted">
-                Record one full sign, then stop to recognize it.
+            <div
+              className={`flex items-center justify-between gap-3 p-2.5 ${insetCls}`}
+            >
+              <span className="text-[11px] text-text-muted">
+                Record one sign, then stop.
               </span>
               <button
                 type="button"
                 onClick={toggleManualRecording}
                 disabled={!cameraActive}
-                className={`shrink-0 rounded-lg px-3.5 py-1.5 text-xs font-semibold disabled:opacity-40 ${
-                  manualRecording
-                    ? "bg-status-error/15 text-status-error"
-                    : "bg-accent-primary text-black"
-                }`}
+                className={manualRecording ? softDangerBtn : softPrimaryBtn}
               >
-                {manualRecording ? "Stop and recognize" : "Start recording"}
+                {manualRecording ? "Stop & recognize" : "Start recording"}
               </button>
             </div>
           )}
 
-          <div className={`px-3.5 py-3 ${insetCls}`}>
-            <div className="mb-2 flex items-center justify-between text-xs">
-              <label htmlFor="confidence-threshold" className="text-text-secondary">
-                Auto-append confidence
-              </label>
-              <span className="font-mono font-semibold text-accent-primary">
-                {Math.round(confidenceThreshold * 100)}%
-              </span>
+          {recognitionNotice && (
+            <div className="flex items-center gap-2 rounded-xl border border-rose-400/20 bg-rose-500/15 px-3 py-2 text-xs text-rose-200">
+              <ShieldAlert size={13} className="shrink-0" />
+              <span>{recognitionNotice}</span>
             </div>
-            <input
-              id="confidence-threshold"
-              type="range"
-              min={0}
-              max={0.8}
-              step={0.05}
-              value={confidenceThreshold}
-              onChange={(event) => setConfidenceThreshold(Number(event.target.value))}
-              className="w-full accent-[var(--accent-primary)]"
-            />
-            <p className="mt-2 text-xs leading-snug text-text-muted">
-              Signs below this are still shown, just not added automatically.
-            </p>
-          </div>
+          )}
 
-          <div className={`flex min-w-0 flex-1 flex-col gap-3 p-4 ${insetCls}`}>
-            {recognitionNotice && (
-              <div className="flex items-center gap-2 rounded-lg bg-status-error/10 px-3 py-2 text-xs text-status-error">
-                <ShieldAlert size={13} className="shrink-0" />
-                <span>{recognitionNotice}</span>
-              </div>
-            )}
-
+          {/* Prediction readout */}
+          <div className={`flex flex-col gap-2.5 p-3.5 ${insetCls}`}>
             {prediction && prediction.detected ? (
-              <div className="space-y-4">
-                <div className="flex items-baseline justify-between gap-3">
-                  <span className="truncate text-3xl font-semibold tracking-tight text-text-primary">
-                    {prediction.label}
-                  </span>
-                  <span className="font-mono text-sm text-accent-primary">
+              <div className="space-y-3">
+                <div className="flex items-baseline justify-between gap-2">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="truncate text-2xl font-semibold tracking-tight text-text-primary">
+                      {prediction.label}
+                    </span>
+                    {prediction.flag && (
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                          prediction.low
+                            ? "bg-amber-400/15 text-amber-300"
+                            : "bg-emerald-500/15 text-emerald-300"
+                        }`}
+                      >
+                        {prediction.flag}
+                      </span>
+                    )}
+                  </div>
+                  <span className="font-mono text-sm font-semibold text-emerald-300">
                     {Math.round(prediction.confidence * 100)}%
                   </span>
                 </div>
 
-                <div className="space-y-2">
-                  <div className="text-xs text-text-muted">Closest matches</div>
-                  {prediction.top5.slice(0, 5).map((item, idx) => (
+                <div className="space-y-1.5">
+                  {prediction.top5.slice(0, 3).map((item, idx) => (
                     <div key={idx} className="space-y-1">
-                      <div className="flex justify-between text-xs">
+                      <div className="flex justify-between text-[11px]">
                         <span
                           className={
                             idx === 0
@@ -936,18 +1153,20 @@ export default function SignToTextPage() {
                         </span>
                         <span
                           className={`font-mono ${
-                            idx === 0 ? "text-accent-primary" : "text-text-muted"
+                            idx === 0 ? "text-emerald-300" : "text-text-muted"
                           }`}
                         >
                           {Math.round(item.confidence * 100)}%
                         </span>
                       </div>
-                      <div className="h-1 w-full overflow-hidden rounded-full bg-white/[0.07]">
+                      <div className="h-1 w-full overflow-hidden rounded-full bg-white/[0.08]">
                         <div
                           className={`h-full rounded-full transition-all duration-300 ${
-                            idx === 0 ? "bg-accent-primary" : "bg-white/25"
+                            idx === 0 ? "bg-emerald-400" : "bg-white/25"
                           }`}
-                          style={{ width: `${Math.round(item.confidence * 100)}%` }}
+                          style={{
+                            width: `${Math.round(item.confidence * 100)}%`,
+                          }}
                         />
                       </div>
                     </div>
@@ -955,64 +1174,51 @@ export default function SignToTextPage() {
                 </div>
               </div>
             ) : (
-              <div className="flex flex-1 flex-col items-center justify-center py-8 text-center">
-                <span className="text-sm font-medium text-text-secondary">
-                  {cameraActive ? "Waiting for a sign" : "Camera is off"}
-                </span>
-                <span className="mt-1 text-xs text-text-muted">
-                  Sign inside the guide frame.
-                </span>
+              <div className="py-3 text-center">
+                <p className="text-xs font-medium text-text-secondary">
+                  {cameraActive
+                    ? "Raise hands above rest line to sign"
+                    : "Camera is off"}
+                </p>
               </div>
             )}
           </div>
+        </div>
 
-          <p className="text-xs text-text-muted">
-            Reads a {contract.frames}-frame window of your movement.
-          </p>
-        </section>
-
-        {/* COLUMN 3: TRANSLATION */}
-        <section className={cardCls}>
-          <div className="flex items-center justify-between">
-            <span className={sectionTitleCls}>Translation</span>
-            <div className="flex items-center gap-1">
+        {/* RIGHT-SIDE FLOATING TRANSLATION & SPEECH PANEL */}
+        <aside className="relative z-30 mx-3 mb-3 flex flex-col justify-between gap-5 bg-transparent p-1 lg:absolute lg:bottom-3 lg:right-3 lg:top-3 lg:mx-0 lg:mb-0 lg:h-[calc(100%-1.5rem)] lg:w-[295px] lg:overflow-y-auto">
+          <div className="flex flex-col gap-2.5">
+            <div className="flex items-center justify-end gap-1.5">
               <button
                 onClick={handleBackspace}
                 disabled={detectedHistory.length === 0}
-                className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-text-secondary transition-colors hover:bg-white/[0.07] hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-30"
+                className="inline-flex items-center gap-1 rounded-lg bg-[#0C0D10]/85 px-2.5 py-1.5 text-[11px] text-text-secondary backdrop-blur-xl transition-colors hover:bg-white/10 hover:text-text-primary disabled:opacity-35"
                 title="Remove last detected sign"
               >
-                <Delete size={12} />
+                <Delete size={11} />
                 Back
               </button>
               <button
                 onClick={handleClear}
                 disabled={detectedHistory.length === 0 && !bengaliOutput}
-                className="flex items-center gap-1 rounded-md px-2 py-1 text-xs text-text-secondary transition-colors hover:bg-white/[0.07] hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-30"
+                className="inline-flex items-center gap-1 rounded-lg bg-[#0C0D10]/85 px-2.5 py-1.5 text-[11px] text-text-secondary backdrop-blur-xl transition-colors hover:bg-white/10 hover:text-text-primary disabled:opacity-35"
                 title="Clear all recognized signs and output"
               >
-                <Trash2 size={12} />
+                <Trash2 size={11} />
                 Clear
               </button>
             </div>
-          </div>
 
-          {/* Recognized signs container */}
-          <div className={`flex min-w-0 flex-col gap-3 p-4 ${insetCls}`}>
-            <div className="flex items-center justify-between text-xs text-text-muted">
-              <span>Recognized signs</span>
-              <span className="font-mono text-text-secondary">
-                {detectedHistory.length}
-              </span>
-            </div>
-
-            {/* Horizontal single-row scroll area */}
+            {/* Recognized signs (anchored TOP) */}
+            <div className={`flex flex-col gap-2.5 p-3.5 ${floatPanelCls}`}>
             <div
               ref={historyScrollRef}
-              className="w-full min-w-0 overflow-x-auto overflow-y-hidden py-1 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.2)_transparent]"
+              className="w-full min-w-0 overflow-x-auto overflow-y-hidden py-0.5 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.2)_transparent]"
             >
               {detectedHistory.length === 0 ? (
-                <span className="text-xs text-text-muted">Nothing yet.</span>
+                <span className="text-[11px] text-text-muted">
+                  Signs appear here as you sign.
+                </span>
               ) : (
                 <div className="flex w-max items-center gap-1.5">
                   {detectedHistory.map((s, idx) => (
@@ -1025,7 +1231,7 @@ export default function SignToTextPage() {
                         setBengaliOutput("");
                       }}
                       title="Click to remove signs from here"
-                      className="shrink-0 whitespace-nowrap rounded-md bg-white/[0.08] px-2.5 py-1 text-xs font-medium text-text-primary transition-colors hover:bg-white/[0.14]"
+                      className="shrink-0 whitespace-nowrap rounded-lg bg-white/[0.08] px-2.5 py-1 text-[11px] font-medium text-text-primary transition-colors hover:bg-white/[0.15]"
                     >
                       {s.gloss}
                     </button>
@@ -1034,15 +1240,20 @@ export default function SignToTextPage() {
               )}
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex gap-1.5">
               <select
                 value={pickSign}
                 onChange={(e) => setPickSign(e.target.value)}
-                className="min-w-0 flex-1 rounded-lg bg-white/[0.06] px-3 py-2 text-sm text-text-primary [color-scheme:dark] focus:bg-white/[0.09] focus:outline-none"
+                className="min-w-0 flex-1 rounded-lg bg-black/35 px-3 py-1.5 text-[11px] text-text-primary [color-scheme:dark] focus:bg-black/50 focus:outline-none"
               >
                 {catalog.map((c) => (
-                  <option key={c.label} value={c.label} className="bg-[#10161c] text-slate-100">
-                    {c.label} {c.bengali_meaning ? `— ${c.bengali_meaning}` : ""}
+                  <option
+                    key={c.label}
+                    value={c.label}
+                    className="bg-[#0C0D10] text-slate-100"
+                  >
+                    {c.label}{" "}
+                    {c.bengali_meaning ? `— ${c.bengali_meaning}` : ""}
                   </option>
                 ))}
               </select>
@@ -1050,61 +1261,67 @@ export default function SignToTextPage() {
               <button
                 onClick={handleAddPick}
                 disabled={!pickSign}
-                className="flex items-center gap-1 rounded-lg bg-white/10 px-3.5 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-white/[0.16] disabled:opacity-40"
+                className="inline-flex items-center gap-1 rounded-lg bg-white/[0.08] px-2.5 py-1.5 text-[11px] font-medium text-text-primary transition-colors hover:bg-white/[0.14] disabled:opacity-40"
               >
-                <Plus size={13} />
+                <Plus size={11} />
                 Add
               </button>
             </div>
 
-            <div className="min-w-0 space-y-0.5 text-xs text-text-muted">
-              <div className="truncate">
-                Gloss: <span className="font-mono text-text-secondary">{glossPreview}</span>
+            {(detectedHistory.length > 0 || emotionSummary) && (
+              <div className="min-w-0 space-y-0.5 text-[10px] text-text-muted">
+                {detectedHistory.length > 0 && (
+                  <div className="truncate font-mono text-text-secondary">
+                    {glossPreview}
+                  </div>
+                )}
+                {emotionSummary && (
+                  <div>
+                    Tone:{" "}
+                    <span className="capitalize text-text-secondary">
+                      {emotionSummary.dominant}
+                    </span>{" "}
+                    · {Math.round(emotionSummary.confidence * 100)}%
+                  </div>
+                )}
               </div>
-              {emotionSummary && (
-                <div>
-                  Tone sent along:{" "}
-                  <span className="capitalize text-text-secondary">
-                    {emotionSummary.dominant}
-                  </span>{" "}
-                  · {Math.round(emotionSummary.confidence * 100)}%
-                </div>
-              )}
+            )}
             </div>
           </div>
 
-          {/* Bengali sentence */}
-          <div className={`flex flex-col gap-2.5 p-4 ${insetCls}`}>
-            <div className="text-xs text-text-muted">Bengali sentence</div>
-            <div className="flex min-h-[96px] items-center justify-center text-center">
+          {/* Bengali sentence (VERTICAL CENTER) */}
+          <div className={`flex flex-col p-3.5 ${floatPanelCls}`}>
+            <div
+              ref={bengaliScrollRef}
+              className="w-full min-w-0 overflow-x-auto overflow-y-hidden py-1 [scrollbar-width:thin] [scrollbar-color:rgba(255,255,255,0.2)_transparent]"
+            >
               {bengaliOutput ? (
-                <p className="font-bengali text-2xl font-semibold leading-relaxed text-text-primary">
+                <p className="w-max whitespace-nowrap font-bengali text-lg font-semibold leading-relaxed text-text-primary">
                   {bengaliOutput}
                 </p>
               ) : (
-                <span className="text-sm text-text-muted">
-                  The sentence shows up here once you generate it.
+                <span className="text-[11px] text-text-muted">
+                  Translated Bengali sentence appears here.
                 </span>
               )}
             </div>
           </div>
 
-          {/* Voice */}
-          <div className={`flex flex-col gap-3.5 p-4 ${insetCls}`}>
-            <div className="flex items-center justify-between gap-2">
-              <span className="shrink-0 text-xs text-text-muted">Voice engine</span>
-              <div className={segCls}>
+          {/* Voice & Speak */}
+          <div className={`flex flex-col gap-2.5 p-3.5 ${floatPanelCls}`}>
+            <div className="flex items-center justify-end">
+              <div className={`${segCls} w-full`}>
                 <button
                   type="button"
                   onClick={() => {
                     setTtsEngine("free");
                     setVoiceId("1");
                   }}
-                  className={`${segBtnCls} ${
+                  className={`flex-1 ${segBtnCls} ${
                     ttsEngine === "free" ? segActiveCls : segIdleCls
                   }`}
                 >
-                  Edge TTS (free)
+                  Edge TTS
                 </button>
                 <button
                   type="button"
@@ -1113,18 +1330,18 @@ export default function SignToTextPage() {
                       setShowTtsPremiumModal(true);
                     }
                   }}
-                  className={`${segBtnCls} ${
+                  className={`flex-1 ${segBtnCls} ${
                     ttsEngine === "elevenlabs"
                       ? "bg-amber-400/20 text-amber-300"
                       : segIdleCls
                   }`}
                 >
-                  ElevenLabs (premium)
+                  ElevenLabs
                 </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-1.5">
               {(ttsEngine === "free"
                 ? [
                     { id: "1", label: "Female · Nabanita" },
@@ -1139,12 +1356,12 @@ export default function SignToTextPage() {
                   key={v.id}
                   type="button"
                   onClick={() => setVoiceId(v.id)}
-                  className={`h-10 rounded-lg text-xs font-medium transition-colors ${
+                  className={`h-8 rounded-lg text-[11px] font-medium transition-colors ${
                     voiceId === v.id
                       ? ttsEngine === "free"
                         ? "bg-accent-primary/15 text-accent-primary"
                         : "bg-amber-400/20 text-amber-300"
-                      : "bg-white/[0.05] text-text-secondary hover:bg-white/[0.09] hover:text-text-primary"
+                      : "bg-white/[0.06] text-text-secondary hover:bg-white/10 hover:text-text-primary"
                   }`}
                 >
                   {v.label}
@@ -1153,89 +1370,91 @@ export default function SignToTextPage() {
             </div>
 
             {ttsEngine === "elevenlabs" && (
-              <p className="text-xs text-amber-300/80">
-                Emotion tags are kept in the speech: [excited], [sad], [whispers], [happy]
+              <p className="text-[10px] text-amber-300/80">
+                Emotion tags preserved: [excited], [sad], [whispers], [happy]
               </p>
-            )}
-
-            {showTtsPremiumModal && (
-              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-                <div className="flex w-full max-w-md flex-col gap-4 rounded-2xl bg-surface p-6 shadow-2xl">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-400/15 text-amber-300">
-                      <ShieldAlert size={20} />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-semibold text-text-primary">
-                        Switch to ElevenLabs premium voice?
-                      </h3>
-                      <span className="text-xs text-text-muted">
-                        Expressive multilingual speech with emotion tags
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-2 rounded-xl bg-black/25 p-4 text-xs leading-relaxed text-text-secondary">
-                    <p>
-                      Speech uses the ElevenLabs eleven_v3 model through your backend ELEVENLABS_API_KEY.
-                    </p>
-                    <p>Cloud API credits are used for every character generated.</p>
-                    <p className="font-medium text-amber-300">
-                      There is no automatic fallback. If the key is invalid or the quota runs out, you get an error instead of switching back to free mode.
-                    </p>
-                  </div>
-
-                  <div className="flex items-center justify-end gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => setShowTtsPremiumModal(false)}
-                      className="rounded-lg px-3.5 py-2 text-xs text-text-secondary transition-colors hover:bg-white/[0.07] hover:text-text-primary"
-                    >
-                      Stay on free
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setTtsEngine("elevenlabs");
-                        setVoiceId("eleven_1");
-                        setShowTtsPremiumModal(false);
-                        toast.success("Switched to ElevenLabs premium voice.");
-                      }}
-                      className="rounded-lg bg-amber-400 px-4 py-2 text-xs font-semibold text-black transition-colors hover:bg-amber-300"
-                    >
-                      Use ElevenLabs
-                    </button>
-                  </div>
-                </div>
-              </div>
             )}
 
             <button
               onClick={handleStreamAndSpeak}
               disabled={detectedHistory.length === 0 || isGenerating}
-              className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-accent-secondary text-sm font-semibold text-white transition hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
+              className="flex h-9 w-full items-center justify-center gap-2 rounded-xl bg-accent-secondary text-xs font-semibold text-white transition hover:brightness-110 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40"
             >
               {isGenerating ? (
                 <>
-                  <Loader2 size={15} className="animate-spin" />
+                  <Loader2 size={13} className="animate-spin" />
                   Generating...
                 </>
               ) : isPlayingAudio ? (
                 <>
-                  <Volume2 size={15} className="animate-pulse" />
+                  <Volume2 size={13} className="animate-pulse" />
                   Speaking...
                 </>
               ) : (
                 <>
-                  <Volume2 size={15} />
+                  <Volume2 size={13} />
                   Speak in Bengali
                 </>
               )}
             </button>
           </div>
-        </section>
-
+        </aside>
       </div>
-    </PageContainer>
+
+      {showTtsPremiumModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="flex w-full max-w-md flex-col gap-4 rounded-2xl border border-white/[0.08] bg-surface p-6 shadow-2xl">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-400/15 text-amber-300">
+                <ShieldAlert size={20} />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-text-primary">
+                  Switch to ElevenLabs premium voice?
+                </h3>
+                <span className="text-xs text-text-muted">
+                  Expressive multilingual speech with emotion tags
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2 rounded-xl bg-black/25 p-4 text-xs leading-relaxed text-text-secondary">
+              <p>
+                Speech uses the ElevenLabs eleven_v3 model through your backend
+                ELEVENLABS_API_KEY.
+              </p>
+              <p>Cloud API credits are used for every character generated.</p>
+              <p className="font-medium text-amber-300">
+                There is no automatic fallback. If the key is invalid or the
+                quota runs out, you get an error instead of switching back to
+                free mode.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowTtsPremiumModal(false)}
+                className={softPillBtn}
+              >
+                Stay on free
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setTtsEngine("elevenlabs");
+                  setVoiceId("eleven_1");
+                  setShowTtsPremiumModal(false);
+                  toast.success("Switched to ElevenLabs premium voice.");
+                }}
+                className="rounded-full border border-amber-400/35 bg-amber-400/20 px-4 py-1.5 text-xs font-semibold text-amber-200 transition-colors hover:bg-amber-400/30"
+              >
+                Use ElevenLabs
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

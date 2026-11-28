@@ -20,29 +20,33 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 os.environ["ABSL_MIN_LOG_LEVEL"] = "2"
 logging.getLogger("absl").setLevel(logging.ERROR)
 
+import asyncio
 import difflib
 import json
 import re
+import struct
 import unicodedata
 from pathlib import Path
 
 import cv2
 import numpy as np
 import onnxruntime as ort
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, Response, StreamingResponse
 from pydantic import BaseModel
 
 # Local imports
+import backend.dtw_engine as dtw_engine
 from backend.extract import (
+    MIN_SPAN_FRAMES,
     N_FEATURES,
     N_FRAMES,
     complete_mask_single,
     frame_features,
     frame_in_use,
     process_holistic_frame,
-    select_frames_from_span,
+    raise_state,
 )
 from backend.emotion_engine import detect_emotion_from_frame, emotion_available
 from backend.streaming import (
@@ -308,6 +312,8 @@ class ModelRegistry:
         print(f"[WBSL Backend] Active model: {target['label']} "
               f"({'temporal' if target['temporal'] else 'static'}, "
               f"{len(self.classes)} classes)")
+        dtw_ok = dtw_engine.init_engine(Path(target["path"]).parent, self.classes)
+        print(f"[WBSL Backend] Hybrid DTW+DL v2 engine: {'READY' if dtw_ok else 'ONNX-only fallback'}")
         return {"ok": True, "active": target, "models": self.models}
 
     # ── accessors used by the prediction routes ─────────────
@@ -481,7 +487,9 @@ def health(response: Response):
             "feature_width": active.get("input_width"),
             "feature_kind": "shoulder_box_98",
             "endpoint": active.get("endpoint", "/api/stream/frame"),
+            "ws_endpoint": "/api/stream/ws",
         },
+        "recognition_config": dtw_engine.get_recognition_config(),
         "sequence_coverage": _coverage_summary(),
         "emotion_available": emotion_available(),
     }
@@ -742,61 +750,42 @@ def _span_duration(timestamps):
 
 
 def _recognize_stream_clip(clip, emotion, hands_detected):
-    logits = REGISTRY.session.run(
-        None, {REGISTRY.input_name: clip[np.newaxis].astype(np.float32)}
-    )[0][0]
-    probabilities = np.exp(logits - logits.max())
-    probabilities /= probabilities.sum()
-    order = np.argsort(probabilities)[::-1][:3]
-    top_probability = float(probabilities[order[0]])
-    margin = (
-        float(probabilities[order[0]] - probabilities[order[1]])
-        if len(order) > 1
-        else 1.0
+    res = dtw_engine.hybrid_recognize(
+        clip,
+        REGISTRY.session,
+        REGISTRY.input_name,
+        REGISTRY.active_classes,
     )
     return {
         "ready": True,
-        "label": REGISTRY.active_classes[int(order[0])],
-        "confidence": top_probability,
-        "margin": margin,
+        "label": res["label"],
+        "confidence": res["confidence"],
+        "margin": res["margin"],
         "frames_used": N_FRAMES,
         "state": "IDLE",
         "emotion": emotion,
         "hands_detected": hands_detected,
-        "top3": [
-            {
-                "label": REGISTRY.active_classes[int(index)],
-                "confidence": float(probabilities[index]),
-            }
-            for index in order
-        ],
+        "top3": res["top3"],
+        "flag": res.get("flag"),
+        "low": res.get("low", False),
+        "note": res.get("note", "ok"),
+        "tta_stability": res.get("tta_stability"),
+        "r_best": res.get("r_best"),
+        "dtw_active": res.get("dtw_active", False),
     }
 
 
-@app.post("/api/stream/frame")
-async def stream_frame(
-    session_id: str = "default",
-    file: UploadFile = File(...),
-    mode: str = Form(default="auto"),
-    recording: bool = Form(default=False),
-    capture_time: float | None = Form(default=None),
-):
-    if REGISTRY.session is None:
-        raise HTTPException(409, "No model loaded.")
-    if mode not in {"auto", "manual"}:
-        raise HTTPException(422, "mode must be 'auto' or 'manual'")
-    if capture_time is not None and not math.isfinite(capture_time):
-        raise HTTPException(400, "capture_time must be finite")
-
-    raw = await file.read()
-    fr = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
-    if fr is None:
-        raise HTTPException(400, detail="Could not decode image")
-    sess = get_session(session_id)
+def _process_decoded_frame(
+    sess,
+    fr: np.ndarray,
+    mode: str,
+    recording: bool,
+    timestamp: float,
+) -> dict:
+    """Run v2 landmark extraction, span state machine, and hybrid recognition."""
     if sess.mode != mode:
         sess.reset(mode)
-    timestamp = capture_time if capture_time is not None else time.monotonic()
-    height, width = fr.shape[:2]
+
     emotion = detect_emotion_from_frame(fr)
     frame_data = process_holistic_frame(fr)
     if frame_data is None:
@@ -805,16 +794,22 @@ async def stream_frame(
         features = np.zeros(N_FEATURES, np.float32)
         complete = False
         hands_detected = 0
+        raised_now = False
+        lowered_now = False
     else:
         pose = frame_data["pose"]
-        hands = frame_data["hands"]
+        hands, held_flags = sess.hand_holder(pose, frame_data["hands"])
+        frame_data["hands"] = hands
+        frame_data["held"] = held_flags
         face = frame_data["face"]
-        in_use = frame_in_use(pose, width, height)
-        features = frame_features(pose, hands, face, in_use, width, height, 0.0)
+        w_proc, h_proc = frame_data["W"], frame_data["H"]
+        in_use = frame_data["in_use"]
+        features = frame_features(pose, hands, face, in_use, w_proc, h_proc, 0.0)
         complete = complete_mask_single(
-            pose, hands, frame_data["face_ok"], in_use, width, height
+            pose, hands, frame_data["face_ok"], in_use, w_proc, h_proc
         )
         hands_detected = int(in_use.sum())
+        raised_now, lowered_now = raise_state(pose, w_proc, h_proc)
 
     if mode == "manual":
         if recording:
@@ -840,11 +835,21 @@ async def stream_frame(
                 "hands_detected": hands_detected,
             }
         sess.manual_recording = False
-        clip = select_frames_from_span(sess.features)
+        frames_buf = list(sess.frames)
         duration = _span_duration(sess.timestamps)
         sess.frames = []
         sess.features = []
         sess.timestamps = []
+        if len(frames_buf) < MIN_SPAN_FRAMES:
+            return {
+                "ready": False,
+                "buffered": 0,
+                "state": "IDLE",
+                "detail": "span_too_short",
+                "emotion": emotion,
+                "hands_detected": hands_detected,
+            }
+        clip = dtw_engine.build_clip2(frames_buf, duration, n_tta=4)
         if clip is None:
             return {
                 "ready": False,
@@ -854,25 +859,29 @@ async def stream_frame(
                 "emotion": emotion,
                 "hands_detected": hands_detected,
             }
-        clip[:, -1] = duration
         return _recognize_stream_clip(clip, emotion, hands_detected)
 
-    if frame_data is None:
-        state = update_span_state(
-            sess, False, None, features, False, timestamp
-        )
-    else:
-        state = update_span_state(
-            sess, bool(in_use.any()), frame_data, features, complete, timestamp
-        )
+    state = update_span_state(
+        sess, raised_now, lowered_now, frame_data, features, complete, timestamp
+    )
 
     if state == "SPAN_COMPLETE":
-        clip = select_frames_from_span(sess.features)
+        frames_buf = list(sess.frames)
         duration = _span_duration(sess.timestamps)
         sess.frames = []
         sess.features = []
         sess.timestamps = []
         sess.pre_roll.clear()
+        if len(frames_buf) < MIN_SPAN_FRAMES:
+            return {
+                "ready": False,
+                "buffered": 0,
+                "state": "IDLE",
+                "detail": "span_too_short",
+                "emotion": emotion,
+                "hands_detected": hands_detected,
+            }
+        clip = dtw_engine.build_clip2(frames_buf, duration, n_tta=4)
         if clip is None:
             return {
                 "ready": False,
@@ -882,7 +891,6 @@ async def stream_frame(
                 "emotion": emotion,
                 "hands_detected": hands_detected,
             }
-        clip[:, -1] = duration
         return _recognize_stream_clip(clip, emotion, hands_detected)
 
     return {
@@ -893,6 +901,141 @@ async def stream_frame(
         "emotion": emotion,
         "hands_detected": hands_detected,
     }
+
+
+@app.post("/api/stream/frame")
+async def stream_frame(
+    session_id: str = "default",
+    file: UploadFile = File(...),
+    mode: str = Form(default="auto"),
+    recording: bool = Form(default=False),
+    capture_time: float | None = Form(default=None),
+):
+    if REGISTRY.session is None:
+        raise HTTPException(409, "No model loaded.")
+    if mode not in {"auto", "manual"}:
+        raise HTTPException(422, "mode must be 'auto' or 'manual'")
+    if capture_time is not None and not math.isfinite(capture_time):
+        raise HTTPException(400, "capture_time must be finite")
+
+    raw = await file.read()
+    fr = cv2.imdecode(np.frombuffer(raw, np.uint8), cv2.IMREAD_COLOR)
+    if fr is None:
+        raise HTTPException(400, detail="Could not decode image")
+    sess = get_session(session_id)
+    timestamp = capture_time if capture_time is not None else time.monotonic()
+    return _process_decoded_frame(sess, fr, mode, recording, timestamp)
+
+
+_WS_HEADER_FMT = "<IB3xd"
+_WS_HEADER_SIZE = struct.calcsize(_WS_HEADER_FMT)  # 16 bytes
+
+
+@app.websocket("/api/stream/ws")
+async def stream_ws(websocket: WebSocket, session_id: str = "default"):
+    """Persistent WebSocket stream with bounded latest-frame queue (drops stale frames)."""
+    await websocket.accept()
+    if REGISTRY.session is None:
+        await websocket.close(code=1013, reason="No model loaded.")
+        return
+
+    sess = get_session(session_id)
+    latest_lock = asyncio.Lock()
+    has_frame = asyncio.Event()
+    latest_item: dict | None = None
+    dropped_frames = 0
+    closed = False
+
+    async def receiver():
+        nonlocal latest_item, dropped_frames, closed
+        try:
+            while True:
+                msg = await websocket.receive()
+                if msg.get("type") == "websocket.disconnect":
+                    break
+                data = msg.get("bytes")
+                if not data or len(data) <= _WS_HEADER_SIZE:
+                    continue
+                seq, flags, capture_time = struct.unpack_from(_WS_HEADER_FMT, data, 0)
+                mode = "manual" if (flags & 1) else "auto"
+                recording = bool(flags & 2)
+                if not math.isfinite(capture_time):
+                    capture_time = time.monotonic()
+                jpeg_bytes = data[_WS_HEADER_SIZE:]
+                async with latest_lock:
+                    if latest_item is not None:
+                        dropped_frames += 1
+                    latest_item = {
+                        "seq": seq,
+                        "mode": mode,
+                        "recording": recording,
+                        "capture_time": capture_time,
+                        "jpeg": jpeg_bytes,
+                    }
+                    has_frame.set()
+        except WebSocketDisconnect:
+            pass
+        except Exception:
+            pass
+        finally:
+            closed = True
+            has_frame.set()
+
+    async def processor():
+        nonlocal latest_item
+        ema_proc_dt = 0.05
+        last_done = time.perf_counter()
+        while True:
+            await has_frame.wait()
+            async with latest_lock:
+                item = latest_item
+                latest_item = None
+                has_frame.clear()
+                dropped = dropped_frames
+            if item is None:
+                if closed:
+                    break
+                continue
+
+            def _run_one():
+                fr = cv2.imdecode(
+                    np.frombuffer(item["jpeg"], np.uint8), cv2.IMREAD_COLOR
+                )
+                if fr is None:
+                    return None
+                return _process_decoded_frame(
+                    sess,
+                    fr,
+                    item["mode"],
+                    item["recording"],
+                    item["capture_time"],
+                )
+
+            result = await asyncio.to_thread(_run_one)
+            if result is None:
+                continue
+
+            now = time.perf_counter()
+            dt = now - last_done
+            last_done = now
+            if 0.0 < dt < 2.0:
+                ema_proc_dt = 0.85 * ema_proc_dt + 0.15 * dt
+            result["seq"] = item["seq"]
+            result["process_fps"] = round(1.0 / max(ema_proc_dt, 1e-4), 1)
+            result["dropped_frames"] = dropped
+            try:
+                await websocket.send_json(result)
+            except Exception:
+                break
+
+    recv_task = asyncio.create_task(receiver())
+    proc_task = asyncio.create_task(processor())
+    try:
+        await asyncio.gather(recv_task, proc_task)
+    finally:
+        for t in (recv_task, proc_task):
+            if not t.done():
+                t.cancel()
 
 
 @app.get("/api/coverage")
